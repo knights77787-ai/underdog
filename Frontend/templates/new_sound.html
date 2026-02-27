@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>새로운 소리 등록</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='css/new_sound.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Lumen</div>
+
+    <nav class="tabs">
+      <a class="tab active" href="/new-sound">새로운 소리 등록</a>
+      <a class="tab" href="/my-sounds">내가 등록한 소리 목록</a>
+    </nav>
+
+    <div class="user">
+      <button id="userMenuBtn" class="user-btn" type="button" aria-haspopup="true" aria-expanded="false">
+        <span class="user-name">사용자 이름</span>
+        <span class="user-icon" aria-hidden="true"><i class="fa-solid fa-user"></i></span>
+      </button>
+
+      <div id="userMenu" class="user-menu" role="menu" aria-hidden="true">
+        <a href="#" role="menuitem">소리등록</a>
+        <a href="#" role="menuitem">설정</a>
+        <a href="#" role="menuitem">로그아웃</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h1 class="title">새로운 소리 등록</h1>
+      <p class="desc">마이크로 녹음하거나, 이미 녹음된 파일(mp3/wav/webm 등)을 업로드하세요.</p>
+
+      <!-- 녹음패널 -->
+      <div class="record-panel">
+        <div class="wave">
+          <div class="wave-dot" id="recDot" aria-hidden="true"></div>
+          <div class="wave-bars" aria-hidden="true">
+            <!-- 가짜 바 녹음용 -->
+            <span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+        </div>
+
+        <div class="controls">
+          <button id="btnStart" class="btn primary" type="button">● 녹음</button>
+          <button id="btnStop" class="btn" type="button" disabled>■ 정지</button>
+          <button id="btnPlay" class="btn" type="button" disabled>▶ 재생</button>
+
+          <div class="timer" id="timer">00:00</div>
+        </div>
+
+        <audio id="audioPreview" controls class="audio" hidden></audio>
+
+        <div class="hint">
+          * 녹음 후 “재생”으로 확인할 수 있어요. 업로드 파일을 선택하면 녹음 파일 대신 업로드 파일이 사용됩니다.
+        </div>
+      </div>
+
+        <!-- 업로드 -->
+      <div class="row">
+        <label class="label" for="fileInput">녹음 파일 업로드 (파일 형식: mp3, wav, webm 등)</label>
+        <input id="fileInput" class="input" type="file" accept=".mp3,.wav,.webm,audio/*">
+        <div class="meta" id="fileMeta">선택된 파일 없음</div>
+      </div>
+
+        <!-- 소리이름 -->
+      <div class="row">
+        <label class="label" for="soundName">소리 이름</label>
+        <input type="text" id="soundName" class="input"  placeholder="예: 현관문 초인종, 전자레인지 완료음" maxlength="40">
+      </div>
+
+      <!-- 분류 -->
+      <div class="row">
+        <label class="label" for="soundCategory">소리 분류</label>
+        <select id="soundCategory" class="select">
+          <option value="" selected disabled>분류를 선택하세요</option>
+          <option value="danger">위험</option>
+          <option value="alert">생활알림</option>
+        </select>
+      </div>
+
+      <div class="actions">
+        <button id="btnSubmit" class="btn primary" type="button">다음</button>
+        <div class="status" id="status"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', path='js/new_sound.js') }}"></script>
+</body>
+</html>
