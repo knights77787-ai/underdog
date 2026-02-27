@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+  <body>
+    <h3>WebSocket Test</h3>
+    <button id="connect">Connect</button>
+    <button id="send">Send caption</button>
+    <pre id="log"></pre>
+
+    <script>
+      let ws;
+      const logEl = document.getElementById("log");
+      const log = (m) => (logEl.textContent += m + "\n");
+
+      document.getElementById("connect").onclick = () => {
+        ws = new WebSocket("ws://127.0.0.1:8000/ws");
+
+        ws.onopen = () => {
+          log("✅ connected");
+          ws.send(JSON.stringify({ type: "join", session_id: "S1" })); // ✅ 여기!
+        };
+
+        ws.onclose = () => log("❌ closed");
+        ws.onerror = () => log("⚠ error");
+        ws.onmessage = (e) => log("⬅ " + e.data);
+      };
+     
+
+      document.getElementById("send").onclick = () => {
+        const payload = {
+          type: "caption",
+          session_id: "S1",
+          text: "불이야 도와줘 테스트",
+          ts: Date.now()
+        };
+        ws.send(JSON.stringify(payload));
+        log("➡ " + JSON.stringify(payload));
+      };
+      
+    </script>
+  </body>
+</html>

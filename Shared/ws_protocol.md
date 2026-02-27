@@ -1,0 +1,1 @@
+# hello/caption/alert 필드 정의

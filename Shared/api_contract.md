@@ -1,0 +1,1 @@
+# /logs /settings 등 REST 응답 규격

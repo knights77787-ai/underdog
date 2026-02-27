@@ -1,0 +1,7 @@
+{
+  "keyword_cooldown_seconds": 5,
+  "keywords_by_event_type": {
+    "danger": ["불", "비상", "살려"],
+    "alert": ["도와", "안내", "방송"]
+  }
+}
