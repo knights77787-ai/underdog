@@ -65,7 +65,12 @@ def get_logs_from_db(
     session_id: str | None = None,
     since_ts_ms: int | None = None,
     until_ts_ms: int | None = None,
-) -> list[dict]:
+) -> dict:
+    """스크롤(커서) 조회: 최신순 limit+1건 조회해 has_more 판단 후 limit건만 반환.
+
+    Returns:
+        {"items": [...], "next_until_ts_ms": int | None, "has_more": bool}
+    """
     q = (
         db.query(Event)
         .options(joinedload(Event.session), joinedload(Event.transcripts))
@@ -81,7 +86,11 @@ def get_logs_from_db(
     elif log_type == "alert":
         q = q.filter(Event.event_type.in_(["danger", "alert"]))
 
-    events = q.order_by(desc(Event.segment_start_ms)).limit(limit).all()
+    events = q.order_by(desc(Event.segment_start_ms)).limit(limit + 1).all()
+    has_more = len(events) > limit
+    if has_more:
+        events = events[:limit]
+
     out: list[dict] = []
     for event in events:
         ts_ms = _ts_ms_from_event(event)
@@ -98,7 +107,9 @@ def get_logs_from_db(
                 "text": text,
                 "ts_ms": ts_ms,
             })
-    return out
+
+    next_until_ts_ms = out[-1]["ts_ms"] if out else None
+    return {"items": out, "next_until_ts_ms": next_until_ts_ms, "has_more": has_more}
 
 
 def get_admin_summary_from_db(

@@ -23,12 +23,13 @@ def get_logs(
     until_ts_ms: Optional[int] = Query(None, description="이 값 이하 ts_ms만 (상한)"),
 ):
     limit = min(limit, MAX_LOG_LIMIT)
-    items = crud_events.get_logs_from_db(
+    result = crud_events.get_logs_from_db(
         db, log_type=type, limit=limit,
         session_id=session_id,
         since_ts_ms=since_ts_ms,
         until_ts_ms=until_ts_ms,
     )
+    items = result["items"]
     return {
         "ok": True,
         "type": type,
@@ -36,4 +37,6 @@ def get_logs(
         "limit": limit,
         "count": len(items),
         "data": items,
+        "next_until_ts_ms": result["next_until_ts_ms"],
+        "has_more": result["has_more"],
     }
