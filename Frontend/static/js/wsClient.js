@@ -1,10 +1,16 @@
 /**
+ * Frontend/static/js/wsClient.js
  * 단일 사용자 기준 WS 클라이언트
  * - connect(): 연결
  * - disconnect(): 끊기
  * - send(type, payload): 서버로 JSON 전송
  * - on(type, handler): 서버에서 특정 type 메시지 수신
  */
+
+const API_BASE = "http://127.0.0.1:8000";
+const WS_BASE  = "ws://127.0.0.1:8000";
+
+
 window.WSClient = class WSClient {
   constructor(url) {
     this.url = url;
