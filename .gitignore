@@ -1,2 +1,7 @@
 .env
 README.md
+activate_venv.bat
+jupyter_kclass.bat
+__pycache__/
+*.py[cod]
+*$py.class
