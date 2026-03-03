@@ -66,3 +66,31 @@
   }
 }
 ```
+
+---
+
+## POST /feedback
+
+이벤트 피드백 저장. Body: `event_id`, `vote`(up|down), `comment`(선택), `client_session_uuid`(선택).
+
+### 요청 예시
+
+```json
+{
+  "event_id": 1,
+  "vote": "up",
+  "comment": "정확해요",
+  "client_session_uuid": "sess-abc"
+}
+```
+
+### 응답 예시
+
+```json
+{
+  "ok": true,
+  "feedback_id": 1,
+  "event_id": 1,
+  "vote": "up"
+}
+```
