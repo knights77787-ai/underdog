@@ -1,7 +1,7 @@
 """ERD 기준 테이블 모델 (underdog_2.erd)."""
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -32,6 +32,22 @@ class Session(Base):
     end_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     events: Mapped[list["Event"]] = relationship("Event", back_populates="session")
+    # 1세션=1설정 (settings 테이블과 1:1)
+    settings: Mapped["SettingsModel | None"] = relationship(
+        "SettingsModel", back_populates="session", uselist=False, cascade="all, delete-orphan"
+    )
+
+
+class SettingsModel(Base):
+    """세션별 설정 1건. sessions.session_id와 1:1."""
+    __tablename__ = "settings"
+    __table_args__ = (UniqueConstraint("session_id", name="uq_settings_session_id"),)  # 1세션=1설정
+
+    settings_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[int] = mapped_column(Integer, ForeignKey("sessions.session_id"), nullable=False)
+    data_json: Mapped[str] = mapped_column(Text, nullable=False)  # 설정값 JSON 문자열
+
+    session: Mapped["Session"] = relationship("Session", back_populates="settings")
 
 
 class CustomSound(Base):

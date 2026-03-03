@@ -80,13 +80,15 @@ def get_logs_from_db(
     if since_ts_ms is not None:
         q = q.filter(Event.segment_start_ms >= since_ts_ms)
     if until_ts_ms is not None:
-        q = q.filter(Event.segment_start_ms <= until_ts_ms)
+        # 커서 기준: until_ts_ms \"미만\"만 가져와서 이전 페이지와 중복 방지
+        q = q.filter(Event.segment_start_ms < until_ts_ms)
     if log_type == "caption":
         q = q.filter(Event.event_type == "pass")
     elif log_type == "alert":
         q = q.filter(Event.event_type.in_(["danger", "alert"]))
 
-    events = q.order_by(desc(Event.segment_start_ms)).limit(limit + 1).all()
+    # 정렬: ts_ms 내림차순 + event_id 내림차순(tie-breaker)으로 커서 안정성 확보
+    events = q.order_by(desc(Event.segment_start_ms), desc(Event.event_id)).limit(limit + 1).all()
     has_more = len(events) > limit
     if has_more:
         events = events[:limit]
