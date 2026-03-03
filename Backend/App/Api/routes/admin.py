@@ -36,10 +36,18 @@ def get_recent_alerts(
     since_ts_ms: Optional[int] = Query(None),
     until_ts_ms: Optional[int] = Query(None),
 ):
-    items = crud_events.get_logs_from_db(
+    result = crud_events.get_logs_from_db(
         db, log_type="alert", limit=limit,
         session_id=session_id,
         since_ts_ms=since_ts_ms,
         until_ts_ms=until_ts_ms,
     )
-    return {"ok": True, "limit": limit, "count": len(items), "data": items}
+    items = result["items"]
+    return {
+        "ok": True,
+        "limit": limit,
+        "count": len(items),
+        "data": items,
+        "next_until_ts_ms": result["next_until_ts_ms"],
+        "has_more": result["has_more"],
+    }
