@@ -1,4 +1,4 @@
-/**
+/** WS + REST
  * 단일 사용자 기준 WS 클라이언트
  * - connect(): 연결
  * - disconnect(): 끊기
