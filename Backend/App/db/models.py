@@ -1,7 +1,7 @@
 """ERD 기준 테이블 모델 (underdog_2.erd)."""
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -55,12 +55,34 @@ class CustomSound(Base):
 
     custom_sound_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.user_id"), nullable=True)
+    client_session_uuid: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    group_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    group_type: Mapped[str | None] = mapped_column(String(32), nullable=True)  # "warning" | "daily"
+    event_type: Mapped[str | None] = mapped_column(String(32), nullable=True)  # "danger" | "alert"
     match_target: Mapped[str | None] = mapped_column(String(255), nullable=True)
     audio_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    embed_dim: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    embed_blob: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class CustomPhraseAudio(Base):
+    __tablename__ = "custom_phrase_audio"
+
+    custom_phrase_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    client_session_uuid: Mapped[str] = mapped_column(String(64), index=True)
+
+    name: Mapped[str] = mapped_column(String(255))
+    event_type: Mapped[str] = mapped_column(String(16))  # "alert" | "danger"
+    threshold_pct: Mapped[int] = mapped_column(Integer, default=80)  # 80 => 0.80
+
+    audio_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+
+    embed_dim: Mapped[int] = mapped_column(Integer)
+    embed_blob: Mapped[bytes] = mapped_column(LargeBinary)  # float32 bytes
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 class Event(Base):
@@ -100,11 +122,14 @@ class EventTranscript(Base):
 
 class EventFeedback(Base):
     __tablename__ = "event_feedback"
+    __table_args__ = (
+        UniqueConstraint("event_id", "client_session_uuid", name="uq_feedback_event_session"),
+    )
 
     feedback_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    event_id: Mapped[int] = mapped_column(ForeignKey("events.event_id"))
+    event_id: Mapped[int] = mapped_column(ForeignKey("events.event_id"), nullable=False)
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.user_id"), nullable=True)
-    client_session_uuid: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    vote: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    client_session_uuid: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    vote: Mapped[str] = mapped_column(String(8), nullable=False)  # "up" | "down"
     comment: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

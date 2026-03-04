@@ -16,7 +16,11 @@ def get_or_create_by_client_uuid(db: Session, client_session_uuid: str) -> Sessi
     if row is not None:
         return row
     row = SessionModel(client_session_uuid=client_session_uuid)
-    db.add(row)
-    db.commit()
-    db.refresh(row)
+    try:
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+    except Exception:
+        db.rollback()
+        raise
     return row

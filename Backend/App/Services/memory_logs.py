@@ -16,12 +16,12 @@ def _now_ms() -> int:
     return int(time() * 1000)
 
 
-def append_caption(session_id: str, text: str) -> dict:
+def append_caption(session_id: str, text: str, ts_ms: int | None = None) -> dict:
     entry = {
         "type": "caption",
         "session_id": session_id,
         "text": text,
-        "ts_ms": _now_ms(),
+        "ts_ms": ts_ms if ts_ms is not None else _now_ms(),
     }
     captions_log.append(entry)
     return entry
@@ -32,14 +32,22 @@ def append_alert(
     text: str,
     keyword: str,
     event_type: str,
+    category: str,
+    score: float,
+    ts_ms: int | None = None,
+    source: str = "text",
 ) -> dict:
+    """source: 'text'(키워드) | 'audio'(YAMNet) | 'demo'(데모 트리거)."""
     entry = {
         "type": "alert",
+        "source": source,
+        "category": category,
         "event_type": event_type,
         "keyword": keyword,
-        "session_id": session_id,
         "text": text,
-        "ts_ms": _now_ms(),
+        "session_id": session_id,
+        "ts_ms": ts_ms if ts_ms is not None else _now_ms(),
+        "score": score,
     }
     alerts_log.append(entry)
     return entry

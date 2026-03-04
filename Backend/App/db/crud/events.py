@@ -17,6 +17,17 @@ def _ts_ms_from_event(e: Event) -> int:
     return int(e.created_at.timestamp() * 1000) if e.created_at else 0
 
 
+def _source_from_keyword(keyword: str | None) -> str:
+    """keyword 접두어로 alert.source 추론 (DB에는 source 컬럼 없음)."""
+    if not keyword:
+        return "text"
+    if keyword.startswith("demo:"):
+        return "demo"
+    if keyword.startswith("yamnet:"):
+        return "audio"
+    return "text"
+
+
 def create_caption_event(
     db: Session,
     client_session_uuid: str,
@@ -25,13 +36,16 @@ def create_caption_event(
 ) -> int:
     sess = crud_sessions.get_or_create_by_client_uuid(db, client_session_uuid)
     event = Event(session_id=sess.session_id, event_type="pass", segment_start_ms=ts_ms)
-    db.add(event)
-    db.flush()  # event_id 할당 (commit 전)
-    transcript = EventTranscript(event_id=event.event_id, text=text)
-    db.add(transcript)
-    db.commit()
-    db.refresh(event)
-    return event.event_id
+    try:
+        db.add(event)
+        db.flush()  # event_id 할당 (commit 전)
+        transcript = EventTranscript(event_id=event.event_id, text=text)
+        db.add(transcript)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return event.event_id  # flush() 후 이미 채워짐, refresh 불필요
 
 
 def create_alert_event(
@@ -49,13 +63,16 @@ def create_alert_event(
         keyword=keyword,
         segment_start_ms=ts_ms,
     )
-    db.add(event)
-    db.flush()  # event_id 할당 (commit 전)
-    transcript = EventTranscript(event_id=event.event_id, text=text)
-    db.add(transcript)
-    db.commit()
-    db.refresh(event)
-    return event.event_id
+    try:
+        db.add(event)
+        db.flush()  # event_id 할당 (commit 전)
+        transcript = EventTranscript(event_id=event.event_id, text=text)
+        db.add(transcript)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return event.event_id  # flush() 후 이미 채워짐, refresh 불필요
 
 
 def get_logs_from_db(
@@ -99,10 +116,18 @@ def get_logs_from_db(
         client_uuid = event.session.client_session_uuid if event.session else None
         text = event.transcripts[0].text if event.transcripts else ""
         if event.event_type == "pass":
-            out.append({"type": "caption", "session_id": client_uuid, "text": text, "ts_ms": ts_ms})
+            out.append({
+                "type": "caption",
+                "event_id": event.event_id,
+                "session_id": client_uuid,
+                "text": text,
+                "ts_ms": ts_ms,
+            })
         else:
             out.append({
                 "type": "alert",
+                "event_id": event.event_id,
+                "source": _source_from_keyword(event.keyword),
                 "event_type": event.event_type,
                 "keyword": event.keyword or "",
                 "session_id": client_uuid,
@@ -154,9 +179,17 @@ def get_admin_summary_from_db(
         text = e.transcripts[0].text if e.transcripts else ""
         client_uuid = e.session.client_session_uuid if e.session else None
         if e.event_type == "pass":
-            return {"type": "caption", "session_id": client_uuid, "text": text, "ts_ms": _ts_ms_from_event(e)}
+            return {
+                "type": "caption",
+                "event_id": e.event_id,
+                "session_id": client_uuid,
+                "text": text,
+                "ts_ms": _ts_ms_from_event(e),
+            }
         return {
             "type": "alert",
+            "event_id": e.event_id,
+            "source": _source_from_keyword(e.keyword),
             "event_type": e.event_type,
             "keyword": e.keyword or "",
             "session_id": client_uuid,

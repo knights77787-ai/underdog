@@ -34,6 +34,9 @@ def get_settings(db: Session, client_session_uuid: str) -> dict:
             # session_id 유니크라서 동시에 2번 생성 시도할 때를 대비한 레이스 방어
             db.rollback()
             row = db.query(SettingsModel).filter(SettingsModel.session_id == sid).first()
+        except Exception:
+            db.rollback()
+            raise
     return json.loads(row.data_json)
 
 
@@ -53,6 +56,10 @@ def upsert_settings(db: Session, client_session_uuid: str, patch: dict) -> dict:
         db.add(row)
     else:
         row.data_json = data_json
-    db.commit()
-    db.refresh(row)
+    try:
+        db.commit()
+        db.refresh(row)
+    except Exception:
+        db.rollback()
+        raise
     return json.loads(row.data_json)

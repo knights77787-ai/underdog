@@ -1,4 +1,10 @@
 fastapi>=0.109.0
+numpy>=1.24.0
+openai-whisper>=20231117
+python-dotenv>=1.0.0
+silero-vad>=4.0.0
+torch>=1.12.0
 uvicorn[standard]>=0.27.0
 websockets>=12.0
 sqlalchemy>=2.0.0
+alembic>=1.13.0
