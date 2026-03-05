@@ -34,16 +34,17 @@ load_dotenv()  # .env 에서 ADMIN_TOKEN 등 로드
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
-    setup_logging(log_level)
-    create_tables()
+    setup_logging(log_level)  # 서버가 무슨일을 했는지 콘솔/파일에 기록 남기는것
+    create_tables()     # 서버 켤 때 한번 '없으면 생성' 을 해두는 안전장치.
     get_logger("app").info(
         "app_started level=%s db=%s", log_level, DATABASE_PATH
-    )
+    )   # 서버가 정상 기동됐는지 확인하는 최초신호
 
-    # 오디오 분류(Yamnet) worker: 비말 1초 윈도우 → AUDIOCLS_QUEUE → 분류/alert
-    # 검증: 1) 서버 기동 시 yamnet_worker_started 로그 2) 비말 상태에서 환경음 재생
+    # 오디오 분류(Yamnet) worker: 비언어 1초 윈도우 → AUDIOCLS_QUEUE → 분류/alert
+    # 검증: 1) 서버 기동 시 yamnet_worker_started 로그 2) 비언어 상태에서 환경음 재생
     #       3) 콘솔에 YAMNET top=... score=... mapped=... 4) 매핑되면 /admin/alerts 에 source:"audio" 적재
-    reload_audio_rules()
+    reload_audio_rules()  
+
     async def _broadcast_yamnet(sid: str, entry: dict) -> None:
         await manager.broadcast_to_session(sid, entry)
 
