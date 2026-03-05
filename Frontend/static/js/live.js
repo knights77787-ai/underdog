@@ -1,8 +1,9 @@
 // Frontend/static/js/live.js
 // =======================
-// 0) 서버 주소
+// 0) 서버 주소 · 세션 (백엔드 연동: join 시 사용)
 // =======================
 const WS_URL = "ws://127.0.0.1:8000/ws";
+const SESSION_ID = "S1"; // 라이브 화면에서 쓸 세션 ID (설정/로그 API와 맞추면 됨)
 
 // =======================
 // 1) DOM
@@ -50,6 +51,12 @@ function nowTS() {
   return new Date().toTimeString().slice(0, 8);
 }
 
+function formatTs(tsMs) {
+  if (tsMs == null) return nowTS();
+  const d = new Date(Number(tsMs));
+  return isNaN(d.getTime()) ? nowTS() : d.toTimeString().slice(0, 8);
+}
+
 function isDanger(text) {
   return ["불", "도와", "살려", "화재", "위험"].some(k => (text || "").includes(k));
 }
@@ -66,14 +73,15 @@ function appendCaption(text, danger=false) {
   }
 }
 
-function appendLogRow({ ts, type, text, score, event_type, keyword }) {
+function appendLogRow({ ts, ts_ms, type, text, score, event_type, keyword }) {
   const tr = document.createElement("tr");
   const kind = (type === "alert") ? "경고" : "자막";
   const prob = (typeof score === "number") ? `${Math.round(score * 100)}%` : "-";
   const extra = keyword ? ` [${keyword}]` : "";
+  const timeStr = formatTs(ts_ms ?? ts);
 
   tr.innerHTML = `
-    <td>${ts || nowTS()}</td>
+    <td>${timeStr}</td>
     <td>${kind}</td>
     <td>${text}${extra}${event_type ? ` (${event_type})` : ""}</td>
     <td>${prob}</td>
@@ -141,6 +149,9 @@ client.on("open", () => {
   btnConnect.disabled = true;
   btnDisconnect.disabled = false;
 
+  // 백엔드는 join을 받아야 이 세션으로 caption/alert를 보냄
+  client.send("join", { session_id: SESSION_ID });
+
   btnSendCaption.disabled = false;
   btnFeedbackYes.disabled = false;
   btnFeedbackNo.disabled = false;
@@ -159,13 +170,13 @@ client.on("close", () => {
   btnFeedbackNo.disabled = true;
 });
 
-// 서버가 caption 보내면
+// 서버가 caption 보내면 (백엔드는 ts_ms 필드 사용)
 client.on("caption", (msg) => {
   const text = msg.text || "";
   const danger = isDanger(text);
 
   appendCaption(text, danger);
-  appendLogRow({ ts: msg.ts, type: "caption", text, score: msg.score });
+  appendLogRow({ ts_ms: msg.ts_ms, ts: msg.ts, type: "caption", text, score: msg.score });
 
   if (danger) {
     setHeroDanger(text);
@@ -173,14 +184,14 @@ client.on("caption", (msg) => {
   }
 });
 
-// 서버가 alert 보내면
+// 서버가 alert 보내면 (백엔드는 ts_ms 필드 사용)
 client.on("alert", (msg) => {
   const text = msg.text || "";
   const keyword = msg.keyword || "";
   const event_type = msg.event_type || "danger";
 
   appendCaption(`[ALERT] ${text}`, true);
-  appendLogRow({ ts: msg.ts, type: "alert", text, keyword, event_type, score: msg.score });
+  appendLogRow({ ts_ms: msg.ts_ms, ts: msg.ts, type: "alert", text, keyword, event_type, score: msg.score });
 
   setHeroDanger(`${keyword ? "["+keyword+"] " : ""}${text}`);
   showToast("알림", `${keyword ? "["+keyword+"] " : ""}${text}`, true);

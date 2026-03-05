@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 
 from App.Api.routes.admin import router as admin_router
+from App.Api.routes.auth import router as auth_router
 from App.Api.routes.feedback import router as feedback_router
 from App.Api.routes.health import router as health_router
 from App.Api.routes.custom_phrase_audio import router as custom_phrase_audio_router
@@ -106,6 +107,7 @@ app.include_router(logs_router)
 app.include_router(admin_router)
 app.include_router(feedback_router)
 app.include_router(settings_router)
+app.include_router(auth_router)
 
 # WebSocket 라우트 등록
 app.include_router(ws_router)

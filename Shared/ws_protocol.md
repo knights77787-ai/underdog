@@ -13,7 +13,7 @@
 - **수신 메시지:**  
   - **caption** — Whisper(STT) 결과(자막)  
   - **alert** — 키워드/환경음/데모 알림 (`keyword`, `event_type`, `source` 등)
-- **alert.source:** `"text"`(또는 없음, 키워드 감지), `"audio"`(YAMNet 환경음), `"demo"`(데모 트리거)
+- **alert.source:** `"text"`(또는 없음, 키워드 감지), `"audio"`(YAMNet 환경음), `"custom_phrase"`(Whisper 커스텀 구문), `"demo"`(데모 트리거)
 
 ---
 

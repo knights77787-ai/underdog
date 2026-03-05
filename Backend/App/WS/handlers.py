@@ -308,10 +308,10 @@ async def handle_message(
                                         text_phrase,
                                         kw_phrase,
                                         best_phrase.event_type,
-                                        \"warning\",
+                                        "warning",
                                         float(sim),
                                         ts_ms=ts_ms,
-                                        source=\"text\",
+                                        source="custom_phrase",
                                     )
                                     await asyncio.to_thread(
                                         _persist_alert,

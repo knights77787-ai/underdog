@@ -1,4 +1,8 @@
 // Frontend/static/js/new_sound.js
+// 백엔드 연동: POST /custom-sounds (session_id, name, group_type, event_type, file=.wav)
+const API_BASE = "http://127.0.0.1:8000";
+const SESSION_ID = "S1";
+
 // ====== user menu ======
 const userMenuBtn = document.getElementById("userMenuBtn");
 const userMenu = document.getElementById("userMenu");
@@ -189,30 +193,32 @@ btnSubmit.addEventListener("click", async () => {
   if (!name) return setStatus("소리 이름을 입력하세요.", "err");
   if (!cat) return setStatus("소리 분류를 선택하세요.", "err");
 
-  // 우선순위: 업로드 파일 > 녹음 파일
   const uploadFile = fileInput.files && fileInput.files[0];
   const hasRecorded = !!recordedBlob;
 
-  if (!uploadFile && !hasRecorded) {
-    return setStatus("녹음하거나 파일을 업로드하세요.", "err");
+  // 백엔드는 .wav만 지원
+  if (uploadFile && !uploadFile.name.toLowerCase().endsWith(".wav")) {
+    return setStatus("서버는 .wav 파일만 지원합니다. WAV 파일을 선택해 주세요.", "err");
+  }
+  if (hasRecorded && !uploadFile) {
+    return setStatus("서버는 .wav만 지원합니다. WAV 파일을 업로드해 주세요.", "err");
+  }
+  if (!uploadFile) {
+    return setStatus("WAV 파일을 업로드하세요.", "err");
   }
 
   const form = new FormData();
-  form.append("sound_name", name);
-  form.append("sound_category", cat);
-
-  if (uploadFile) {
-    form.append("audio_file", uploadFile, uploadFile.name);
-  } else {
-    // 파일명은 webm으로 저장
-    form.append("audio_file", recordedBlob, "recorded.webm");
-  }
+  form.append("name", name);
+  form.append("group_type", cat === "danger" ? "warning" : "daily");
+  form.append("event_type", cat === "danger" ? "danger" : "alert");
+  form.append("file", uploadFile, uploadFile.name);
 
   btnSubmit.disabled = true;
   setStatus("업로드 중...", "");
 
   try {
-    const res = await fetch("/api/sounds", {
+    const url = `${API_BASE}/custom-sounds?session_id=${encodeURIComponent(SESSION_ID)}`;
+    const res = await fetch(url, {
       method: "POST",
       body: form,
     });
@@ -223,13 +229,11 @@ btnSubmit.addEventListener("click", async () => {
     }
 
     const data = await res.json();
-    setStatus(`저장 완료: #${data.sound_id} (다음 단계로 이동 가능)`, "ok");
-
-    // TODO: 실제로는 학습 페이지로 이동
-    // location.href = `/train?sound_id=${data.sound_id}`;
+    const id = data.data && data.data.custom_sound_id != null ? data.data.custom_sound_id : data.sound_id;
+    setStatus(`저장 완료${id != null ? ": #" + id : ""}`, "ok");
   } catch (err) {
     console.error(err);
-    setStatus("저장 실패. 서버 실행/라우트(/api/sounds) 확인 필요", "err");
+    setStatus("저장 실패. 백엔드 주소(" + API_BASE + ") 및 CORS 확인.", "err");
   } finally {
     btnSubmit.disabled = false;
   }

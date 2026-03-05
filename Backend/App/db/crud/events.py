@@ -25,6 +25,8 @@ def _source_from_keyword(keyword: str | None) -> str:
         return "demo"
     if keyword.startswith("yamnet:"):
         return "audio"
+    if keyword.startswith("phrase:"):
+        return "custom_phrase"
     return "text"
 
 
