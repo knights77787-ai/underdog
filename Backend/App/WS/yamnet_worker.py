@@ -49,9 +49,11 @@ class YamnetWorker:
 
                 record_alert_ts(sid, keyword2, event_type, ts_ms)
 
-                # DB 저장(텍스트는 요약)
+                # DB 저장(텍스트는 요약) → event_id 반환받아 WS에 포함 (프론트 피드백용)
                 text = f"AudioIndex:{top_i} ({top_score:.2f})"
-                await asyncio.to_thread(_persist_alert, sid, text, keyword2, event_type, ts_ms)
+                event_id = await asyncio.to_thread(
+                    _persist_alert, sid, text, keyword2, event_type, ts_ms
+                )
 
                 # WS 브로드캐스트
                 if alert_enabled:
@@ -66,6 +68,8 @@ class YamnetWorker:
                         "session_id": sid,
                         "ts_ms": ts_ms,
                     }
+                    if event_id is not None:
+                        entry["event_id"] = event_id
                     await manager.broadcast_to_session(sid, entry)
 
             except Exception:

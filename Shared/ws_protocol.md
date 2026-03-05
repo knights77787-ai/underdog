@@ -130,6 +130,7 @@
 ```json
 {
   "type": "alert",
+  "event_id": 42,
   "category": "warning",
   "event_type": "danger",
   "keyword": "불",
@@ -143,6 +144,7 @@
 | 필드 | 의미 |
 |------|------|
 | `type` | 메시지 종류. `"alert"` = 알림 한 건 |
+| `event_id` | DB 이벤트 ID. **POST /feedback** 호출 시 `event_id`로 사용 (필수) |
 | `source` | (선택) `"text"`(키워드, 또는 없음), `"audio"`(YAMNet 환경음), `"demo"`(데모 트리거) |
 | `category` | `"warning"`(경고) 또는 `"daily"`(일상). daily/warning 구분용 |
 | `event_type` | `"danger"`(경고), `"alert"`(일상 알림), `"info"`(저장만, WS에는 안 나옴) |

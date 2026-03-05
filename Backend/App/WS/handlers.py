@@ -110,15 +110,17 @@ def _persist_alert(
     keyword: str | None,
     event_type: str,
     ts_ms: int,
-) -> None:
+) -> int | None:
+    """alert 이벤트 DB 저장. 성공 시 event_id 반환 (WS 브로드캐스트용)."""
     from App.db.crud import events as crud_events
     from App.db.database import SessionLocal
 
     db = SessionLocal()
     try:
-        crud_events.create_alert_event(
+        event_id = crud_events.create_alert_event(
             db, client_session_uuid, text, keyword or "", event_type, ts_ms
         )
+        return event_id
     except Exception:
         db.rollback()
         persist_logger.exception(
@@ -171,12 +173,14 @@ async def _handle_caption_generated(
             f"{conn_prefix}alert_skipped reason=cooldown session_id={sid} keyword={keyword or ''} event_type={event_type}"
         )
         return
-    # 5) alert 저장 + (가능하면) WS 발행
+    # 5) alert 저장 + (가능하면) WS 발행 (event_id 포함해 프론트 피드백용)
     _last_alert_ts_by_key[(sid, keyword or "", event_type)] = ts_ms
     entry = memory_logs.append_alert(
         sid, text, keyword or "", event_type, category, score, ts_ms=ts_ms, source="text"
     )
-    await asyncio.to_thread(_persist_alert, sid, text, keyword, event_type, ts_ms)
+    event_id = await asyncio.to_thread(_persist_alert, sid, text, keyword, event_type, ts_ms)
+    if event_id is not None:
+        entry["event_id"] = event_id
     if alert_enabled:
         await manager.broadcast_to_session(sid, entry)
         logger.info(
@@ -295,12 +299,12 @@ async def handle_message(
                                 settings = await asyncio.to_thread(_get_settings, sid)
                                 cooldown_sec = int(settings.get("cooldown_sec", 5))
                                 alert_enabled = bool(settings.get("alert_enabled", True))
-                                kw_phrase = f\"phrase:{best_phrase.custom_phrase_id}\"
+                                kw_phrase = f"phrase:{best_phrase.custom_phrase_id}"
                                 if not _is_in_cooldown(
                                     sid, kw_phrase, best_phrase.event_type, cooldown_sec, ts_ms
                                 ):
                                     text_phrase = (
-                                        f\"CustomPhraseAudio:{best_phrase.name} (sim={sim:.2f})\"
+                                        f"CustomPhraseAudio:{best_phrase.name} (sim={sim:.2f})"
                                     )
                                     _last_alert_ts_by_key[(sid, kw_phrase, best_phrase.event_type)] = ts_ms
                                     entry_p = memory_logs.append_alert(
@@ -313,7 +317,7 @@ async def handle_message(
                                         ts_ms=ts_ms,
                                         source="custom_phrase",
                                     )
-                                    await asyncio.to_thread(
+                                    event_id = await asyncio.to_thread(
                                         _persist_alert,
                                         sid,
                                         text_phrase,
@@ -321,10 +325,12 @@ async def handle_message(
                                         best_phrase.event_type,
                                         ts_ms,
                                     )
+                                    if event_id is not None:
+                                        entry_p["event_id"] = event_id
                                     if alert_enabled:
                                         await manager.broadcast_to_session(sid, entry_p)
                                         audio_logger.info(
-                                            \"%s PHRASE_ALERT_EMITTED sid=%s phrase_id=%s sim=%.2f\",
+                                            "%s PHRASE_ALERT_EMITTED sid=%s phrase_id=%s sim=%.2f",
                                             conn_prefix,
                                             sid,
                                             best_phrase.custom_phrase_id,

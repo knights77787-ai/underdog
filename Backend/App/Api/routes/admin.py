@@ -232,7 +232,7 @@ async def admin_demo_emit(
     """데모 트리거: 현장 소리 인식이 흔들려도 한 번 눌러서 경고 이벤트 생성·브로드캐스트."""
     ts_ms = int(time.time() * 1000)
     kw = f"demo:{keyword}"
-    await asyncio.to_thread(_persist_alert, session_id, text, kw, event_type, ts_ms)
+    event_id = await asyncio.to_thread(_persist_alert, session_id, text, kw, event_type, ts_ms)
     entry = {
         "type": "alert",
         "source": "demo",
@@ -243,5 +243,7 @@ async def admin_demo_emit(
         "ts_ms": ts_ms,
         "score": 1.0,
     }
+    if event_id is not None:
+        entry["event_id"] = event_id
     await manager.broadcast_to_session(session_id, entry)
     return {"ok": True, "data": entry}
