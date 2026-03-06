@@ -1,0 +1,11 @@
+.login-page {
+  min-height: 100vh;
+}
+
+.login-page .card {
+  border-radius: 12px;
+}
+
+.login-page .btn-lg {
+  border-radius: 10px;
+}

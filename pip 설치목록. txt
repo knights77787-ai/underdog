@@ -39,3 +39,6 @@ pip install pytesseract
 
 데이터 테스트 ...
 pip install streamlit openai pydub python-dotenv
+
+
+pip install python-multipart

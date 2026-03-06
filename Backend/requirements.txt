@@ -1,3 +1,6 @@
+# pkg_resources is removed in setuptools 82; keep <82 for tools that still use it
+setuptools>=60,<82
+
 fastapi>=0.109.0
 numpy>=1.24.0
 openai-whisper>=20231117

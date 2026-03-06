@@ -11,10 +11,7 @@
  * - on(type, handler): 서버에서 특정 type 메시지 수신
  */
 
-const API_BASE = "http://127.0.0.1:8000";
-const WS_BASE  = "ws://127.0.0.1:8000";
-
-
+// API_BASE / WS 주소는 live.js 등 사용처에서 정의 (중복 선언 방지)
 window.WSClient = class WSClient {
   constructor(url) {
     this.url = url;
