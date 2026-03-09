@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from App.Api.routes.admin import router as admin_router
@@ -166,6 +166,12 @@ def frontend_login():
 def frontend_live():
     """라이브 페이지 (구글/카카오 콜백 리다이렉트용). index와 동일."""
     return _send_html("index.html")
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    """기본 /favicon.ico 요청을 static/favicon.svg 로 리다이렉트."""
+    return RedirectResponse(url="/static/favicon.svg", status_code=302)
 
 
 if _FRONTEND_STATIC.is_dir():

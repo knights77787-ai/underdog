@@ -155,9 +155,9 @@ async def _handle_caption_generated(
     conn_prefix: str,
 ) -> None:
     """caption 텍스트 공통 처리: 브로드캐스트·DB 저장·키워드 판정·alert(쿨다운·설정 반영). STT 결과도 동일 흐름."""
-    # 1) caption 브로드캐스트 + 메모리 로그
+    # 1) caption 브로드캐스트 (말한/입력한 클라이언트도 자막 보이도록 exclude 없이 전송)
     caption_entry = memory_logs.append_caption(sid, text, ts_ms=ts_ms)
-    await manager.broadcast_to_session(sid, caption_entry, exclude=websocket)
+    await manager.broadcast_to_session(sid, caption_entry)
     # 2) DB 저장
     await asyncio.to_thread(_persist_caption, sid, text, ts_ms)
     # 3) 키워드 판정
@@ -181,14 +181,16 @@ async def _handle_caption_generated(
     event_id = await asyncio.to_thread(_persist_alert, sid, text, keyword, event_type, ts_ms)
     if event_id is not None:
         entry["event_id"] = event_id
-    if alert_enabled:
+        # 항상 클라이언트에 event_id 전달 (맞아요/아니에요 동작). 알림 끄면 silent로 토스트만 생략
+        if not alert_enabled:
+            entry["silent"] = True
         await manager.broadcast_to_session(sid, entry)
         logger.info(
-            f"{conn_prefix}ws_alert_emitted session_id={sid} keyword={keyword or ''} event_type={event_type}"
+            f"{conn_prefix}ws_alert_emitted session_id={sid} keyword={keyword or ''} event_type={event_type} event_id={event_id} silent={not alert_enabled}"
         )
     else:
         logger.debug(
-            f"{conn_prefix}alert_saved_no_broadcast reason=alert_disabled session_id={sid} keyword={keyword or ''}"
+            f"{conn_prefix}alert_not_broadcast event_id=None session_id={sid} keyword={keyword or ''}"
         )
 
 
@@ -407,6 +409,26 @@ async def handle_message(
             conn_prefix=conn_prefix,
         )
         return new_sid
+
+    if msg_type == "send_caption":
+        # 클라이언트 타이핑 자막: 같은 세션에 브로드캐스트 (입력한 사람 포함 표시)
+        sid = msg.get("session_id") or session_id
+        text = (msg.get("text") or "").strip()
+        if not sid:
+            logger.warning(f"{conn_prefix}send_caption ignored no session_id")
+            return session_id
+        if not text:
+            return session_id
+        ts_ms = msg.get("ts_ms") or int(time.time() * 1000)
+        logger.info(f"{conn_prefix}send_caption session_id={sid} text_len={len(text)} text={text[:40]!r}")
+        await _handle_caption_generated(
+            websocket=websocket,
+            sid=sid,
+            text=text,
+            ts_ms=ts_ms,
+            conn_prefix=conn_prefix,
+        )
+        return sid
 
     if session_id is None and msg.get("session_id"):
         return msg["session_id"]

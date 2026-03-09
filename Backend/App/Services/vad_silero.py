@@ -46,8 +46,30 @@ class SileroVADStream:
         it: VADIterator,
         audio_f32: np.ndarray,
     ) -> Optional[Dict[str, Any]]:
-        """audio_f32: float32 mono, 16kHz, shape (N,). None 또는 {"start": idx} / {"end": idx} 등."""
+        """audio_f32: float32 mono, 16kHz, shape (N,).
+
+        Silero VADIterator는 16kHz에서 한 번에 512 샘플만 허용한다.
+        프론트엔드에서는 0.5초(8000샘플) 단위로 audio_chunk를 보내므로,
+        여기에서 512 샘플 단위로 잘라서 iterator에 순차적으로 먹이고
+        마지막으로 발생한 이벤트(있다면)를 반환한다.
+        """
         if audio_f32.size == 0:
             return None
-        x = torch.from_numpy(audio_f32).to(self.device)  # (N,) float32
-        return it(x)
+
+        num_samples = 512 if self.cfg.sr == 16000 else 256
+        last_ev: Optional[Dict[str, Any]] = None
+
+        for start in range(0, audio_f32.shape[0], num_samples):
+            chunk = audio_f32[start : start + num_samples]
+            if chunk.shape[0] < num_samples:
+                # Silero는 고정 길이를 요구하므로 0으로 패딩
+                pad = np.zeros(num_samples, dtype=np.float32)
+                pad[: chunk.shape[0]] = chunk
+                chunk = pad
+
+            x = torch.from_numpy(chunk).to(self.device)  # (num_samples,) float32
+            ev = it(x)
+            if ev is not None:
+                last_ev = ev
+
+        return last_ev

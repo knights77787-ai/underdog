@@ -40,6 +40,10 @@ const logTbody = document.getElementById("logTbody");
 const micTitle = document.getElementById("micTitle");
 const micDesc  = document.getElementById("micDesc");
 const btnMic   = document.getElementById("btnMic");
+const micPermissionModal = document.getElementById("micPermissionModal");
+const micPermissionConfirm = document.getElementById("micPermissionConfirm");
+const micStopModal = document.getElementById("micStopModal");
+const micStopConfirm = document.getElementById("micStopConfirm");
 
 const captionBox = document.getElementById("captionBox");
 
@@ -119,6 +123,33 @@ function appendLogRow({ ts, ts_ms, type, text, score, event_type, keyword }) {
   }
 }
 
+// 마이크 권한 요청 + 해제 유틸
+function requestMicPermission() {
+  navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+    micStream = stream;
+    micTitle.textContent = "마이크 승인 완료";
+    micDesc.textContent = client.isConnected && SESSION_ID
+      ? "전송 시작 중…"
+      : "Connect 후 자동 전송됩니다.";
+    if (client.isConnected && SESSION_ID) startAudioSend();
+  }).catch(() => {
+    micTitle.textContent = "마이크 권한 거부됨";
+    micDesc.textContent = "브라우저 설정에서 마이크 허용이 필요합니다.";
+  });
+}
+
+function stopMicAndRelease() {
+  stopAudioSend();
+  if (micStream) {
+    try {
+      micStream.getTracks().forEach((t) => t.stop());
+    } catch (_) {}
+    micStream = null;
+  }
+  micTitle.textContent = "소리 감지 대기중";
+  micDesc.textContent = "마이크 사용 승인이 필요합니다.";
+}
+
 function showToast(title, body, danger=true) {
   const toastEl = document.createElement("div");
   toastEl.className = `toast ${danger ? "text-bg-danger" : "text-bg-primary"} border-0`;
@@ -194,6 +225,7 @@ function stopAudioSend() {
   audioBuffer = [];
 }
 
+
 function startAudioSend() {
   if (!micStream || !SESSION_ID || !client.isConnected) return;
   stopAudioSend();
@@ -245,17 +277,32 @@ function startAudioSend() {
   }
 }
 
-btnMic.addEventListener("click", async () => {
-  try {
-    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    micTitle.textContent = "마이크 승인 완료";
-    micDesc.textContent = client.isConnected && SESSION_ID
-      ? "전송 시작 중…"
-      : "Connect 후 자동 전송됩니다.";
-    if (client.isConnected && SESSION_ID) startAudioSend();
-  } catch (e) {
-    micTitle.textContent = "마이크 권한 거부됨";
-    micDesc.textContent = "브라우저 설정에서 마이크 허용이 필요합니다.";
+btnMic.addEventListener("click", () => {
+  // 이미 마이크 사용 중이면 종료 안내 모달
+  if (micStream) {
+    if (micStopModal && micStopConfirm && window.bootstrap) {
+      const modal = new bootstrap.Modal(micStopModal);
+      modal.show();
+      micStopConfirm.addEventListener("click", () => {
+        modal.hide();
+        stopMicAndRelease();
+      }, { once: true });
+    } else {
+      stopMicAndRelease();
+    }
+    return;
+  }
+
+  // 마이크 미사용 → 권한 안내 모달 후 권한 요청
+  if (micPermissionModal && micPermissionConfirm && window.bootstrap) {
+    const modal = new bootstrap.Modal(micPermissionModal);
+    modal.show();
+    micPermissionConfirm.addEventListener("click", () => {
+      modal.hide();
+      requestMicPermission();
+    }, { once: true });
+  } else {
+    requestMicPermission();
   }
 });
 
@@ -386,13 +433,23 @@ async function sendFeedback(vote) {
 btnFeedbackYes.addEventListener("click", () => sendFeedback("up"));
 btnFeedbackNo.addEventListener("click", () => sendFeedback("down"));
 
-// Test sender (server must support)
+// 타이핑 자막 전송 (서버 send_caption 처리 필요)
 btnSendCaption.addEventListener("click", () => {
   const text = testInput.value.trim();
   if (!text) return;
-
-  client.send("send_caption", { text, save: saveToggle.checked });
+  if (!SESSION_ID) {
+    if (typeof showToast === "function") showToast("자막 전송", "먼저 Connect를 눌러 세션을 만드세요.", true);
+    return;
+  }
+  const sent = client.send("send_caption", {
+    text,
+    save: saveToggle.checked,
+    session_id: SESSION_ID,
+  });
   testInput.value = "";
+  if (!sent && typeof showToast === "function") {
+    showToast("자막 전송", "WebSocket이 연결되지 않았습니다. Connect 후 다시 시도하세요.", true);
+  }
 });
 
 function updateSessionLabel() {
