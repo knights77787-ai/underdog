@@ -1,3 +1,4 @@
+import io
 from pathlib import Path
 
 import numpy as np
@@ -14,26 +15,58 @@ router = APIRouter(prefix="/custom-phrase-audio", tags=["custom-phrase-audio"])
 UPLOAD_DIR = Path("data/custom_phrase_audio")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+ALLOWED_EXTENSIONS = (".wav", ".mp3")
+TARGET_SAMPLES = 16000 * 2  # 2초
+
+
+def _resample_to_16k(x: np.ndarray, sr: int) -> np.ndarray:
+    if sr == 16000:
+        return x
+    x_tf = tf.convert_to_tensor(x, dtype=tf.float32)[None, :]
+    new_len = int(round(x.shape[0] * (16000 / sr)))
+    return tf.signal.resample(x_tf, new_len)[0].numpy().astype(np.float32)
+
 
 def _decode_wav_to_16k_mono_f32(wav_bytes: bytes) -> np.ndarray:
-    audio, sr = tf.audio.decode_wav(wav_bytes)  # (samples, ch) float32 -1..1
-    audio = tf.reduce_mean(audio, axis=1)  # mono
+    audio, sr = tf.audio.decode_wav(wav_bytes)
+    audio = tf.reduce_mean(audio, axis=1)
     sr = int(sr.numpy())
     x = audio.numpy().astype(np.float32)
-
-    if sr != 16000:
-        x_tf = tf.convert_to_tensor(x, dtype=tf.float32)[None, :]
-        new_len = int(round(x.shape[0] * (16000 / sr)))
-        x_rs = tf.signal.resample(x_tf, new_len)[0].numpy().astype(np.float32)
-        x = x_rs
-
-    # 2초 정도로 고정 (과도한 길이 → 유사도 떨어짐)
-    target = 16000 * 2
-    if x.shape[0] < target:
-        x = np.pad(x, (0, target - x.shape[0]))
+    x = _resample_to_16k(x, sr)
+    if x.shape[0] < TARGET_SAMPLES:
+        x = np.pad(x, (0, TARGET_SAMPLES - x.shape[0]))
     else:
-        x = x[:target]
+        x = x[:TARGET_SAMPLES]
     return x
+
+
+def _decode_mp3_to_16k_mono_f32(mp3_bytes: bytes) -> np.ndarray:
+    try:
+        from pydub import AudioSegment
+    except ImportError:
+        raise HTTPException(503, "MP3 지원을 위해 pydub 설치가 필요합니다: pip install pydub")
+    try:
+        seg = AudioSegment.from_file(io.BytesIO(mp3_bytes), format="mp3")
+    except Exception as e:
+        raise HTTPException(400, f"MP3 디코딩 실패 (ffmpeg 설치 확인): {e!s}")
+    seg = seg.set_channels(1)
+    sr = seg.frame_rate
+    x = np.array(seg.get_array_of_samples(), dtype=np.float32) / 32768.0
+    x = _resample_to_16k(x, sr)
+    if x.shape[0] < TARGET_SAMPLES:
+        x = np.pad(x, (0, TARGET_SAMPLES - x.shape[0]))
+    else:
+        x = x[:TARGET_SAMPLES]
+    return x
+
+
+def _decode_audio_to_16k_mono_f32(data: bytes, ext: str) -> np.ndarray:
+    ext = ext.lower()
+    if ext == ".wav":
+        return _decode_wav_to_16k_mono_f32(data)
+    if ext == ".mp3":
+        return _decode_mp3_to_16k_mono_f32(data)
+    raise HTTPException(400, f"지원 형식: {', '.join(ALLOWED_EXTENSIONS)}")
 
 
 @router.post("")
@@ -45,16 +78,18 @@ async def register_phrase_audio(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
-    if not file.filename.lower().endswith(".wav"):
-        raise HTTPException(400, "Only .wav supported in MVP")
+    fn = (file.filename or "").lower()
+    ext = next((e for e in ALLOWED_EXTENSIONS if fn.endswith(e)), None)
+    if not ext:
+        raise HTTPException(400, f"지원 형식: {', '.join(ALLOWED_EXTENSIONS)}")
 
-    wav_bytes = await file.read()
-    x = _decode_wav_to_16k_mono_f32(wav_bytes)
+    raw_bytes = await file.read()
+    x = _decode_audio_to_16k_mono_f32(raw_bytes, ext)
 
     emb = PHRASE_EMB.embed_16k_f32(x)
 
     save_path = UPLOAD_DIR / f"{session_id}_{file.filename}"
-    save_path.write_bytes(wav_bytes)
+    save_path.write_bytes(raw_bytes)
 
     row = create_phrase(
         db=db,

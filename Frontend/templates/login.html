@@ -1,0 +1,86 @@
+<!-- Underdog · 로그인 (게스트 / 구글 / 카카오) -->
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Underdog · 로그인</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/css/login.css" rel="stylesheet">
+</head>
+<body class="bg-light login-page">
+  <nav class="navbar bg-white border-bottom">
+    <div class="container-fluid">
+      <span class="navbar-brand fw-bold">Underdog</span>
+    </div>
+  </nav>
+
+  <main class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-12 col-md-8 col-lg-5">
+        <div class="card shadow-sm">
+          <div class="card-body p-4 p-md-5">
+            <h1 class="h4 fw-bold mb-2">시작하기</h1>
+            <p class="text-muted small mb-4">라이브 자막·알림을 사용하려면 아래 방법 중 하나로 들어가세요.</p>
+
+            <div class="d-grid gap-2">
+              <button type="button" id="btnGuest" class="btn btn-primary btn-lg">
+                게스트로 시작
+              </button>
+              <a id="linkGoogle" href="#" class="btn btn-outline-secondary btn-lg d-flex align-items-center justify-content-center gap-2">
+                <span>Google로 로그인</span>
+              </a>
+              <a id="linkKakao" href="#" class="btn btn-warning btn-lg text-dark d-flex align-items-center justify-content-center gap-2">
+                <span>카카오로 로그인</span>
+              </a>
+            </div>
+
+            <div id="loginStatus" class="mt-3 small text-muted" role="status" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      const API_BASE = window.APP_CONFIG?.API_BASE || "http://127.0.0.1:8000";
+      const LIVE_PATH = window.APP_CONFIG?.LIVE_PATH || "/";
+
+      const btnGuest = document.getElementById("btnGuest");
+      const linkGoogle = document.getElementById("linkGoogle");
+      const linkKakao = document.getElementById("linkKakao");
+      const loginStatus = document.getElementById("loginStatus");
+
+      function setStatus(msg, isError) {
+        loginStatus.textContent = msg || "";
+        loginStatus.className = "mt-3 small " + (isError ? "text-danger" : "text-muted");
+      }
+
+      linkGoogle.href = API_BASE + "/auth/google/login";
+      linkKakao.href = API_BASE + "/auth/kakao/login";
+
+      btnGuest.addEventListener("click", async function () {
+        btnGuest.disabled = true;
+        setStatus("세션 생성 중...", false);
+        try {
+          const res = await fetch(API_BASE + "/auth/guest", { method: "POST" });
+          const data = await res.json();
+          if (!res.ok || !data.ok || !data.session_id) {
+            setStatus("세션 생성에 실패했습니다.", true);
+            btnGuest.disabled = false;
+            return;
+          }
+          const path = LIVE_PATH.replace(/\/*$/, "") || "/";
+          const sep = path.includes("?") ? "&" : "?";
+          const url = (path.startsWith("http") ? path : (document.location.origin + path)) + sep + "session_id=" + encodeURIComponent(data.session_id);
+          window.location.href = url;
+        } catch (e) {
+          setStatus("연결할 수 없습니다. 서버 주소를 확인하세요.", true);
+          btnGuest.disabled = false;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

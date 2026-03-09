@@ -2,8 +2,23 @@
 // =======================
 // 0) 서버 주소 · 세션 (백엔드 연동: join 시 사용)
 // =======================
-const WS_URL = "ws://127.0.0.1:8000/ws";
-const SESSION_ID = "S1"; // 라이브 화면에서 쓸 세션 ID (설정/로그 API와 맞추면 됨)
+const API_BASE = window.APP_CONFIG?.API_BASE || "http://127.0.0.1:8000";
+const WS_URL = (window.APP_CONFIG?.WS_URL || "ws://127.0.0.1:8000/ws").replace(/^http/, "ws");
+let SESSION_ID = (function () {
+  const params = new URLSearchParams(document.location.search);
+  return params.get("session_id") || null;
+})();
+// 피드백 대상: 가장 최근 수신한 alert의 event_id
+let lastAlertEventId = null;
+
+// 마이크 → audio_chunk 전송
+let micStream = null;
+let audioContext = null;
+let audioProcessor = null;
+let audioSource = null;
+let audioBuffer = [];
+const TARGET_SR = 16000;
+const CHUNK_SAMPLES = 8000; // 0.5 sec at 16kHz
 
 // =======================
 // 1) DOM
@@ -32,6 +47,17 @@ const testInput = document.getElementById("testInput");
 const btnSendCaption = document.getElementById("btnSendCaption");
 
 const toastContainer = document.getElementById("toastContainer");
+const sessionLabel = document.getElementById("sessionLabel");
+const loginLabel = document.getElementById("loginLabel");
+
+// 설정 패널
+const settingFontSize = document.getElementById("settingFontSize");
+const settingAlertEnabled = document.getElementById("settingAlertEnabled");
+const settingCooldownSec = document.getElementById("settingCooldownSec");
+const settingAutoScroll = document.getElementById("settingAutoScroll");
+const btnSettingsSave = document.getElementById("btnSettingsSave");
+const settingsStatus = document.getElementById("settingsStatus");
+const settingsCollapse = document.getElementById("settingsCollapse");
 
 // =======================
 // 2) Helpers
@@ -126,16 +152,110 @@ function setHeroDanger(text) {
 }
 
 // =======================
-// 3) Mic UI
+// 3) Mic UI + audio_chunk 전송
 // =======================
+function float32ToInt16(float32Arr) {
+  const int16 = new Int16Array(float32Arr.length);
+  for (let i = 0; i < float32Arr.length; i++) {
+    const s = Math.max(-1, Math.min(1, float32Arr[i]));
+    int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+  }
+  return int16;
+}
+
+function downsample(input, inputSr, outputSr) {
+  const ratio = inputSr / outputSr;
+  const outLen = Math.floor(input.length / ratio);
+  const out = new Float32Array(outLen);
+  for (let i = 0; i < outLen; i++) {
+    const srcIdx = i * ratio;
+    const j = Math.floor(srcIdx);
+    const f = srcIdx - j;
+    out[i] = j + 1 < input.length
+      ? input[j] * (1 - f) + input[j + 1] * f
+      : input[j];
+  }
+  return out;
+}
+
+function stopAudioSend() {
+  if (audioProcessor) {
+    try {
+      audioProcessor.disconnect();
+      audioSource?.disconnect();
+    } catch (_) {}
+  }
+  audioProcessor = null;
+  audioSource = null;
+  if (audioContext && audioContext.state !== "closed") {
+    audioContext.close().catch(() => {});
+  }
+  audioContext = null;
+  audioBuffer = [];
+}
+
+function startAudioSend() {
+  if (!micStream || !SESSION_ID || !client.isConnected) return;
+  stopAudioSend();
+
+  try {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const sr = audioContext.sampleRate;
+    audioSource = audioContext.createMediaStreamSource(micStream);
+    const bufferSize = 4096;
+    audioProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
+    audioBuffer = [];
+
+    audioProcessor.onaudioprocess = (e) => {
+      if (!client.isConnected || !SESSION_ID) return;
+      const input = e.inputBuffer.getChannelData(0);
+      const down = downsample(input, sr, TARGET_SR);
+      for (let i = 0; i < down.length; i++) audioBuffer.push(down[i]);
+
+      while (audioBuffer.length >= CHUNK_SAMPLES) {
+        const chunk = audioBuffer.splice(0, CHUNK_SAMPLES);
+        const floatArr = new Float32Array(chunk);
+        const int16 = float32ToInt16(floatArr);
+        const uint8 = new Uint8Array(int16.buffer);
+        let binary = "";
+        for (let i = 0; i < uint8.length; i++) binary += String.fromCharCode(uint8[i]);
+        const data_b64 = btoa(binary);
+
+        client.send("audio_chunk", {
+          session_id: SESSION_ID,
+          ts_ms: Date.now(),
+          sr: TARGET_SR,
+          format: "pcm_s16le",
+          data_b64: data_b64,
+        });
+      }
+    };
+
+    const gain = audioContext.createGain();
+    gain.gain.value = 0;
+    gain.connect(audioContext.destination);
+    audioSource.connect(audioProcessor);
+    audioProcessor.connect(gain);
+    micTitle.textContent = "마이크 전송 중";
+    micDesc.textContent = "실시간 음성을 서버로 전송 중입니다.";
+  } catch (e) {
+    console.error("audio_chunk start failed:", e);
+    micTitle.textContent = "마이크 오류";
+    micDesc.textContent = "오디오 초기화에 실패했습니다.";
+  }
+}
+
 btnMic.addEventListener("click", async () => {
   try {
-    await navigator.mediaDevices.getUserMedia({ audio: true });
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     micTitle.textContent = "마이크 승인 완료";
-    micDesc.textContent  = "서버 연결 후 감지 대기중입니다.";
-  } catch {
+    micDesc.textContent = client.isConnected && SESSION_ID
+      ? "전송 시작 중…"
+      : "Connect 후 자동 전송됩니다.";
+    if (client.isConnected && SESSION_ID) startAudioSend();
+  } catch (e) {
     micTitle.textContent = "마이크 권한 거부됨";
-    micDesc.textContent  = "브라우저 설정에서 마이크 허용이 필요합니다.";
+    micDesc.textContent = "브라우저 설정에서 마이크 허용이 필요합니다.";
   }
 });
 
@@ -156,11 +276,17 @@ client.on("open", () => {
   btnFeedbackYes.disabled = false;
   btnFeedbackNo.disabled = false;
 
-  micTitle.textContent = "소리 감지 대기중";
-  micDesc.textContent  = "서버 연결됨. 이벤트 수신을 기다립니다.";
+  micTitle.textContent = micStream ? "마이크 전송 시작" : "소리 감지 대기중";
+  micDesc.textContent  = micStream ? "실시간 음성을 서버로 전송 중입니다." : "마이크 권한 요청 후 전송됩니다.";
+  if (micStream && SESSION_ID) startAudioSend();
 });
 
 client.on("close", () => {
+  stopAudioSend();
+  if (micStream) {
+    micTitle.textContent = "마이크 승인 완료";
+    micDesc.textContent = "Connect 후 자동 전송됩니다.";
+  }
   setBadge("disconnected");
   btnConnect.disabled = false;
   btnDisconnect.disabled = true;
@@ -184,11 +310,12 @@ client.on("caption", (msg) => {
   }
 });
 
-// 서버가 alert 보내면 (백엔드는 ts_ms 필드 사용)
+// 서버가 alert 보내면 (백엔드는 ts_ms, event_id 필드 사용)
 client.on("alert", (msg) => {
   const text = msg.text || "";
   const keyword = msg.keyword || "";
   const event_type = msg.event_type || "danger";
+  if (msg.event_id != null) lastAlertEventId = msg.event_id;
 
   appendCaption(`[ALERT] ${text}`, true);
   appendLogRow({ ts_ms: msg.ts_ms, ts: msg.ts, type: "alert", text, keyword, event_type, score: msg.score });
@@ -198,12 +325,66 @@ client.on("alert", (msg) => {
 });
 
 // Buttons
-btnConnect.addEventListener("click", () => client.connect());
+btnConnect.addEventListener("click", async () => {
+  if (!SESSION_ID) {
+    btnConnect.disabled = true;
+    try {
+      const res = await fetch(API_BASE + "/auth/guest", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (data.ok && data.session_id) {
+        SESSION_ID = data.session_id;
+        const url = new URL(document.location.href);
+        url.searchParams.set("session_id", SESSION_ID);
+        history.replaceState(null, "", url.toString());
+        updateSessionLabel();
+        updateLoginLabel();
+        loadSettings();
+      } else {
+        const msg = data.detail || (res.ok ? "세션 ID를 받지 못했습니다." : "서버 오류 " + res.status);
+        showToast("세션 발급 실패", msg, true);
+        btnConnect.disabled = false;
+        return;
+      }
+    } catch (e) {
+      showToast("오류", "서버에 연결할 수 없습니다. 백엔드가 실행 중인지 확인하세요.", true);
+      btnConnect.disabled = false;
+      return;
+    } finally {
+      btnConnect.disabled = false;
+    }
+  }
+  client.connect();
+});
 btnDisconnect.addEventListener("click", () => client.disconnect());
 
-// Feedback UI only
-btnFeedbackYes.addEventListener("click", () => showToast("피드백", "맞아요(정탐) (UI만)", false));
-btnFeedbackNo.addEventListener("click", () => showToast("피드백", "아니에요(오탐) (UI만)", true));
+// Feedback: POST /feedback (event_id, vote, session_id)
+async function sendFeedback(vote) {
+  if (lastAlertEventId == null) {
+    showToast("피드백", "대상 알림이 없습니다. 알림이 온 뒤에 눌러주세요.", true);
+    return;
+  }
+  try {
+    const res = await fetch(API_BASE + "/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event_id: lastAlertEventId,
+        vote: vote,
+        session_id: SESSION_ID || undefined,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok) {
+      showToast("피드백", "저장되었습니다.", false);
+    } else {
+      showToast("피드백 실패", data.detail || res.statusText || "다시 시도해 주세요.", true);
+    }
+  } catch (e) {
+    showToast("오류", "연결할 수 없습니다. 서버를 확인하세요.", true);
+  }
+}
+btnFeedbackYes.addEventListener("click", () => sendFeedback("up"));
+btnFeedbackNo.addEventListener("click", () => sendFeedback("down"));
 
 // Test sender (server must support)
 btnSendCaption.addEventListener("click", () => {
@@ -214,6 +395,117 @@ btnSendCaption.addEventListener("click", () => {
   testInput.value = "";
 });
 
+function updateSessionLabel() {
+  if (sessionLabel) sessionLabel.textContent = SESSION_ID ? "세션: " + SESSION_ID.slice(0, 8) + "…" : "";
+}
+
+// 로그인 상태 표시 (URL의 provider 또는 게스트)
+function updateLoginLabel() {
+  if (!loginLabel) return;
+  const params = new URLSearchParams(document.location.search);
+  const provider = params.get("provider");
+  if (SESSION_ID) {
+    if (provider === "google") {
+      loginLabel.textContent = "Google 로그인됨";
+      loginLabel.style.display = "";
+    } else if (provider === "kakao") {
+      loginLabel.textContent = "카카오 로그인됨";
+      loginLabel.style.display = "";
+    } else {
+      loginLabel.textContent = "게스트";
+      loginLabel.style.display = "";
+    }
+  } else {
+    loginLabel.style.display = "none";
+  }
+}
+
+// =======================
+// 설정 패널 (GET/POST /settings)
+// =======================
+function setSettingsStatus(msg, isError) {
+  if (settingsStatus) {
+    settingsStatus.textContent = msg || "";
+    settingsStatus.className = "col-auto small " + (isError ? "text-danger" : "text-muted");
+  }
+}
+
+function applyFontSizeToCaption(px) {
+  if (captionBox && px != null) {
+    const num = Math.min(60, Math.max(10, Number(px)));
+    captionBox.style.fontSize = num + "px";
+  }
+}
+
+async function loadSettings() {
+  if (!SESSION_ID || !settingFontSize) return;
+  setSettingsStatus("불러오는 중…", false);
+  try {
+    const res = await fetch(API_BASE + "/settings?session_id=" + encodeURIComponent(SESSION_ID));
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok || !data.data) {
+      setSettingsStatus("불러오기 실패", true);
+      return;
+    }
+    const d = data.data;
+    if (settingFontSize) settingFontSize.value = d.font_size ?? 20;
+    if (settingAlertEnabled) settingAlertEnabled.checked = d.alert_enabled !== false;
+    if (settingCooldownSec) settingCooldownSec.value = d.cooldown_sec ?? 5;
+    if (settingAutoScroll) settingAutoScroll.checked = d.auto_scroll !== false;
+    applyFontSizeToCaption(d.font_size);
+    setSettingsStatus("불러옴", false);
+  } catch (e) {
+    setSettingsStatus("연결 실패", true);
+  }
+}
+
+async function saveSettings() {
+  if (!SESSION_ID) {
+    setSettingsStatus("세션이 없습니다. Connect 하세요.", true);
+    return;
+  }
+  const body = {};
+  if (settingFontSize) {
+    const v = parseInt(settingFontSize.value, 10);
+    if (v >= 10 && v <= 60) body.font_size = v;
+  }
+  if (settingAlertEnabled) body.alert_enabled = settingAlertEnabled.checked;
+  if (settingCooldownSec) {
+    const v = parseInt(settingCooldownSec.value, 10);
+    if (v >= 0 && v <= 60) body.cooldown_sec = v;
+  }
+  if (settingAutoScroll) body.auto_scroll = settingAutoScroll.checked;
+
+  setSettingsStatus("저장 중…", false);
+  try {
+    const res = await fetch(API_BASE + "/settings?session_id=" + encodeURIComponent(SESSION_ID), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok) {
+      setSettingsStatus("저장됨", false);
+      applyFontSizeToCaption(body.font_size);
+      showToast("설정", "저장되었습니다.", false);
+    } else {
+      setSettingsStatus(data.detail || "저장 실패", true);
+    }
+  } catch (e) {
+    setSettingsStatus("연결 실패", true);
+  }
+}
+
+if (btnSettingsSave) btnSettingsSave.addEventListener("click", saveSettings);
+if (settingsCollapse) {
+  settingsCollapse.addEventListener("show.bs.collapse", function () {
+    if (SESSION_ID) loadSettings();
+  });
+}
+
 // Init
 setBadge("disconnected");
 setHeroNormal();
+updateSessionLabel();
+updateLoginLabel();
+if (SESSION_ID) loadSettings();

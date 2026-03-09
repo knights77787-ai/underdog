@@ -79,14 +79,28 @@
 
 ---
 
-## 5. CORS / 프론트 서빙
+## 5. 프론트 서빙 (백엔드에서 HTML/정적 파일 제공)
 
-- 백엔드가 다른 포트/도메인에서 프론트를 서빙하면 **CORS**가 필요합니다. FastAPI에 `CORSMiddleware` 추가 여부 확인.
-- 프론트를 백엔드와 같은 오리진에서 서빙하면 (예: FastAPI에서 `StaticFiles`, `HTMLResponse`로 index 제공) CORS 없이 동작합니다.
+**Backend/App/main.py** 에서 프론트를 서빙합니다. 같은 오리진이므로 CORS 없이 동작합니다.
+
+| 경로 | 설명 |
+|------|------|
+| `GET /` | 라이브 메인 (index.html) |
+| `GET /login` | 로그인 페이지 (login.html) |
+| `GET /live` | 라이브와 동일 (OAuth 콜백 리다이렉트용) |
+| `GET /static/*` | Frontend/static (CSS, JS 등) |
+
+- 프로젝트 구조가 `underdog/Frontend/`, `underdog/Backend/` 이어야 합니다. Backend에서 `uvicorn main:app` 실행 시 Frontend 폴더를 자동으로 찾습니다.
+- **테스트 방법**은 **Frontend/TEST.md** 에 정리되어 있습니다.
+
+## 6. CORS (다른 오리진에서 프론트 서빙할 때)
+
+- 프론트를 **다른 포트/도메인**에서 서빙하면 CORS가 필요합니다. FastAPI에 `CORSMiddleware` 추가 여부 확인.
+- 위처럼 **백엔드에서 같은 오리진으로** HTML/정적 파일을 주면 CORS 없이 동작합니다.
 
 ---
 
-## 6. 요약 체크리스트
+## 7. 요약 체크리스트
 
 - [ ] **라이브**: WS 연결 후 **join** 전송 (`type`, `session_id`)
 - [ ] **라이브**: caption/alert 표시 시 **ts_ms** 사용

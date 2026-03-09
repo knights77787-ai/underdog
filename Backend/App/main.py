@@ -1,14 +1,18 @@
 """
 underdog AI Pipeline - FastAPI 앱 (App 폴더 진입점)
 DB: SQLite 연동, 기동 시 테이블 생성.
+프론트엔드: /, /login, /live → HTML, /static → 정적 파일 (Frontend 폴더 기준).
 """
 import asyncio
 import os
 import uuid
+from pathlib import Path
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from App.Api.routes.admin import router as admin_router
 from App.Api.routes.auth import router as auth_router
@@ -28,7 +32,20 @@ from App.WS.manager import manager
 from App.WS.stt_worker import SttWorker
 from App.db.database import create_tables
 
-load_dotenv()  # .env 에서 ADMIN_TOKEN 등 로드
+# .env 로드 (Backend/.env 우선, 없으면 repo 루트 .env)
+_backend_dir = Path(__file__).resolve().parent.parent  # .../Backend
+_repo_root_dir = _backend_dir.parent  # .../underdog (repo root)
+for _env_path in (_backend_dir / ".env", _repo_root_dir / ".env"):
+    if _env_path.is_file():
+        load_dotenv(_env_path)
+        break
+else:
+    load_dotenv()
+
+from fastapi import Body
+from App.WS.manager import manager
+from App.WS.handlers import memory_logs, keyword_detector  # 이미 있으면 생략
+import time
 
 
 @asynccontextmanager
@@ -110,9 +127,46 @@ app.include_router(feedback_router)
 app.include_router(settings_router)
 app.include_router(auth_router)
 
+
+
 # WebSocket 라우트 등록
 app.include_router(ws_router)
 
 # 커스텀 사운드 / 커스텀 구문 업로드·조회
 app.include_router(custom_sounds_router)
 app.include_router(custom_phrase_audio_router)
+
+# ---------- 프론트엔드 서빙 (API 라우트보다 나중에 등록) ----------
+# 프로젝트 루트 = Backend의 상위(underdog). Frontend = 루트/Frontend
+_FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "Frontend"
+_FRONTEND_STATIC = _FRONTEND_DIR / "static"
+_FRONTEND_TEMPLATES = _FRONTEND_DIR / "templates"
+
+
+def _send_html(name: str):
+    path = _FRONTEND_TEMPLATES / name
+    if not path.is_file():
+        return FileResponse(_FRONTEND_TEMPLATES / "index.html")
+    return FileResponse(path, media_type="text/html; charset=utf-8")
+
+
+@app.get("/", response_class=FileResponse)
+def frontend_index():
+    """라이브 메인 페이지."""
+    return _send_html("index.html")
+
+
+@app.get("/login", response_class=FileResponse)
+def frontend_login():
+    """로그인 페이지."""
+    return _send_html("login.html")
+
+
+@app.get("/live", response_class=FileResponse)
+def frontend_live():
+    """라이브 페이지 (구글/카카오 콜백 리다이렉트용). index와 동일."""
+    return _send_html("index.html")
+
+
+if _FRONTEND_STATIC.is_dir():
+    app.mount("/static", StaticFiles(directory=str(_FRONTEND_STATIC)), name="static")
