@@ -500,9 +500,9 @@ Google과 거의 동일한 흐름으로 User/Session을 만들고, 프론트 페
 | GET | `/auth/google/callback` | 구글 OAuth 콜백 → 세션 생성 후 프론트로 리다이렉트 |
 | GET | `/auth/kakao/login` | 카카오 로그인 페이지로 리다이렉트 |
 | GET | `/auth/kakao/callback` | 카카오 OAuth 콜백 → 세션 생성 후 프론트로 리다이렉트 |
-| POST | `/custom-sounds` | 커스텀 소리(YAMNet) WAV 업로드·등록 |
+| POST | `/custom-sounds` | 커스텀 소리(YAMNet) 오디오 업로드·등록 (.wav, .mp3) |
 | GET | `/custom-sounds` | 세션별 커스텀 소리 목록 조회 |
-| POST | `/custom-phrase-audio` | 커스텀 구문(Whisper embedding) WAV 업로드·등록 |
+| POST | `/custom-phrase-audio` | 커스텀 구문(Whisper embedding) 오디오 업로드·등록 (.wav, .mp3) |
 | GET | `/custom-phrase-audio` | 세션별 커스텀 구문 목록 조회 |
 
 ---
@@ -510,7 +510,7 @@ Google과 거의 동일한 흐름으로 User/Session을 만들고, 프론트 페
 ### POST /custom-sounds (커스텀 환경음 등록)
 
 - **역할:** YAMNet embedding 기반 커스텀 소리(환경음) 등록. 실시간 비말 구간과 코사인 유사도로 매칭 후 alert 발생.
-- **요청:** `session_id`(Query), `name`, `group_type`, `event_type`(Form), `file`(.wav, 1초 권장).
+- **요청:** `session_id`(Query), `name`, `group_type`, `event_type`(Form), `file`(.wav 또는 .mp3, 1초 권장). MP3는 pydub·ffmpeg 필요.
 - **응답:** `{"ok": true, "data": {"custom_sound_id": int, "name": str}}`
 
 ### GET /custom-sounds
@@ -521,7 +521,7 @@ Google과 거의 동일한 흐름으로 User/Session을 만들고, 프론트 페
 ### POST /custom-phrase-audio (커스텀 안내 음성 등록)
 
 - **역할:** Whisper encoder embedding 기반 커스텀 구문(안내 방송 등) 등록. VAD_END 말 구간과 코사인 유사도로 매칭 후 alert 발생.
-- **요청:** `session_id`(Query), `name`, `event_type`(Form, `alert`|`danger`), `threshold_pct`(Form, 50~99, 기본 80), `file`(.wav, 약 2초 권장).
+- **요청:** `session_id`(Query), `name`, `event_type`(Form, `alert`|`danger`), `threshold_pct`(Form, 50~99, 기본 80), `file`(.wav 또는 .mp3, 약 2초 권장).
 - **응답:** `{"ok": true, "data": {"custom_phrase_id": int, "name": str}}`
 
 ### GET /custom-phrase-audio
