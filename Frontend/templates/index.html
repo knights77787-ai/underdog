@@ -18,7 +18,8 @@
   <!-- Topbar -->
   <nav class="navbar bg-white border-bottom">
     <div class="container-fluid d-flex align-items-center gap-2">
-      <div class="fw-bold">Underdog · Live</div>
+      <a href="/" class="fw-bold text-dark text-decoration-none">Underdog · Live</a>
+      <a href="/login" class="btn btn-sm btn-outline-secondary ms-2">다른 계정</a>
 
       <!-- WS Buttons -->
       <button id="btnConnect" class="btn btn-sm btn-primary ms-2">Connect</button>
@@ -26,6 +27,8 @@
 
       <!-- Status -->
       <span id="wsBadge" class="badge text-bg-secondary ms-2">Disconnected</span>
+      <span id="loginLabel" class="badge bg-light text-dark border ms-2" style="display:none;"></span>
+      <span id="sessionLabel" class="small text-muted ms-2 d-none d-md-inline"></span>
 
       <!-- (optional) Save toggle (UI only) -->
       <div class="ms-3 d-flex align-items-center gap-2">
@@ -34,8 +37,43 @@
           <input class="form-check-input" type="checkbox" role="switch" id="saveToggle">
         </div>
       </div>
+
+      <!-- 설정 토글 -->
+      <button class="btn btn-sm btn-outline-secondary ms-2" type="button" data-bs-toggle="collapse" data-bs-target="#settingsCollapse" aria-expanded="false" aria-controls="settingsCollapse" id="btnSettingsToggle">설정</button>
     </div>
   </nav>
+
+  <!-- 설정 패널 (접기/펼치기) -->
+  <div class="collapse border-bottom bg-white" id="settingsCollapse">
+    <div class="container-fluid py-3">
+      <div class="row align-items-end">
+        <div class="col-auto">
+          <label class="form-label small mb-0 me-2">글자 크기</label>
+          <input type="number" class="form-control form-control-sm" id="settingFontSize" min="10" max="60" value="20" style="width:4rem">
+        </div>
+        <div class="col-auto">
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" id="settingAlertEnabled" checked>
+            <label class="form-check-label small" for="settingAlertEnabled">알림 사용</label>
+          </div>
+        </div>
+        <div class="col-auto">
+          <label class="form-label small mb-0 me-2">쿨다운(초)</label>
+          <input type="number" class="form-control form-control-sm" id="settingCooldownSec" min="0" max="60" value="5" style="width:4rem">
+        </div>
+        <div class="col-auto">
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" id="settingAutoScroll" checked>
+            <label class="form-check-label small" for="settingAutoScroll">자동 스크롤</label>
+          </div>
+        </div>
+        <div class="col-auto ms-2">
+          <button type="button" class="btn btn-sm btn-primary" id="btnSettingsSave">저장</button>
+        </div>
+        <div class="col-auto small text-muted" id="settingsStatus"></div>
+      </div>
+    </div>
+  </div>
 
   <main class="container-fluid py-3">
     <div class="row g-3">

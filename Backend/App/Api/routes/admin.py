@@ -18,6 +18,13 @@ from App.db.database import get_db
 from App.Services.audio_rules import get_audio_rules_status, reload_audio_rules
 from App.Services.keyword_detector import get_keyword_counts, reload_keywords
 
+
+from fastapi import Body
+from App.WS.handlers import memory_logs, keyword_detector  # 이미 있으면 생략
+
+
+
+
 router = APIRouter(
     prefix="/admin",
     tags=["admin"],
@@ -247,3 +254,37 @@ async def admin_demo_emit(
         entry["event_id"] = event_id
     await manager.broadcast_to_session(session_id, entry)
     return {"ok": True, "data": entry}
+
+# test 용
+
+@router.post("/test-caption")
+async def admin_test_caption(
+    session_id: str = Body(..., embed=True),
+    text: str = Body(..., embed=True),
+):
+    """
+    관리자가 테스트용 캡션을 강제로 세션에 broadcast.
+    RN Captions 박스에 뜨는지 확인용.
+    """
+    msg = {"type": "caption", "session_id": session_id, "text": text, "ts_ms": int(time.time() * 1000)}
+
+    # 로그 저장(있으면)
+    try:
+        memory_logs.append_caption(session_id, text)
+    except Exception:
+        pass
+
+    # 세션 전체에 broadcast (관리자 호출은 websocket이 없으니 exclude 없음)
+    await manager.broadcast_to_session(session_id, msg)
+
+    # 키워드 룰까지 태워서 alert도 같이 보내기(원하면)
+    alerts = []
+    try:
+        for kw, etype in keyword_detector.check_alerts(text):
+            entry = memory_logs.append_alert(session_id, text, kw, etype)
+            await manager.broadcast_to_session(session_id, entry)
+            alerts.append(entry)
+    except Exception:
+        pass
+
+    return {"ok": True, "sent": msg, "alerts": alerts}
