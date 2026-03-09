@@ -1,95 +1,205 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>새로운 소리 등록</title>
-  <link rel="stylesheet" href="{{ url_for('static', path='css/new_sound.css') }}">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lumen | 새 소리 등록</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link href="/static/css/new_sound.css" rel="stylesheet">
 </head>
-<body>
-  <header class="topbar">
-    <div class="brand">Lumen</div>
+<body class="bg-light">
 
-    <nav class="tabs">
-      <a class="tab active" href="/new-sound">새로운 소리 등록</a>
-      <a class="tab" href="/my-sounds">내가 등록한 소리 목록</a>
-    </nav>
+  <nav class="navbar navbar-expand bg-white border-bottom shadow-sm">
+    <div class="container-fluid px-3">
+      <a class="navbar-brand fw-bold border px-3 py-1 bg-light" href="#">Lumen</a>
+    </div>
+  </nav>
 
-    <div class="user">
-      <button id="userMenuBtn" class="user-btn" type="button" aria-haspopup="true" aria-expanded="false">
-        <span class="user-name">사용자 이름</span>
-        <span class="user-icon" aria-hidden="true"><i class="fa-solid fa-user"></i></span>
-      </button>
+  <main class="container-fluid py-4">
+    <div class="center-shell">
+      <div class="card shadow-sm border-0 main-card">
+        <div class="card-body p-4 p-lg-5">
 
-      <div id="userMenu" class="user-menu" role="menu" aria-hidden="true">
-        <a href="#" role="menuitem">소리등록</a>
-        <a href="#" role="menuitem">설정</a>
-        <a href="#" role="menuitem">로그아웃</a>
+          <!-- Bootstrap Toggleable Tabs -->
+          <ul class="nav nav-tabs sound-tabs mb-4" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button
+                class="nav-link active"
+                id="register-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#registerPanel"
+                type="button"
+                role="tab"
+                aria-controls="registerPanel"
+                aria-selected="true"
+              >
+                새로운 소리 등록
+              </button>
+            </li>
+
+            <li class="nav-item" role="presentation">
+              <button
+                class="nav-link"
+                id="list-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#listPanel"
+                type="button"
+                role="tab"
+                aria-controls="listPanel"
+                aria-selected="false"
+              >
+                내가 등록한 소리 목록
+              </button>
+            </li>
+          </ul>
+
+          <!-- Tab panes -->
+          <div class="tab-content">
+
+            <!-- 새로운 소리 등록 -->
+            <div
+              class="tab-pane fade show active"
+              id="registerPanel"
+              role="tabpanel"
+              aria-labelledby="register-tab"
+              tabindex="0"
+            >
+              <div class="record-shell mx-auto mb-4">
+                <p class="text-center text-muted helper-text mb-4">
+                  가능한 주변 소음 없는 조용한 환경에서 녹음해주세요. 더 좋은 품질로 변환할 수 있어요.
+                </p>
+
+                <div class="wave-wrap mb-4">
+                  <div class="wave-bars">
+                    <span></span><span></span><span></span><span></span><span></span>
+                    <span id="recDot" class="rec-dot"></span>
+                    <span></span><span></span><span></span><span></span><span></span>
+                  </div>
+                </div>
+
+                <div class="d-flex justify-content-center flex-wrap gap-2 align-items-center">
+                  <button id="btnStart" type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3">
+                    ● 녹음
+                  </button>
+                  <button id="btnStop" type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" disabled>
+                    ■ 중지
+                  </button>
+                  <button id="btnPlay" type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" disabled>
+                    ▶ 재생
+                  </button>
+                  <div id="timer" class="timer-pill">00:00</div>
+                </div>
+
+                <audio id="audioPreview" hidden controls class="w-100 mt-3"></audio>
+              </div>
+
+              <div class="mb-3">
+                <label for="fileInput" class="form-label fw-semibold">
+                  녹음 파일 업로드
+                  <span class="text-muted small">(파일 형식: .mp3, .wav, .webm)</span>
+                </label>
+                <input id="fileInput" type="file" class="form-control" accept=".mp3,.wav,.webm,audio/*">
+                <div id="fileMeta" class="form-text">선택된 파일 없음</div>
+              </div>
+
+              <div class="mb-3">
+                <label for="soundName" class="form-label fw-semibold">소리 이름</label>
+                <input
+                  id="soundName"
+                  type="text"
+                  class="form-control"
+                  placeholder="예: 초인종, 세탁기 완료음"
+                >
+              </div>
+
+              <div class="mb-3">
+                <label for="soundCategory" class="form-label fw-semibold">소리 알림 분류</label>
+                <select id="soundCategory" class="form-select">
+                  <option value="">선택</option>
+                  <option value="danger">경고</option>
+                  <option value="alert">일상생활</option>
+                </select>
+              </div>
+
+              <div id="status" class="status small mb-3"></div>
+
+              <div class="d-flex justify-content-end">
+                <button id="btnSubmit" type="button" class="btn btn-outline-secondary px-4">
+                  다음
+                </button>
+              </div>
+            </div>
+
+          <!-- 내가 등록한 소리 목록 -->
+          <div
+            class="tab-pane fade"
+            id="listPanel"
+            role="tabpanel"
+            aria-labelledby="list-tab"
+            tabindex="0"
+          >
+            <div class="d-flex align-items-center justify-content-between mb-3">
+              <div>
+                <h5 class="mb-1">내가 등록한 소리 목록</h5>
+                <p class="text-muted small mb-0">등록한 커스텀 소리를 여기서 확인합니다.</p>
+              </div>
+            </div>
+
+            <div id="soundListStatus" class="small text-muted mb-3">
+              등록된 소리 목록 예시
+            </div>
+
+            <div id="soundList" class="sound-list">
+              <div class="sound-row">
+                <div class="sound-left">
+                  <div class="sound-title-line">
+                    <span class="sound-name">삼성 세탁기 완료음</span>
+                    <span class="sound-time">00:20</span>
+                    <span class="sound-badge alert">일상생활</span>
+                  </div>
+                  <div class="sound-date">2025-11-12</div>
+                </div>
+
+                <div class="sound-right">
+                  <button type="button" class="icon-btn play-btn" aria-label="재생">
+                    <i class="bi bi-volume-up-fill"></i>
+                  </button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary">수정</button>
+                  <button type="button" class="btn btn-sm btn-outline-danger">삭제</button>
+                </div>
+              </div>
+
+              <div class="sound-row">
+                <div class="sound-left">
+                  <div class="sound-title-line">
+                    <span class="sound-name">화재경보기</span>
+                    <span class="sound-time">00:08</span>
+                    <span class="sound-badge danger">경고</span>
+                  </div>
+                  <div class="sound-date">2025-11-13</div>
+                </div>
+
+                <div class="sound-right">
+                  <button type="button" class="icon-btn play-btn" aria-label="재생">
+                    <i class="bi bi-volume-up-fill"></i>
+                  </button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary">수정</button>
+                  <button type="button" class="btn btn-sm btn-outline-danger">삭제</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+          <!-- /tab-content -->
+
+        </div>
       </div>
     </div>
-  </header>
-
-  <main class="container">
-    <section class="card">
-      <h1 class="title">새로운 소리 등록</h1>
-      <p class="desc">마이크로 녹음하거나, 이미 녹음된 파일(mp3/wav/webm 등)을 업로드하세요.</p>
-
-      <!-- 녹음패널 -->
-      <div class="record-panel">
-        <div class="wave">
-          <div class="wave-dot" id="recDot" aria-hidden="true"></div>
-          <div class="wave-bars" aria-hidden="true">
-            <!-- 가짜 바 녹음용 -->
-            <span></span><span></span><span></span><span></span><span></span>
-            <span></span><span></span><span></span><span></span><span></span>
-          </div>
-        </div>
-
-        <div class="controls">
-          <button id="btnStart" class="btn primary" type="button">● 녹음</button>
-          <button id="btnStop" class="btn" type="button" disabled>■ 정지</button>
-          <button id="btnPlay" class="btn" type="button" disabled>▶ 재생</button>
-
-          <div class="timer" id="timer">00:00</div>
-        </div>
-
-        <audio id="audioPreview" controls class="audio" hidden></audio>
-
-        <div class="hint">
-          * 녹음 후 “재생”으로 확인할 수 있어요. 업로드 파일을 선택하면 녹음 파일 대신 업로드 파일이 사용됩니다.
-        </div>
-      </div>
-
-        <!-- 업로드 -->
-      <div class="row">
-        <label class="label" for="fileInput">녹음 파일 업로드 (서버는 .wav만 지원)</label>
-        <input id="fileInput" class="input" type="file" accept=".wav,audio/wav">
-        <div class="meta" id="fileMeta">선택된 파일 없음</div>
-      </div>
-
-        <!-- 소리이름 -->
-      <div class="row">
-        <label class="label" for="soundName">소리 이름</label>
-        <input type="text" id="soundName" class="input"  placeholder="예: 현관문 초인종, 전자레인지 완료음" maxlength="40">
-      </div>
-
-      <!-- 분류 -->
-      <div class="row">
-        <label class="label" for="soundCategory">소리 분류</label>
-        <select id="soundCategory" class="select">
-          <option value="" selected disabled>분류를 선택하세요</option>
-          <option value="danger">위험</option>
-          <option value="alert">생활알림</option>
-        </select>
-      </div>
-
-      <div class="actions">
-        <button id="btnSubmit" class="btn primary" type="button">다음</button>
-        <div class="status" id="status"></div>
-      </div>
-    </section>
   </main>
 
-  <script src="{{ url_for('static', path='js/new_sound.js') }}"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/static/js/new_sound.js"></script>
 </body>
 </html>
