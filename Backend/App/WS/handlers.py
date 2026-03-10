@@ -194,6 +194,104 @@ async def _handle_caption_generated(
         )
 
 
+async def _process_speech_and_enqueue_stt(
+    *,
+    sid: str,
+    speech_audio: np.ndarray,
+    ts_ms: int,
+    conn_prefix: str,
+    websocket: WebSocket,
+) -> None:
+    """말 구간 오디오 검사 후 STT 큐에 넣기. 짧음/조용함 스킵, 10초 컷, 커스텀 구문 매칭·알림 포함."""
+    min_samples = int(16000 * 0.3)
+    if speech_audio.shape[0] < min_samples:
+        audio_logger.info(
+            "%s STT_SKIP_SHORT sid=%s samples=%s",
+            conn_prefix, sid, speech_audio.shape[0],
+        )
+        return
+    rms = float(np.sqrt(np.mean(np.square(speech_audio))) + 1e-12)
+    if rms < 0.008:
+        audio_logger.info(
+            "%s STT_SKIP_SILENT sid=%s rms=%.4f",
+            conn_prefix, sid, rms,
+        )
+        return
+    max_samples = 16000 * 10
+    if speech_audio.shape[0] > max_samples:
+        speech_audio = speech_audio[-max_samples:].copy()
+        audio_logger.info("%s STT_CUT sid=%s max_sec=10", conn_prefix, sid)
+    # 커스텀 구문 매칭
+    try:
+        best_phrase, sim = await asyncio.to_thread(
+            match_phrase, sid, speech_audio
+        )
+    except Exception:
+        audio_logger.exception(
+            "%s PHRASE_MATCH_FAILED sid=%s", conn_prefix, sid
+        )
+        best_phrase, sim = None, 0.0
+    else:
+        if best_phrase is not None and sim >= (
+            (best_phrase.threshold_pct or 80) / 100.0
+        ):
+            settings = await asyncio.to_thread(_get_settings, sid)
+            cooldown_sec = int(settings.get("cooldown_sec", 5))
+            alert_enabled = bool(settings.get("alert_enabled", True))
+            kw_phrase = f"phrase:{best_phrase.custom_phrase_id}"
+            if not _is_in_cooldown(
+                sid, kw_phrase, best_phrase.event_type, cooldown_sec, ts_ms
+            ):
+                text_phrase = (
+                    f"CustomPhraseAudio:{best_phrase.name} (sim={sim:.2f})"
+                )
+                _last_alert_ts_by_key[(sid, kw_phrase, best_phrase.event_type)] = ts_ms
+                entry_p = memory_logs.append_alert(
+                    sid,
+                    text_phrase,
+                    kw_phrase,
+                    best_phrase.event_type,
+                    "warning",
+                    float(sim),
+                    ts_ms=ts_ms,
+                    source="custom_phrase",
+                )
+                event_id = await asyncio.to_thread(
+                    _persist_alert,
+                    sid,
+                    text_phrase,
+                    kw_phrase,
+                    best_phrase.event_type,
+                    ts_ms,
+                )
+                if event_id is not None:
+                    entry_p["event_id"] = event_id
+                if alert_enabled:
+                    await manager.broadcast_to_session(sid, entry_p)
+                audio_logger.info(
+                    "%s PHRASE_ALERT_EMITTED sid=%s phrase_id=%s sim=%.2f",
+                    conn_prefix,
+                    sid,
+                    best_phrase.custom_phrase_id,
+                    sim,
+                )
+    item = {
+        "sid": sid,
+        "speech_audio": speech_audio,
+        "ts_ms": ts_ms,
+        "conn_prefix": conn_prefix,
+        "websocket": websocket,
+    }
+    try:
+        STT_QUEUE.put_nowait(item)
+        inc("stt_enqueued")
+    except asyncio.QueueFull:
+        inc("stt_dropped")
+        audio_logger.warning(
+            "%s STT_QUEUE_FULL sid=%s", conn_prefix, sid
+        )
+
+
 async def handle_message(
     websocket: WebSocket,
     msg: dict,
@@ -260,101 +358,13 @@ async def handle_message(
                     "VAD_END session_id=%s ts_ms=%s samples=%s",
                     sid, ts_ms, speech_audio.shape[0],
                 )
-                # 너무 짧은 음성은 Whisper에 안 보냄 (노이즈/헛발화 방지)
-                min_samples = int(16000 * 0.3)
-                if speech_audio.shape[0] < min_samples:
-                    audio_logger.info(
-                        "%s STT_SKIP_SHORT sid=%s samples=%s",
-                        conn_prefix, sid, speech_audio.shape[0],
-                    )
-                else:
-                    # 너무 조용한 구간 스킵 (RMS 기준, Whisper 환각 방지)
-                    rms = float(np.sqrt(np.mean(np.square(speech_audio))) + 1e-12)
-                    if rms < 0.008:
-                        audio_logger.info(
-                            "%s STT_SKIP_SILENT sid=%s rms=%.4f",
-                            conn_prefix, sid, rms,
-                        )
-                    else:
-                        # 최대 길이 컷 (Whisper 지연 방지, MVP 8~10초 권장)
-                        max_samples = 16000 * 10
-                        if speech_audio.shape[0] > max_samples:
-                            speech_audio = speech_audio[-max_samples:]
-                            audio_logger.info(
-                                "%s STT_CUT sid=%s max_sec=10",
-                                conn_prefix, sid,
-                            )
-                        # 4-1) 커스텀 구문 매칭 (Whisper encoder embedding 기반)
-                        try:
-                            best_phrase, sim = await asyncio.to_thread(
-                                match_phrase, sid, speech_audio
-                            )
-                        except Exception:
-                            audio_logger.exception(
-                                "%s PHRASE_MATCH_FAILED sid=%s", conn_prefix, sid
-                            )
-                            best_phrase, sim = None, 0.0
-                        else:
-                            if best_phrase is not None and sim >= (
-                                (best_phrase.threshold_pct or 80) / 100.0
-                            ):
-                                settings = await asyncio.to_thread(_get_settings, sid)
-                                cooldown_sec = int(settings.get("cooldown_sec", 5))
-                                alert_enabled = bool(settings.get("alert_enabled", True))
-                                kw_phrase = f"phrase:{best_phrase.custom_phrase_id}"
-                                if not _is_in_cooldown(
-                                    sid, kw_phrase, best_phrase.event_type, cooldown_sec, ts_ms
-                                ):
-                                    text_phrase = (
-                                        f"CustomPhraseAudio:{best_phrase.name} (sim={sim:.2f})"
-                                    )
-                                    _last_alert_ts_by_key[(sid, kw_phrase, best_phrase.event_type)] = ts_ms
-                                    entry_p = memory_logs.append_alert(
-                                        sid,
-                                        text_phrase,
-                                        kw_phrase,
-                                        best_phrase.event_type,
-                                        "warning",
-                                        float(sim),
-                                        ts_ms=ts_ms,
-                                        source="custom_phrase",
-                                    )
-                                    event_id = await asyncio.to_thread(
-                                        _persist_alert,
-                                        sid,
-                                        text_phrase,
-                                        kw_phrase,
-                                        best_phrase.event_type,
-                                        ts_ms,
-                                    )
-                                    if event_id is not None:
-                                        entry_p["event_id"] = event_id
-                                    if alert_enabled:
-                                        await manager.broadcast_to_session(sid, entry_p)
-                                        audio_logger.info(
-                                            "%s PHRASE_ALERT_EMITTED sid=%s phrase_id=%s sim=%.2f",
-                                            conn_prefix,
-                                            sid,
-                                            best_phrase.custom_phrase_id,
-                                            sim,
-                                        )
-
-                        # STT 큐에 넣어 단일 워커가 직렬 처리 (동시 다중 Whisper 방지)
-                        item = {
-                            "sid": sid,
-                            "speech_audio": speech_audio,
-                            "ts_ms": ts_ms,
-                            "conn_prefix": conn_prefix,
-                            "websocket": websocket,
-                        }
-                        try:
-                            STT_QUEUE.put_nowait(item)
-                            inc("stt_enqueued")
-                        except asyncio.QueueFull:
-                            inc("stt_dropped")
-                            audio_logger.warning(
-                                "%s STT_QUEUE_FULL sid=%s", conn_prefix, sid
-                            )
+                await _process_speech_and_enqueue_stt(
+                    sid=sid,
+                    speech_audio=speech_audio,
+                    ts_ms=ts_ms,
+                    conn_prefix=conn_prefix,
+                    websocket=websocket,
+                )
             if "start" in vad_ev and not st.in_speech:
                 st.in_speech = True
                 st.speech_chunks = []  # 아래 append에서 현재 청크 추가
@@ -366,6 +376,22 @@ async def handle_message(
                 audio_logger.debug("VAD_EVT session_id=%s ev=%s", sid, vad_ev)
         if st.in_speech:
             st.speech_chunks.append(audio_f32.copy())
+            # 10초 초과 말 구간은 끊어서 STT에 보냄 (큐 적체·지연 완화)
+            if len(st.speech_chunks) >= 20:
+                speech_audio = np.concatenate(st.speech_chunks)[-16000 * 10:]
+                st.speech_chunks = []
+                st.in_speech = False
+                audio_logger.info(
+                    "STT_FORCED_FLUSH_10s session_id=%s ts_ms=%s",
+                    sid, ts_ms,
+                )
+                await _process_speech_and_enqueue_stt(
+                    sid=sid,
+                    speech_audio=speech_audio,
+                    ts_ms=ts_ms,
+                    conn_prefix=conn_prefix,
+                    websocket=websocket,
+                )
         else:
             # 비말(non-speech) 구간: 0.5초 청크 2개 모이면 1초 윈도우로 큐에 넣기
             st.non_speech_chunks.append(audio_f32.copy())

@@ -16,6 +16,8 @@ class WhisperEmbedder:
         return: (D,) float32 normalized embedding.
         """
         audio = audio_f32_16k.astype(np.float32)
+        # Whisper encoder 기대 길이(30초)로 패딩/트림 (incorrect audio shape 방지)
+        audio = whisper.pad_or_trim(audio)
 
         # Whisper 입력용 mel 생성
         mel = whisper.log_mel_spectrogram(audio)

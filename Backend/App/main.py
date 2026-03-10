@@ -82,14 +82,16 @@ async def lifespan(app: FastAPI):
         app.state.yamnet_worker.run()
     )
 
-    # STT 큐 워커: VAD_END → STT_QUEUE → 단일 워커가 Whisper 직렬 처리
+    # STT 큐 워커: VAD_END → STT_QUEUE → 2개 워커가 Whisper 병렬 처리 (반응 지연 완화)
     app.state.stt_worker = SttWorker(handlers.STT_QUEUE)
     app.state.stt_task = asyncio.create_task(app.state.stt_worker.run())
+    app.state.stt_worker_2 = SttWorker(handlers.STT_QUEUE)
+    app.state.stt_task_2 = asyncio.create_task(app.state.stt_worker_2.run())
 
     yield
 
     # shutdown: worker tasks 취소
-    for name in ("yamnet_task", "stt_task"):
+    for name in ("yamnet_task", "stt_task", "stt_task_2"):
         t = getattr(app.state, name, None)
         if t is not None:
             t.cancel()
