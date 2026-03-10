@@ -10,6 +10,10 @@ from dataclasses import dataclass
 import numpy as np
 import whisper
 
+from App.Core.logging import get_logger
+
+logger = get_logger("stt.whisper")
+
 
 @dataclass
 class WhisperConfig:
@@ -26,22 +30,44 @@ class WhisperSTT:
         self.model = whisper.load_model(self.cfg.model_name)  # load once
 
     def transcribe_16k_f32(self, audio_f32_16k: np.ndarray) -> str:
-        """audio_f32_16k: float32 mono 16kHz, range -1~1, shape (N,)"""
-        if audio_f32_16k is None or audio_f32_16k.size == 0:
+        """audio_f32_16k: float32 mono 16kHz, range -1~1, shape (N,) or (C,N)"""
+        if audio_f32_16k is None:
             return ""
-        # whisper가 기대하는 형태로 보정
-        audio = audio_f32_16k.astype(np.float32)
-        # 너무 짧으면(예: 0.2초 이하) 빈값 처리
-        if audio.shape[0] < 16000 * 0.2:
+        audio = np.asarray(audio_f32_16k, dtype=np.float32)
+        if audio.ndim == 2:
+            if audio.shape[0] == 1 or audio.shape[1] == 1:
+                audio = audio.reshape(-1)
+            else:
+                audio = audio.mean(axis=1)
+        audio = np.ravel(audio)
+        audio = np.ascontiguousarray(audio, dtype=np.float32)
+        if audio.size == 0:
             return ""
-        # Whisper는 내부적으로 30초 단위로 pad/trim함. 환각↓/한국어 안정 우선 옵션.
+        audio = np.nan_to_num(audio, nan=0.0, posinf=0.0, neginf=0.0)
+        audio = np.clip(audio, -1.0, 1.0)
+        # 입력 오디오 품질: DC 제거, 피크 정규화 (인식 안정성·정확도 보조)
+        audio = audio - np.mean(audio)
+        peak = float(np.max(np.abs(audio)))
+        if peak > 0.01:
+            audio = (audio * (0.95 / peak)).astype(np.float32)
+        audio = np.clip(audio, -1.0, 1.0)
+        # 최소 0.5초~1초 권장
+        if audio.shape[0] < 16000 * 0.5:
+            return ""
+        logger.info(
+            "WHISPER INPUT shape=%s dtype=%s min=%.4f max=%.4f",
+            audio.shape,
+            audio.dtype,
+            float(audio.min()) if audio.size else 0.0,
+            float(audio.max()) if audio.size else 0.0,
+        )
         result = self.model.transcribe(
             audio,
             language=self.cfg.language,
             task="transcribe",
             fp16=False,
             temperature=0.0,
-            beam_size=1,
+            beam_size=3,
             best_of=1,
             no_speech_threshold=0.6,
             logprob_threshold=-1.0,
@@ -49,5 +75,4 @@ class WhisperSTT:
             condition_on_previous_text=False,
             verbose=False,
         )
-        text = (result.get("text") or "").strip()
-        return text
+        return (result.get("text") or "").strip()

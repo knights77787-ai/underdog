@@ -339,6 +339,7 @@ btnMic.addEventListener("click", () => {
   if (micStream) {
     if (micStopModal && micStopConfirm && window.bootstrap) {
       const modal = new bootstrap.Modal(micStopModal);
+      micStopModal.setAttribute("aria-hidden", "false");
       modal.show();
       micStopConfirm.addEventListener("click", () => {
         modal.hide();
@@ -353,6 +354,7 @@ btnMic.addEventListener("click", () => {
   // 마이크 미사용 → 권한 안내 모달 후 권한 요청
   if (micPermissionModal && micPermissionConfirm && window.bootstrap) {
     const modal = new bootstrap.Modal(micPermissionModal);
+    micPermissionModal.setAttribute("aria-hidden", "false");
     modal.show();
     micPermissionConfirm.addEventListener("click", () => {
       modal.hide();

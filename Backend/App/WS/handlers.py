@@ -33,7 +33,7 @@ VAD_STREAM = SileroVADStream(
     VADConfig(sr=16000, threshold=0.5, min_silence_ms=300, speech_pad_ms=30)
 )
 AUDIO_STATES = AudioStateStore()
-WHISPER = WhisperSTT(WhisperConfig(model_name="base", language="ko"))
+WHISPER = WhisperSTT(WhisperConfig(model_name="medium", language="ko"))
 # 비말(1초) 오디오 분류용 큐. maxsize로 폭주 방지
 AUDIOCLS_QUEUE: asyncio.Queue = asyncio.Queue(maxsize=20)
 # STT 직렬화: VAD_END → 큐 → 단일 워커가 Whisper 실행 (동시 다중 STT 방지)
@@ -203,7 +203,7 @@ async def _process_speech_and_enqueue_stt(
     websocket: WebSocket,
 ) -> None:
     """말 구간 오디오 검사 후 STT 큐에 넣기. 짧음/조용함 스킵, 10초 컷, 커스텀 구문 매칭·알림 포함."""
-    min_samples = int(16000 * 0.3)
+    min_samples = int(16000 * 0.5)
     if speech_audio.shape[0] < min_samples:
         audio_logger.info(
             "%s STT_SKIP_SHORT sid=%s samples=%s",
@@ -275,6 +275,9 @@ async def _process_speech_and_enqueue_stt(
                     best_phrase.custom_phrase_id,
                     sim,
                 )
+    # 큐에 넣기 전 길이 검사 (0.5초 미만이면 worker까지 보내지 않음)
+    if speech_audio is None or getattr(speech_audio, "size", 0) < 16000 * 0.5:
+        return
     item = {
         "sid": sid,
         "speech_audio": speech_audio,

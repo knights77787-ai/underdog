@@ -25,6 +25,12 @@ class SttWorker:
                 logger.info("stt_worker_cancelled")
                 raise
             try:
+                logger.info(
+                    "STT INPUT sid=%s samples=%s dtype=%s",
+                    item["sid"],
+                    item["speech_audio"].shape[0] if item["speech_audio"] is not None else -1,
+                    getattr(item["speech_audio"], "dtype", None),
+                )
                 t0 = time.perf_counter()
                 text = await asyncio.to_thread(
                     handlers.WHISPER.transcribe_16k_f32,
