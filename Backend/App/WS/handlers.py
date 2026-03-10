@@ -33,7 +33,7 @@ VAD_STREAM = SileroVADStream(
     VADConfig(sr=16000, threshold=0.5, min_silence_ms=300, speech_pad_ms=30)
 )
 AUDIO_STATES = AudioStateStore()
-WHISPER = WhisperSTT(WhisperConfig(model_name="medium", language="ko"))
+WHISPER = WhisperSTT(WhisperConfig(model_name="small", language="ko"))
 # 비말(1초) 오디오 분류용 큐. maxsize로 폭주 방지
 AUDIOCLS_QUEUE: asyncio.Queue = asyncio.Queue(maxsize=20)
 # STT 직렬화: VAD_END → 큐 → 단일 워커가 Whisper 실행 (동시 다중 STT 방지)

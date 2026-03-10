@@ -49,15 +49,20 @@ const micPermissionConfirm = document.getElementById("micPermissionConfirm");
 const micStopModal = document.getElementById("micStopModal");
 const micStopConfirm = document.getElementById("micStopConfirm");
 
-// 모달 표시 시 aria-hidden 보정 (포커스 가능한데 숨김 처리되면 접근성 경고 발생)
-if (micPermissionModal) {
-  micPermissionModal.addEventListener("shown.bs.modal", () => micPermissionModal.setAttribute("aria-hidden", "false"));
-  micPermissionModal.addEventListener("hidden.bs.modal", () => micPermissionModal.setAttribute("aria-hidden", "true"));
+// 모달 접근성: 표시 시 inert 제거·aria-hidden=false, 숨김 시 inert 설정 (Blocked aria-hidden 경고 방지)
+function setupModalA11y(modalEl) {
+  if (!modalEl) return;
+  modalEl.addEventListener("shown.bs.modal", () => {
+    modalEl.removeAttribute("inert");
+    modalEl.setAttribute("aria-hidden", "false");
+  });
+  modalEl.addEventListener("hidden.bs.modal", () => {
+    modalEl.setAttribute("inert", "");
+    modalEl.setAttribute("aria-hidden", "true");
+  });
 }
-if (micStopModal) {
-  micStopModal.addEventListener("shown.bs.modal", () => micStopModal.setAttribute("aria-hidden", "false"));
-  micStopModal.addEventListener("hidden.bs.modal", () => micStopModal.setAttribute("aria-hidden", "true"));
-}
+setupModalA11y(micPermissionModal);
+setupModalA11y(micStopModal);
 
 const captionBox = document.getElementById("captionBox");
 
@@ -339,6 +344,7 @@ btnMic.addEventListener("click", () => {
   if (micStream) {
     if (micStopModal && micStopConfirm && window.bootstrap) {
       const modal = new bootstrap.Modal(micStopModal);
+      micStopModal.removeAttribute("inert");
       micStopModal.setAttribute("aria-hidden", "false");
       modal.show();
       micStopConfirm.addEventListener("click", () => {
@@ -354,6 +360,7 @@ btnMic.addEventListener("click", () => {
   // 마이크 미사용 → 권한 안내 모달 후 권한 요청
   if (micPermissionModal && micPermissionConfirm && window.bootstrap) {
     const modal = new bootstrap.Modal(micPermissionModal);
+    micPermissionModal.removeAttribute("inert");
     micPermissionModal.setAttribute("aria-hidden", "false");
     modal.show();
     micPermissionConfirm.addEventListener("click", () => {
