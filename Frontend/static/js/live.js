@@ -15,10 +15,14 @@ let lastAlertEventId = null;
 let micStream = null;
 let audioContext = null;
 let audioProcessor = null;
+let audioWorkletNode = null;
 let audioSource = null;
 let audioBuffer = [];
+let rawBuffer = [];
+let currentSr = 0;
 const TARGET_SR = 16000;
 const CHUNK_SAMPLES = 8000; // 0.5 sec at 16kHz
+const WORKLET_URL = (window.location.origin || "http://127.0.0.1:8000") + "/static/js/audio-processor-worklet.js";
 
 // =======================
 // 1) DOM
@@ -44,6 +48,16 @@ const micPermissionModal = document.getElementById("micPermissionModal");
 const micPermissionConfirm = document.getElementById("micPermissionConfirm");
 const micStopModal = document.getElementById("micStopModal");
 const micStopConfirm = document.getElementById("micStopConfirm");
+
+// 모달 표시 시 aria-hidden 보정 (포커스 가능한데 숨김 처리되면 접근성 경고 발생)
+if (micPermissionModal) {
+  micPermissionModal.addEventListener("shown.bs.modal", () => micPermissionModal.setAttribute("aria-hidden", "false"));
+  micPermissionModal.addEventListener("hidden.bs.modal", () => micPermissionModal.setAttribute("aria-hidden", "true"));
+}
+if (micStopModal) {
+  micStopModal.addEventListener("shown.bs.modal", () => micStopModal.setAttribute("aria-hidden", "false"));
+  micStopModal.addEventListener("hidden.bs.modal", () => micStopModal.setAttribute("aria-hidden", "true"));
+}
 
 const captionBox = document.getElementById("captionBox");
 
@@ -131,7 +145,7 @@ function requestMicPermission() {
     micDesc.textContent = client.isConnected && SESSION_ID
       ? "전송 시작 중…"
       : "Connect 후 자동 전송됩니다.";
-    if (client.isConnected && SESSION_ID) startAudioSend();
+    if (client.isConnected && SESSION_ID) startAudioSend().catch(console.error);
   }).catch(() => {
     micTitle.textContent = "마이크 권한 거부됨";
     micDesc.textContent = "브라우저 설정에서 마이크 허용이 필요합니다.";
@@ -210,6 +224,13 @@ function downsample(input, inputSr, outputSr) {
 }
 
 function stopAudioSend() {
+  if (audioWorkletNode) {
+    try {
+      audioWorkletNode.disconnect();
+      audioSource?.disconnect();
+    } catch (_) {}
+    audioWorkletNode = null;
+  }
   if (audioProcessor) {
     try {
       audioProcessor.disconnect();
@@ -223,51 +244,87 @@ function stopAudioSend() {
   }
   audioContext = null;
   audioBuffer = [];
+  rawBuffer = [];
 }
 
 
-function startAudioSend() {
+function flushRawToChunks() {
+  if (!currentSr || !client.isConnected || !SESSION_ID) return;
+  const needRaw = Math.ceil((CHUNK_SAMPLES * currentSr) / TARGET_SR);
+  while (rawBuffer.length >= needRaw) {
+    const raw = rawBuffer.splice(0, needRaw);
+    const down = downsample(raw, currentSr, TARGET_SR);
+    if (down.length < CHUNK_SAMPLES) continue;
+    const chunk = down.length > CHUNK_SAMPLES ? down.subarray(0, CHUNK_SAMPLES) : down;
+    const int16 = float32ToInt16(chunk);
+    const uint8 = new Uint8Array(int16.buffer);
+    let binary = "";
+    for (let i = 0; i < uint8.length; i++) binary += String.fromCharCode(uint8[i]);
+    client.send("audio_chunk", {
+      session_id: SESSION_ID,
+      ts_ms: Date.now(),
+      sr: TARGET_SR,
+      format: "pcm_s16le",
+      data_b64: btoa(binary),
+    });
+  }
+}
+
+async function startAudioSend() {
   if (!micStream || !SESSION_ID || !client.isConnected) return;
   stopAudioSend();
 
   try {
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const sr = audioContext.sampleRate;
+    currentSr = audioContext.sampleRate;
     audioSource = audioContext.createMediaStreamSource(micStream);
-    const bufferSize = 4096;
-    audioProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
-    audioBuffer = [];
+    rawBuffer = [];
 
-    audioProcessor.onaudioprocess = (e) => {
-      if (!client.isConnected || !SESSION_ID) return;
-      const input = e.inputBuffer.getChannelData(0);
-      const down = downsample(input, sr, TARGET_SR);
-      for (let i = 0; i < down.length; i++) audioBuffer.push(down[i]);
-
-      while (audioBuffer.length >= CHUNK_SAMPLES) {
-        const chunk = audioBuffer.splice(0, CHUNK_SAMPLES);
-        const floatArr = new Float32Array(chunk);
-        const int16 = float32ToInt16(floatArr);
-        const uint8 = new Uint8Array(int16.buffer);
-        let binary = "";
-        for (let i = 0; i < uint8.length; i++) binary += String.fromCharCode(uint8[i]);
-        const data_b64 = btoa(binary);
-
-        client.send("audio_chunk", {
-          session_id: SESSION_ID,
-          ts_ms: Date.now(),
-          sr: TARGET_SR,
-          format: "pcm_s16le",
-          data_b64: data_b64,
-        });
-      }
-    };
-
-    const gain = audioContext.createGain();
-    gain.gain.value = 0;
-    gain.connect(audioContext.destination);
-    audioSource.connect(audioProcessor);
-    audioProcessor.connect(gain);
+    if (audioContext.audioWorklet && typeof audioContext.audioWorklet.addModule === "function") {
+      await audioContext.audioWorklet.addModule(WORKLET_URL);
+      audioWorkletNode = new AudioWorkletNode(audioContext, "mic-processor");
+      audioWorkletNode.port.onmessage = (e) => {
+        if (e.data?.type === "audio" && e.data.samples) {
+          for (let i = 0; i < e.data.samples.length; i++) rawBuffer.push(e.data.samples[i]);
+          flushRawToChunks();
+        }
+      };
+      const gain = audioContext.createGain();
+      gain.gain.value = 0;
+      gain.connect(audioContext.destination);
+      audioSource.connect(audioWorkletNode);
+      audioWorkletNode.connect(gain);
+    } else {
+      const bufferSize = 4096;
+      audioProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
+      audioBuffer = [];
+      audioProcessor.onaudioprocess = (e) => {
+        if (!client.isConnected || !SESSION_ID) return;
+        const input = e.inputBuffer.getChannelData(0);
+        const down = downsample(input, currentSr, TARGET_SR);
+        for (let i = 0; i < down.length; i++) audioBuffer.push(down[i]);
+        while (audioBuffer.length >= CHUNK_SAMPLES) {
+          const chunk = audioBuffer.splice(0, CHUNK_SAMPLES);
+          const floatArr = new Float32Array(chunk);
+          const int16 = float32ToInt16(floatArr);
+          const uint8 = new Uint8Array(int16.buffer);
+          let binary = "";
+          for (let i = 0; i < uint8.length; i++) binary += String.fromCharCode(uint8[i]);
+          client.send("audio_chunk", {
+            session_id: SESSION_ID,
+            ts_ms: Date.now(),
+            sr: TARGET_SR,
+            format: "pcm_s16le",
+            data_b64: btoa(binary),
+          });
+        }
+      };
+      const gain = audioContext.createGain();
+      gain.gain.value = 0;
+      gain.connect(audioContext.destination);
+      audioSource.connect(audioProcessor);
+      audioProcessor.connect(gain);
+    }
     micTitle.textContent = "마이크 전송 중";
     micDesc.textContent = "실시간 음성을 서버로 전송 중입니다.";
   } catch (e) {
@@ -325,7 +382,7 @@ client.on("open", () => {
 
   micTitle.textContent = micStream ? "마이크 전송 시작" : "소리 감지 대기중";
   micDesc.textContent  = micStream ? "실시간 음성을 서버로 전송 중입니다." : "마이크 권한 요청 후 전송됩니다.";
-  if (micStream && SESSION_ID) startAudioSend();
+  if (micStream && SESSION_ID) startAudioSend().catch(console.error);
 });
 
 client.on("close", () => {
