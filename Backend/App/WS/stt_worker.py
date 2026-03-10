@@ -33,10 +33,14 @@ class SttWorker:
                 )
                 t0 = time.perf_counter()
                 beam_size = item.get("beam_size")
+                stt_initial_prompt = item.get("stt_initial_prompt")
+                stt_best_of = item.get("stt_best_of")
                 text = await asyncio.to_thread(
                     handlers.WHISPER.transcribe_16k_f32,
                     item["speech_audio"],
                     beam_size,
+                    stt_initial_prompt,
+                    stt_best_of,
                 )
                 dt_ms = int((time.perf_counter() - t0) * 1000)
                 add_time("stt", dt_ms)

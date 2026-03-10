@@ -158,14 +158,16 @@ async def _handle_caption_generated(
     # 1) caption 브로드캐스트 (말한/입력한 클라이언트도 자막 보이도록 exclude 없이 전송)
     caption_entry = memory_logs.append_caption(sid, text, ts_ms=ts_ms)
     await manager.broadcast_to_session(sid, caption_entry)
-    # 2) DB 저장
-    await asyncio.to_thread(_persist_caption, sid, text, ts_ms)
+    # 2) DB 저장 + 설정 조회 병렬 (비동기 효율)
+    _, settings = await asyncio.gather(
+        asyncio.to_thread(_persist_caption, sid, text, ts_ms),
+        asyncio.to_thread(_get_settings, sid),
+    )
     # 3) 키워드 판정
     category, event_type, keyword, score = keyword_detector.judge(text)
     if event_type not in ("danger", "alert") or not keyword:
         return
-    # 4) 설정 기반 쿨다운·alert on/off
-    settings = await asyncio.to_thread(_get_settings, sid)
+    # 4) 설정 기반 쿨다운·alert on/off (위에서 조회한 settings 사용)
     cooldown_sec = int(settings.get("cooldown_sec", 5))
     alert_enabled = bool(settings.get("alert_enabled", True))
     if _is_in_cooldown(sid, keyword or "", event_type, cooldown_sec, ts_ms):
@@ -217,10 +219,13 @@ async def _process_speech_and_enqueue_stt(
             conn_prefix, sid, rms,
         )
         return
-    max_samples = 16000 * 10
+    # 구간 짧게(6초) 해서 구간당 처리 빠르게 → 반응 텀 감소
+    max_samples = 16000 * 6
     if speech_audio.shape[0] > max_samples:
         speech_audio = speech_audio[-max_samples:].copy()
-        audio_logger.info("%s STT_CUT sid=%s max_sec=10", conn_prefix, sid)
+        audio_logger.info("%s STT_CUT sid=%s max_sec=6", conn_prefix, sid)
+    # 설정 1회 조회 후 구문 매칭·STT 아이템에 재사용 (비동기 호출 최소화)
+    settings = await asyncio.to_thread(_get_settings, sid)
     # 커스텀 구문 매칭
     try:
         best_phrase, sim = await asyncio.to_thread(
@@ -235,7 +240,6 @@ async def _process_speech_and_enqueue_stt(
         if best_phrase is not None and sim >= (
             (best_phrase.threshold_pct or 80) / 100.0
         ):
-            settings = await asyncio.to_thread(_get_settings, sid)
             cooldown_sec = int(settings.get("cooldown_sec", 5))
             alert_enabled = bool(settings.get("alert_enabled", True))
             kw_phrase = f"phrase:{best_phrase.custom_phrase_id}"
@@ -278,8 +282,9 @@ async def _process_speech_and_enqueue_stt(
     # 큐에 넣기 전 길이 검사 (0.5초 미만이면 worker까지 보내지 않음)
     if speech_audio is None or getattr(speech_audio, "size", 0) < 16000 * 0.5:
         return
-    settings = await asyncio.to_thread(_get_settings, sid)
-    beam_size = int(settings.get("beam_size", 3))
+    beam_size = int(settings.get("beam_size", 2))
+    stt_initial_prompt = settings.get("stt_initial_prompt") or None
+    stt_best_of = int(settings.get("stt_best_of", 0))
     item = {
         "sid": sid,
         "speech_audio": speech_audio,
@@ -287,6 +292,8 @@ async def _process_speech_and_enqueue_stt(
         "conn_prefix": conn_prefix,
         "websocket": websocket,
         "beam_size": beam_size,
+        "stt_initial_prompt": stt_initial_prompt,
+        "stt_best_of": stt_best_of,
     }
     try:
         STT_QUEUE.put_nowait(item)
@@ -383,12 +390,13 @@ async def handle_message(
         if st.in_speech:
             st.speech_chunks.append(audio_f32.copy())
             # 10초 초과 말 구간은 끊어서 STT에 보냄 (큐 적체·지연 완화)
-            if len(st.speech_chunks) >= 20:
-                speech_audio = np.concatenate(st.speech_chunks)[-16000 * 10:]
+            # 6초 누적 시 끊어서 전송 (구간당 처리 빠르게)
+            if len(st.speech_chunks) >= 12:
+                speech_audio = np.concatenate(st.speech_chunks)[-16000 * 6:]
                 st.speech_chunks = []
                 st.in_speech = False
                 audio_logger.info(
-                    "STT_FORCED_FLUSH_10s session_id=%s ts_ms=%s",
+                    "STT_FORCED_FLUSH_6s session_id=%s ts_ms=%s",
                     sid, ts_ms,
                 )
                 await _process_speech_and_enqueue_stt(

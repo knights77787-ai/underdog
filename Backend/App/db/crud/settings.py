@@ -12,7 +12,9 @@ DEFAULT_SETTINGS = {
     "alert_enabled": True,
     "cooldown_sec": 5,
     "auto_scroll": True,
-    "beam_size": 3,  # STT Whisper beam_size (1=빠름, 3~5=정확)
+    "beam_size": 2,  # 1=가장 빠름, 2=속도·정확 균형, 3~5=정확하지만 느려짐
+    "stt_initial_prompt": "",  # 비우면 '한국어로 말합니다.' 등 프롬프트가 자막으로 안 나옴
+    "stt_best_of": 0,  # 0 또는 1=가장 빠름(1회 디코딩), 2~3=정확하지만 느려짐
 }
 
 
