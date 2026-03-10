@@ -1,5 +1,8 @@
-const API_BASE = "http://127.0.0.1:8000";
-const SESSION_ID = "S1";
+const API_BASE = window.APP_CONFIG?.API_BASE || "http://127.0.0.1:8000";
+const SESSION_ID = (function () {
+  const params = new URLSearchParams(document.location.search);
+  return params.get("session_id") || "S1";
+})();
 
 // ===== elements =====
 const btnStart = document.getElementById("btnStart");
@@ -101,6 +104,14 @@ function validateStep1Form() {
     };
   }
 
+  const fn = (selectedAudioFile.name || "").toLowerCase();
+  if (!fn.endsWith(".wav") && !fn.endsWith(".mp3")) {
+    return {
+      ok: false,
+      message: "등록은 .wav, .mp3 파일만 지원합니다. (서버 제한)",
+    };
+  }
+
   return {
     ok: true,
     name,
@@ -108,6 +119,12 @@ function validateStep1Form() {
     audioFile: selectedAudioFile,
     audioSource: selectedAudioSource,
   };
+}
+
+/** category(danger|alert) → API용 group_type(warning|daily), event_type(danger|alert) */
+function categoryToApi(category) {
+  if (category === "danger") return { group_type: "warning", event_type: "danger" };
+  return { group_type: "daily", event_type: "alert" };
 }
 
 // ===== initial ui =====
@@ -149,38 +166,98 @@ soundCategory?.addEventListener("change", () => {
   if (statusEl.classList.contains("err")) clearStatus();
 });
 
-// ===== submit (1차: 검증만) =====
+// ===== submit → POST /custom-sounds =====
 btnSubmit?.addEventListener("click", async () => {
   clearStatus();
 
   const result = validateStep1Form();
-
   if (!result.ok) {
     setStatus(result.message, "err");
     return;
   }
 
-  const sourceLabel =
-    result.audioSource === "upload"
-      ? "업로드 파일"
-      : result.audioSource === "record"
-      ? "녹음 파일"
-      : "오디오 파일";
+  const { group_type, event_type } = categoryToApi(result.category);
+  const form = new FormData();
+  form.append("name", result.name);
+  form.append("group_type", group_type);
+  form.append("event_type", event_type);
+  form.append("file", result.audioFile);
 
-  setStatus(
-    `1차 검증 통과: ${sourceLabel}, 이름 "${result.name}", 분류 "${result.category}"`,
-    "ok"
-  );
+  btnSubmit.disabled = true;
+  setStatus("등록 중…", "ok");
 
-  console.log("1차 검증 통과", {
-    name: result.name,
-    category: result.category,
-    audioFile: result.audioFile,
-    audioSource: result.audioSource,
-  });
+  try {
+    const url = API_BASE + "/custom-sounds?session_id=" + encodeURIComponent(SESSION_ID);
+    const res = await fetch(url, { method: "POST", body: form });
+    const data = await res.json().catch(() => ({}));
 
-  // 4차에서 여기서 FormData 만들어 FastAPI로 전송
+    if (res.ok && data.ok) {
+      setStatus('등록되었습니다. "' + (data.data?.name || result.name) + '"', "ok");
+      soundName.value = "";
+      fileInput.value = "";
+      setSelectedAudio(null, null);
+      updateFileMeta(null);
+      loadSoundList();
+    } else {
+      setStatus(data.detail || res.statusText || "등록에 실패했습니다.", "err");
+    }
+  } catch (e) {
+    setStatus("서버에 연결할 수 없습니다. 백엔드를 확인하세요.", "err");
+  } finally {
+    btnSubmit.disabled = false;
+  }
 });
+
+// ===== GET /custom-sounds → 목록 탭 =====
+const soundListEl = document.getElementById("soundList");
+const soundListStatusEl = document.getElementById("soundListStatus");
+
+function loadSoundList() {
+  if (!soundListEl || !soundListStatusEl) return;
+  soundListStatusEl.textContent = "불러오는 중…";
+  const url = API_BASE + "/custom-sounds?session_id=" + encodeURIComponent(SESSION_ID);
+  fetch(url)
+    .then((res) => res.json())
+    .then((data) => {
+      if (!data.ok || !Array.isArray(data.data)) {
+        soundListStatusEl.textContent = "목록을 불러오지 못했습니다.";
+        soundListEl.innerHTML = "";
+        return;
+      }
+      const list = data.data;
+      soundListStatusEl.textContent = list.length ? "총 " + list.length + "건" : "등록된 소리가 없습니다.";
+      soundListEl.innerHTML = list
+        .map(
+          (r) => `
+        <div class="sound-row" data-id="${r.custom_sound_id}">
+          <div class="sound-left">
+            <div class="sound-title-line">
+              <span class="sound-name">${escapeHtml(r.name)}</span>
+              <span class="sound-badge ${r.event_type === "danger" ? "danger" : "alert"}">${r.event_type === "danger" ? "경고" : "일상생활"}</span>
+            </div>
+            <div class="sound-date text-muted small">${r.group_type} · ${r.event_type}</div>
+          </div>
+          <div class="sound-right">
+            <button type="button" class="btn btn-sm btn-outline-secondary" disabled>수정</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" disabled>삭제</button>
+          </div>
+        </div>`
+        )
+        .join("");
+    })
+    .catch(() => {
+      soundListStatusEl.textContent = "서버에 연결할 수 없습니다.";
+      soundListEl.innerHTML = "";
+    });
+}
+
+function escapeHtml(s) {
+  const div = document.createElement("div");
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+document.getElementById("list-tab")?.addEventListener("shown.bs.tab", loadSoundList);
 
 // ===== placeholders for 2차/3차 =====
 function fmtTime(sec) {
