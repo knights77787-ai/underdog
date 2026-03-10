@@ -14,12 +14,15 @@ from App.Core.logging import get_logger
 
 logger = get_logger("stt.whisper")
 
+# STT 언어 고정 (한글)
+STT_LANGUAGE = "ko"
+
 
 @dataclass
 class WhisperConfig:
-    """Whisper 설정. tiny/base/small 등, MVP는 base 권장."""
+    """Whisper 설정. tiny/base/small 등, MVP는 base 권장. 언어는 STT_LANGUAGE로 한글 고정."""
     model_name: str = "base"
-    language: str | None = "ko"  # "ko" 추천, None이면 자동 감지
+    language: str = "ko"  # 한글 고정 (실제 transcribe는 STT_LANGUAGE 사용)
     beam_size: int = 4  # 기본값; 호출 시 인자로 오면 그걸 사용(세션 설정 연동)
 
 
@@ -69,7 +72,7 @@ class WhisperSTT:
         beam = beam_size if beam_size is not None else self.cfg.beam_size
         result = self.model.transcribe(
             audio,
-            language=self.cfg.language,
+            language=STT_LANGUAGE,
             task="transcribe",
             fp16=False,
             temperature=0.0,
