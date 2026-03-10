@@ -278,12 +278,15 @@ async def _process_speech_and_enqueue_stt(
     # 큐에 넣기 전 길이 검사 (0.5초 미만이면 worker까지 보내지 않음)
     if speech_audio is None or getattr(speech_audio, "size", 0) < 16000 * 0.5:
         return
+    settings = await asyncio.to_thread(_get_settings, sid)
+    beam_size = int(settings.get("beam_size", 3))
     item = {
         "sid": sid,
         "speech_audio": speech_audio,
         "ts_ms": ts_ms,
         "conn_prefix": conn_prefix,
         "websocket": websocket,
+        "beam_size": beam_size,
     }
     try:
         STT_QUEUE.put_nowait(item)

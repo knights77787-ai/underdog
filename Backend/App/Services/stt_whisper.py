@@ -20,6 +20,7 @@ class WhisperConfig:
     """Whisper 설정. tiny/base/small 등, MVP는 base 권장."""
     model_name: str = "base"
     language: str | None = "ko"  # "ko" 추천, None이면 자동 감지
+    beam_size: int = 4  # 기본값; 호출 시 인자로 오면 그걸 사용(세션 설정 연동)
 
 
 class WhisperSTT:
@@ -29,8 +30,12 @@ class WhisperSTT:
         self.cfg = cfg or WhisperConfig()
         self.model = whisper.load_model(self.cfg.model_name)  # load once
 
-    def transcribe_16k_f32(self, audio_f32_16k: np.ndarray) -> str:
-        """audio_f32_16k: float32 mono 16kHz, range -1~1, shape (N,) or (C,N)"""
+    def transcribe_16k_f32(
+        self,
+        audio_f32_16k: np.ndarray,
+        beam_size: int | None = None,
+    ) -> str:
+        """audio_f32_16k: float32 mono 16kHz, range -1~1, shape (N,) or (C,N). beam_size None이면 cfg 값 사용."""
         if audio_f32_16k is None:
             return ""
         audio = np.asarray(audio_f32_16k, dtype=np.float32)
@@ -61,13 +66,14 @@ class WhisperSTT:
             float(audio.min()) if audio.size else 0.0,
             float(audio.max()) if audio.size else 0.0,
         )
+        beam = beam_size if beam_size is not None else self.cfg.beam_size
         result = self.model.transcribe(
             audio,
             language=self.cfg.language,
             task="transcribe",
             fp16=False,
             temperature=0.0,
-            beam_size=3,
+            beam_size=beam,
             best_of=1,
             no_speech_threshold=0.6,
             logprob_threshold=-1.0,

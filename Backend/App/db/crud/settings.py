@@ -12,6 +12,7 @@ DEFAULT_SETTINGS = {
     "alert_enabled": True,
     "cooldown_sec": 5,
     "auto_scroll": True,
+    "beam_size": 3,  # STT Whisper beam_size (1=빠름, 3~5=정확)
 }
 
 
