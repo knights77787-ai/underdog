@@ -28,6 +28,10 @@ let selectedAudioFile = null;
 let selectedAudioSource = null; // "upload" | "record" | null
 let previewUrl = null;
 
+let listAudio = null;
+let currentPlayingId = null;
+let currentPlayButton = null;
+
 // ===== recorder state =====
 let mediaRecorder = null;
 let recordedChunks = [];
@@ -98,6 +102,80 @@ function escapeHtml(s) {
   return div.innerHTML;
 }
 
+/** ISO 날짜 문자열을 "YYYY-MM-DD"로 포맷. 수정일이 있으면 수정일을, 없으면 등록일 표시용 라벨/날짜 반환 */
+function formatSoundDateLabel(createdAt, updatedAt) {
+  const toYmd = (s) => {
+    if (!s) return "";
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
+  };
+  const created = toYmd(createdAt);
+  const updated = toYmd(updatedAt);
+  if (updated && updated !== created) {
+    return { label: "수정", date: updated };
+  }
+  return { label: "등록", date: created };
+}
+
+// ===== list audio helpers =====
+function normalizeAudioPath(audioPath) {
+  if (!audioPath) return "";
+  return audioPath.replace(/\\/g, "/");
+}
+
+function buildAudioUrl(audioPath) {
+  const normalized = normalizeAudioPath(audioPath);
+  if (!normalized) return "";
+
+  if (normalized.startsWith("http://") || normalized.startsWith("https://")) {
+    return normalized;
+  }
+
+  if (normalized.startsWith("/")) {
+    return normalized;
+  }
+
+  // DB 값이 data/custom_sounds/... 형태인 경우
+  if (normalized.startsWith("data/")) {
+    return "/" + normalized;
+  }
+
+  // 혹시 custom_sounds/... 만 들어오면 /data 붙여줌
+  return "/data/" + normalized;
+}
+
+function resetPlayButtonUi(btn) {
+  if (!btn) return;
+  btn.innerHTML = '<i class="bi bi-play-fill"></i>';
+  btn.setAttribute("title", "재생");
+  btn.setAttribute("aria-label", "재생");
+  btn.classList.remove("is-playing");
+}
+
+function setPlayButtonUi(btn) {
+  if (!btn) return;
+  btn.innerHTML = '<i class="bi bi-stop-fill"></i>';
+  btn.setAttribute("title", "정지");
+  btn.setAttribute("aria-label", "정지");
+  btn.classList.add("is-playing");
+}
+
+function stopListAudioPlayback() {
+  if (listAudio) {
+    listAudio.pause();
+    listAudio.currentTime = 0;
+    listAudio = null;
+  }
+
+  if (currentPlayButton) {
+    resetPlayButtonUi(currentPlayButton);
+  }
+
+  currentPlayingId = null;
+  currentPlayButton = null;
+}
+
+// ===== preview helpers =====
 function revokePreviewUrl() {
   if (previewUrl) {
     URL.revokeObjectURL(previewUrl);
@@ -189,6 +267,7 @@ function resetRecordingUi() {
   timerEl.textContent = "00:00";
 }
 
+// ===== list render =====
 function renderSoundList(list) {
   if (!soundListEl || !soundListStatusEl) return;
 
@@ -201,34 +280,53 @@ function renderSoundList(list) {
   soundListStatusEl.textContent = `총 ${list.length}건`;
 
   soundListEl.innerHTML = list
-    .map(
-      (r) => `
+    .map((r) => {
+      const { label, date } = formatSoundDateLabel(r.created_at, r.updated_at);
+      const dateStr = date ? ` · ${label}: ${date}` : "";
+      return `
       <div class="sound-row" data-id="${r.custom_sound_id}">
         <div class="sound-left">
           <div class="sound-title-line">
-            <span class="sound-name">${escapeHtml(r.name)}</span>
             <span class="sound-badge ${r.event_type === "danger" ? "danger" : "alert"}">
               ${r.event_type === "danger" ? "경고" : "일상생활"}
             </span>
+            <span class="sound-name">${escapeHtml(r.name)}</span>
           </div>
           <div class="sound-date text-muted small">
-            ${escapeHtml(r.group_type)} · ${escapeHtml(r.event_type)}
+            ${escapeHtml(r.group_type)} · ${escapeHtml(r.event_type)}${dateStr}
           </div>
         </div>
 
         <div class="sound-right">
-          <button type="button" class="btn btn-sm btn-outline-secondary" disabled>수정</button>
-          <button type="button" class="btn btn-sm btn-outline-danger" disabled>삭제</button>
+          <button
+            type="button"
+            class="icon-btn play-toggle-btn"
+            data-id="${r.custom_sound_id}"
+            data-audio-path="${escapeHtml(r.audio_path || "")}"
+            aria-label="재생"
+            title="재생"
+          >
+            <i class="bi bi-play-fill"></i>
+          </button>
+
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-danger delete-sound-btn"
+            data-id="${r.custom_sound_id}"
+          >
+            삭제
+          </button>
         </div>
       </div>
-    `
-    )
+    `;
+    })
     .join("");
 }
 
 async function loadSoundList() {
   if (!soundListEl || !soundListStatusEl) return;
 
+  stopListAudioPlayback();
   soundListStatusEl.textContent = "불러오는 중…";
 
   try {
@@ -295,8 +393,6 @@ btnStart?.addEventListener("click", async () => {
     const mimeCandidates = [
       "audio/webm;codecs=opus",
       "audio/webm",
-      "audio/ogg;codecs=opus",
-      "audio/ogg"
     ];
     const mimeType = mimeCandidates.find((t) => MediaRecorder.isTypeSupported(t)) || "";
 
@@ -385,7 +481,99 @@ document.getElementById("list-tab")?.addEventListener("shown.bs.tab", () => {
 });
 
 document.getElementById("register-tab")?.addEventListener("shown.bs.tab", () => {
+  stopListAudioPlayback();
   clearStatus();
+});
+
+// ===== list audio play / stop / delete =====
+soundListEl?.addEventListener("click", async (e) => {
+  const playBtn = e.target.closest(".play-toggle-btn");
+  const deleteBtn = e.target.closest(".delete-sound-btn");
+
+  // 삭제
+  if (deleteBtn) {
+    const soundId = deleteBtn.dataset.id;
+    if (!soundId) return;
+
+    const ok = window.confirm(
+      "정말 삭제하시겠습니까? 이 소리는 즉시 삭제되며 복구할 수 없습니다."
+    );
+    if (!ok) return;
+
+    stopListAudioPlayback();
+
+    try {
+      soundListStatusEl.textContent = "삭제 중…";
+      const url =
+        API_BASE +
+        "/custom-sounds/" +
+        encodeURIComponent(soundId) +
+        "?session_id=" +
+        encodeURIComponent(SESSION_ID);
+
+      const res = await fetch(url, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data.ok) {
+        setStatus(data.detail || "삭제에 실패했습니다.", "err");
+        soundListStatusEl.textContent = "삭제 실패";
+        await loadSoundList();
+        return;
+      }
+
+      setStatus("소리가 삭제되었습니다.", "ok");
+      await loadSoundList();
+    } catch (err) {
+      console.error(err);
+      setStatus("삭제 요청 중 오류가 발생했습니다.", "err");
+      soundListStatusEl.textContent = "삭제 오류";
+      await loadSoundList();
+    }
+    return;
+  }
+
+  // 재생
+  if (!playBtn) return;
+
+  const soundId = playBtn.dataset.id;
+  const audioPath = playBtn.dataset.audioPath;
+
+  if (!audioPath) {
+    setStatus("재생할 오디오 경로가 없습니다.", "err");
+    return;
+  }
+
+  if (currentPlayingId === soundId && listAudio) {
+    stopListAudioPlayback();
+    return;
+  }
+
+  stopListAudioPlayback();
+
+  const audioUrl = buildAudioUrl(audioPath);
+
+  try {
+    listAudio = new Audio(audioUrl);
+    currentPlayingId = soundId;
+    currentPlayButton = playBtn;
+
+    setPlayButtonUi(playBtn);
+
+    listAudio.addEventListener("ended", () => {
+      stopListAudioPlayback();
+    });
+
+    listAudio.addEventListener("error", () => {
+      stopListAudioPlayback();
+      setStatus("오디오 파일을 불러오지 못했습니다.", "err");
+    });
+
+    await listAudio.play();
+  } catch (err) {
+    console.error(err);
+    stopListAudioPlayback();
+    setStatus("오디오를 재생할 수 없습니다.", "err");
+  }
 });
 
 // ===== submit =====

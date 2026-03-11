@@ -95,13 +95,15 @@
                 <audio id="audioPreview" hidden controls class="w-100 mt-3"></audio>
               </div>
 
+              <div id="status" class="status small mb-3"></div>
+
               <div class="mb-3">
                 <label for="fileInput" class="form-label fw-semibold">
                   녹음 파일 업로드
                   <span class="text-muted small">(파일 형식: .mp3, .wav, .webm)</span>
                 </label>
                 <input id="fileInput" type="file" class="form-control" accept=".mp3,.wav,.webm,audio/*">
-                <div id="fileMeta" class="form-text">선택된 파일 없음</div>
+                <div id="fileMeta" class="form-text"></div>
               </div>
 
               <div class="mb-3">
@@ -122,11 +124,11 @@
                 </select>
               </div>
 
-              <div id="status" class="status small mb-3"></div>
+              
 
               <div class="d-flex justify-content-end">
                 <button id="btnSubmit" type="button" class="btn btn-outline-secondary px-4">
-                  다음
+                  등록
                 </button>
               </div>
             </div>
@@ -147,16 +149,16 @@
             </div>
 
             <div id="soundListStatus" class="small text-muted mb-3">
-              등록된 소리 목록 예시
+              등록된 소리가 없습니다
             </div>
 
-            <div id="soundList" class="sound-list"></div>
+            <div id="soundList" class="sound-list"><!-- 실제 API 목록 받아올 자리--> </div>
 
-          </div>
+          </div> <!-- end of listPanel -->
 
-          <!-- /tab-content -->
+          </div> <!-- end of tab-content -->
 
-        </div>
+        </div> <!-- end of card-body-->
       </div>
     </div>
   </main>
