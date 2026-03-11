@@ -4,12 +4,18 @@ from pathlib import Path
 
 import numpy as np
 import tensorflow as tf
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Path as ApiPath, Query, UploadFile
 from sqlalchemy.orm import Session
 
-from App.db.crud.custom_sounds import create_custom_sound, list_custom_sounds
+from App.db.crud.custom_sounds import (
+    create_custom_sound,
+    list_custom_sounds,
+    delete_custom_sound,
+)
 from App.db.database import get_db
 from App.Services.yamnet_service import YamnetService
+
+from scipy.signal import resample
 
 router = APIRouter(prefix="/custom-sounds", tags=["custom-sounds"])
 
@@ -22,10 +28,17 @@ ALLOWED_EXTENSIONS = (".wav", ".mp3")
 
 def _resample_to_16k(x: np.ndarray, sr: int) -> np.ndarray:
     if sr == 16000:
-        return x
-    x_tf = tf.convert_to_tensor(x, dtype=tf.float32)[None, :]
-    new_len = int(round(x.shape[0] * (16000 / sr)))
-    return tf.signal.resample(x_tf, new_len)[0].numpy().astype(np.float32)
+        return x.astype(np.float32)
+
+    if sr <= 0:
+        raise ValueError("invalid sample rate")
+
+    new_len = int(round(len(x) * 16000 / sr))
+    if new_len <= 0:
+        raise ValueError("invalid resample length")
+
+    y = resample(x, new_len)
+    return y.astype(np.float32)
 
 def _normalize_1s_window(x: np.ndarray) -> np.ndarray:
     if x.shape[0] < 16000:
@@ -116,6 +129,26 @@ def get_custom_sounds(
                 "name": r.name,
                 "group_type": r.group_type,
                 "event_type": r.event_type,
+                "audio_path": r.audio_path,
+                "created_at": r.created_at,
+                "updated_at": r.updated_at,
             } for r in rows
         ]
     }
+
+
+@router.delete("/{custom_sound_id}")
+def remove_custom_sound(
+    custom_sound_id: int = ApiPath(..., description="삭제할 커스텀 사운드 ID"),
+    session_id: str = Query(..., description="클라이언트 세션 문자열 예: S1"),
+    db: Session = Depends(get_db),
+):
+    """
+    커스텀 사운드 1건 삭제.
+    - 세션 ID를 함께 받아 해당 세션이 소유한 항목만 삭제.
+    - DB 레코드와 연결된 오디오 파일을 함께 제거.
+    """
+    deleted = delete_custom_sound(db, client_session_uuid=session_id, custom_sound_id=custom_sound_id)
+    if not deleted:
+        raise HTTPException(404, "해당 소리를 찾을 수 없거나 권한이 없습니다.")
+    return {"ok": True}

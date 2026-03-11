@@ -186,3 +186,8 @@ def favicon():
 
 if _FRONTEND_STATIC.is_dir():
     app.mount("/static", StaticFiles(directory=str(_FRONTEND_STATIC)), name="static")
+
+# 커스텀 소리 오디오 파일 서빙 (재생용). Backend/data → /data
+_DATA_DIR = _backend_dir / "data"
+if _DATA_DIR.is_dir():
+    app.mount("/data", StaticFiles(directory=str(_DATA_DIR)), name="data")
