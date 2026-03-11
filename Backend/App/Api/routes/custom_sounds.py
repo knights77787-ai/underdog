@@ -24,7 +24,7 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 YAMNET = YamnetService()  # 이미 앱 어딘가에서 1회 로드면 거기 재사용해도 OK
 
-ALLOWED_EXTENSIONS = (".wav", ".mp3")
+ALLOWED_EXTENSIONS = (".wav", ".mp3", ".webm")
 
 def _resample_to_16k(x: np.ndarray, sr: int) -> np.ndarray:
     if sr == 16000:
@@ -53,23 +53,33 @@ def _decode_wav_to_16k_mono_f32(wav_bytes: bytes) -> np.ndarray:
     x = _resample_to_16k(x, sr)
     return _normalize_1s_window(x)
 
-def _decode_mp3_to_16k_mono_f32(mp3_bytes: bytes) -> np.ndarray:
+def _decode_via_pydub(data: bytes, fmt: str) -> np.ndarray:
+    """pydub로 mp3/webm 등 디코딩 → 16k mono float32."""
     try:
         from pydub import AudioSegment
     except ImportError:
         raise HTTPException(
             503,
-            "MP3 지원을 위해 pydub 패키지가 필요합니다. pip install pydub 및 (선택) ffmpeg 설치 후 이용하세요.",
+            "오디오 디코딩을 위해 pydub가 필요합니다. pip install pydub 및 ffmpeg 설치 후 이용하세요.",
         )
     try:
-        seg = AudioSegment.from_file(io.BytesIO(mp3_bytes), format="mp3")
+        seg = AudioSegment.from_file(io.BytesIO(data), format=fmt)
     except Exception as e:
-        raise HTTPException(400, f"MP3 디코딩 실패. ffmpeg 설치 여부를 확인하세요: {e!s}")
+        raise HTTPException(400, f"{fmt.upper()} 디코딩 실패. ffmpeg 설치 여부를 확인하세요: {e!s}")
     seg = seg.set_channels(1)
     sr = seg.frame_rate
     samples = np.array(seg.get_array_of_samples(), dtype=np.float32) / 32768.0
     samples = _resample_to_16k(samples, sr)
     return _normalize_1s_window(samples)
+
+
+def _decode_mp3_to_16k_mono_f32(mp3_bytes: bytes) -> np.ndarray:
+    return _decode_via_pydub(mp3_bytes, "mp3")
+
+
+def _decode_webm_to_16k_mono_f32(webm_bytes: bytes) -> np.ndarray:
+    return _decode_via_pydub(webm_bytes, "webm")
+
 
 def _decode_audio_to_16k_mono_f32(data: bytes, ext: str) -> np.ndarray:
     ext = ext.lower()
@@ -77,6 +87,8 @@ def _decode_audio_to_16k_mono_f32(data: bytes, ext: str) -> np.ndarray:
         return _decode_wav_to_16k_mono_f32(data)
     if ext == ".mp3":
         return _decode_mp3_to_16k_mono_f32(data)
+    if ext == ".webm":
+        return _decode_webm_to_16k_mono_f32(data)
     raise HTTPException(400, f"지원하지 않는 형식입니다. 사용 가능: {', '.join(ALLOWED_EXTENSIONS)}")
 
 @router.post("")
