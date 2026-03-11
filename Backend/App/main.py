@@ -172,6 +172,12 @@ def frontend_live():
     return _send_html("index.html")
 
 
+@app.get("/new-sound", response_class=FileResponse)
+def frontend_new_sound():
+    """커스텀 소리 등록·목록 페이지."""
+    return _send_html("new_sound.html")
+
+
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon():
     """기본 /favicon.ico 요청을 static/favicon.svg 로 리다이렉트."""
