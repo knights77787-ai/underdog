@@ -65,10 +65,18 @@ async def lifespan(app: FastAPI):
     async def _broadcast_yamnet(sid: str, entry: dict) -> None:
         await manager.broadcast_to_session(sid, entry)
 
-    def _persist_alert_and_record_ts(sid, text, keyword, event_type, ts_ms):
-        # keyword는 worker가 이미 "yamnet:..." 형태로 넘김 (prefix 한 군데만)
-        handlers._persist_alert(sid, text, keyword, event_type, ts_ms)
+    def _persist_alert_and_record_ts(
+        sid, text, keyword, event_type, ts_ms,
+        *, matched_custom_sound_id=None, custom_similarity=None,
+    ):
+        """DB 저장 + 쿨다운 기록. event_id 반환 (커스텀 사운드 등 WS 브로드캐스트용)."""
+        event_id = handlers._persist_alert(
+            sid, text, keyword, event_type, ts_ms,
+            matched_custom_sound_id=matched_custom_sound_id,
+            custom_similarity=custom_similarity,
+        )
         handlers.record_alert_ts(sid, keyword, event_type, ts_ms)
+        return event_id
 
     app.state.yamnet_worker = AudioClsWorker(
         handlers.AUDIOCLS_QUEUE,
@@ -176,6 +184,18 @@ def frontend_live():
 def frontend_new_sound():
     """커스텀 소리 등록·목록 페이지."""
     return _send_html("new_sound.html")
+
+
+@app.get("/admin-login", response_class=FileResponse)
+def frontend_admin_login():
+    """관리자 로그인 페이지."""
+    return _send_html("ad_login.html")
+
+
+@app.get("/admin", response_class=FileResponse)
+def frontend_admin():
+    """관리자 대시보드 페이지. 로그인 필요."""
+    return _send_html("admin.html")
 
 
 @app.get("/favicon.ico", include_in_schema=False)

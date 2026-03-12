@@ -25,6 +25,8 @@ def _source_from_keyword(keyword: str | None) -> str:
         return "demo"
     if keyword.startswith("yamnet:"):
         return "audio"
+    if keyword.startswith("custom:"):
+        return "custom_sound"
     if keyword.startswith("phrase:"):
         return "custom_phrase"
     return "text"
@@ -57,6 +59,9 @@ def create_alert_event(
     keyword: str,
     event_type: str,
     ts_ms: int,
+    *,
+    matched_custom_sound_id: int | None = None,
+    custom_similarity: float | None = None,
 ) -> int:
     sess = crud_sessions.get_or_create_by_client_uuid(db, client_session_uuid)
     event = Event(
@@ -64,6 +69,8 @@ def create_alert_event(
         event_type=event_type,
         keyword=keyword,
         segment_start_ms=ts_ms,
+        matched_custom_sound_id=matched_custom_sound_id,
+        custom_similarity=custom_similarity,
     )
     try:
         db.add(event)

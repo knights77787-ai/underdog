@@ -1,17 +1,22 @@
-"""OAuth (Google, Kakao) + Guest login endpoints."""
+"""OAuth (Google, Kakao) + Guest login + Admin login endpoints."""
 import os
 from typing import Literal
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
+from App.Core.config import ADMIN_TOKEN, DEV
 from App.db.crud import sessions as crud_sessions
 from App.db.crud import users as crud_users
 from App.db.database import get_db
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+# 관리자 로그인용 쿠키 설정
+ADMIN_COOKIE_NAME = "admin_token"
+ADMIN_COOKIE_MAX_AGE = 60 * 60 * 24  # 24시간
 
 
 Provider = Literal["google", "kakao"]
@@ -278,4 +283,50 @@ def guest_login(db: Session = Depends(get_db)):
         email=None,
     )
     return JSONResponse(payload)
+
+
+#
+# Admin login (토큰 검증 + 쿠키 발급)
+#
+
+@router.post("/admin/login")
+async def admin_login(
+    token: str = Body(..., embed=True),
+):
+    """관리자 토큰 검증 후 쿠키 발급. 성공 시 /admin 페이지로 리다이렉트."""
+    if DEV:
+        # 개발 모드: 토큰 없어도 통과 (빈 값 허용)
+        redirect = RedirectResponse(url="/admin", status_code=302)
+        redirect.set_cookie(
+            key=ADMIN_COOKIE_NAME,
+            value=token or "dev-bypass",
+            max_age=ADMIN_COOKIE_MAX_AGE,
+            httponly=True,
+            samesite="lax",
+        )
+        return redirect
+
+    if not ADMIN_TOKEN:
+        raise HTTPException(status_code=500, detail="ADMIN_TOKEN not set")
+
+    if not token or (token.strip() != ADMIN_TOKEN):
+        raise HTTPException(status_code=401, detail="Invalid admin token")
+
+    redirect = RedirectResponse(url="/admin", status_code=302)
+    redirect.set_cookie(
+        key=ADMIN_COOKIE_NAME,
+        value=token.strip(),
+        max_age=ADMIN_COOKIE_MAX_AGE,
+        httponly=True,
+        samesite="lax",
+    )
+    return redirect
+
+
+@router.post("/admin/logout")
+async def admin_logout():
+    """관리자 쿠키 삭제 후 로그인 페이지로 리다이렉트."""
+    redirect = RedirectResponse(url="/admin-login", status_code=302)
+    redirect.delete_cookie(key=ADMIN_COOKIE_NAME)
+    return redirect
 
