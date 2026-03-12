@@ -4,13 +4,8 @@ from typing import Literal
 from urllib.parse import urlparse
 
 import httpx
-<<<<<<< HEAD
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse, JSONResponse
-=======
-from fastapi import APIRouter, Body, Depends, HTTPException
-from fastapi.responses import JSONResponse, RedirectResponse
->>>>>>> p_fe_v4
 from sqlalchemy.orm import Session
 
 from App.Core.config import ADMIN_TOKEN, DEV
