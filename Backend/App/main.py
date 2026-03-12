@@ -10,6 +10,17 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
+
+# .env 로드 (config import 전에 반드시 실행 → ADMIN_TOKEN 등 로드)
+_backend_dir = Path(__file__).resolve().parent.parent  # .../Backend
+_repo_root_dir = _backend_dir.parent  # .../underdog (repo root)
+for _env_path in (_backend_dir / ".env", _repo_root_dir / ".env"):
+    if _env_path.is_file():
+        load_dotenv(_env_path)
+        break
+else:
+    load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -31,16 +42,6 @@ from App.WS import handlers
 from App.WS.manager import manager
 from App.WS.stt_worker import SttWorker
 from App.db.database import create_tables
-
-# .env 로드 (Backend/.env 우선, 없으면 repo 루트 .env)
-_backend_dir = Path(__file__).resolve().parent.parent  # .../Backend
-_repo_root_dir = _backend_dir.parent  # .../underdog (repo root)
-for _env_path in (_backend_dir / ".env", _repo_root_dir / ".env"):
-    if _env_path.is_file():
-        load_dotenv(_env_path)
-        break
-else:
-    load_dotenv()
 
 from fastapi import Body
 from App.WS.manager import manager
