@@ -11,6 +11,7 @@ from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -105,6 +106,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Underdog AI Backend", version="0.1.0", lifespan=lifespan)
 app_logger = get_logger("app")
+
+# CORS: 프론트(웹/RN)에서 API 호출 시 차단 방지. 개발 중엔 * OK (배포 시 도메인 제한)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.middleware("http")

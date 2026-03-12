@@ -385,6 +385,12 @@ fileInput?.addEventListener("change", () => {
 btnStart?.addEventListener("click", async () => {
   clearStatus();
 
+  if (!navigator?.mediaDevices?.getUserMedia) {
+    console.error("getUserMedia not available", navigator, navigator?.mediaDevices);
+    setStatus("이 환경에서는 마이크 기능이 지원되지 않아요 (HTTPS/localhost 또는 브라우저 확인).", "err");
+    return;
+  }
+
   try {
     resetRecordedState();
 

@@ -1,9 +1,10 @@
 """OAuth (Google, Kakao) + Guest login endpoints."""
 import os
 from typing import Literal
+from urllib.parse import urlparse
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 
@@ -12,6 +13,12 @@ from App.db.crud import users as crud_users
 from App.db.database import get_db
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _redirect_uri_from_request(request: Request, path: str) -> str:
+    """요청 Host 기반 redirect_uri 생성. 에뮬레이터(10.0.2.2) / PC(localhost) 모두 대응."""
+    base = str(request.base_url).rstrip("/")
+    return f"{base}{path}"
 
 
 Provider = Literal["google", "kakao"]
@@ -36,13 +43,22 @@ def _create_session_payload(
     }
 
 
-def _success_redirect_response(payload: dict) -> RedirectResponse:
+def _success_redirect_response(request: Request, payload: dict) -> RedirectResponse:
     """After successful OAuth, redirect to frontend with session info in query.
 
-    FRONTEND_AUTH_REDIRECT_URL 환경변수로 프론트엔드 URL을 지정할 수 있고,
-    기본값은 "/" (백엔드 루트)입니다.
+    FRONTEND_AUTH_REDIRECT_URL 환경변수로 경로 지정. 상대 경로면 요청 Host 사용.
+    127.0.0.1/localhost 절대 URL이면 요청 Host로 교체 (에뮬레이터 대응).
     """
-    base = os.getenv("FRONTEND_AUTH_REDIRECT_URL", "/")
+    path = os.getenv("FRONTEND_AUTH_REDIRECT_URL", "/").strip()
+    if path.startswith("http://") or path.startswith("https://"):
+        parsed = urlparse(path)
+        if "127.0.0.1" in path or "localhost" in path:
+            path_part = parsed.path or "/"
+            base = str(request.base_url).rstrip("/") + path_part
+        else:
+            base = path.rstrip("/")
+    else:
+        base = str(request.base_url).rstrip("/") + (path if path.startswith("/") else "/" + path)
     sep = "&" if "?" in base else "?"
     url = (
         f"{base}{sep}session_id={payload['session_id']}"
@@ -56,14 +72,15 @@ def _success_redirect_response(payload: dict) -> RedirectResponse:
 #
 
 @router.get("/google/login")
-async def google_login():
+async def google_login(request: Request):
     client_id = os.getenv("GOOGLE_CLIENT_ID")
-    redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
-    if not client_id or not redirect_uri:
+    if not client_id:
         raise HTTPException(
             status_code=500,
-            detail="Google OAuth is not configured (GOOGLE_CLIENT_ID / GOOGLE_REDIRECT_URI)",
+            detail="Google OAuth is not configured (GOOGLE_CLIENT_ID)",
         )
+    # 요청 Host 기반 redirect_uri (에뮬레이터 10.0.2.2 / PC localhost 자동 대응)
+    redirect_uri = _redirect_uri_from_request(request, "/auth/google/callback")
 
     auth_url = "https://accounts.google.com/o/oauth2/v2/auth"
     params = {
@@ -79,15 +96,16 @@ async def google_login():
 
 
 @router.get("/google/callback")
-async def google_callback(code: str, db: Session = Depends(get_db)):
+async def google_callback(request: Request, code: str, db: Session = Depends(get_db)):
     client_id = os.getenv("GOOGLE_CLIENT_ID")
     client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
-    redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
-    if not client_id or not client_secret or not redirect_uri:
+    if not client_id or not client_secret:
         raise HTTPException(
             status_code=500,
-            detail="Google OAuth is not configured (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REDIRECT_URI)",
+            detail="Google OAuth is not configured (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET)",
         )
+    # 콜백 요청의 Host와 동일한 redirect_uri 사용 (login 시 사용한 값과 일치해야 함)
+    redirect_uri = _redirect_uri_from_request(request, "/auth/google/callback")
 
     token_url = "https://oauth2.googleapis.com/token"
     userinfo_url = "https://www.googleapis.com/oauth2/v3/userinfo"
@@ -151,8 +169,7 @@ async def google_callback(code: str, db: Session = Depends(get_db)):
         name=user.name,
         email=user.email,
     )
-    # 브라우저 리다이렉트로 사용하는 것을 기본으로 하고, JSON 응답이 필요하면 Accept 헤더로 조절 가능
-    return _success_redirect_response(payload)
+    return _success_redirect_response(request, payload)
 
 
 #
@@ -160,14 +177,14 @@ async def google_callback(code: str, db: Session = Depends(get_db)):
 #
 
 @router.get("/kakao/login")
-async def kakao_login():
+async def kakao_login(request: Request):
     client_id = os.getenv("KAKAO_CLIENT_ID")
-    redirect_uri = os.getenv("KAKAO_REDIRECT_URI")
-    if not client_id or not redirect_uri:
+    if not client_id:
         raise HTTPException(
             status_code=500,
-            detail="Kakao OAuth is not configured (KAKAO_CLIENT_ID / KAKAO_REDIRECT_URI)",
+            detail="Kakao OAuth is not configured (KAKAO_CLIENT_ID)",
         )
+    redirect_uri = _redirect_uri_from_request(request, "/auth/kakao/callback")
 
     auth_url = "https://kauth.kakao.com/oauth/authorize"
     params = {
@@ -180,15 +197,15 @@ async def kakao_login():
 
 
 @router.get("/kakao/callback")
-async def kakao_callback(code: str, db: Session = Depends(get_db)):
+async def kakao_callback(request: Request, code: str, db: Session = Depends(get_db)):
     client_id = os.getenv("KAKAO_CLIENT_ID")
     client_secret = os.getenv("KAKAO_CLIENT_SECRET", "")
-    redirect_uri = os.getenv("KAKAO_REDIRECT_URI")
-    if not client_id or not redirect_uri:
+    if not client_id:
         raise HTTPException(
             status_code=500,
-            detail="Kakao OAuth is not configured (KAKAO_CLIENT_ID / KAKAO_REDIRECT_URI)",
+            detail="Kakao OAuth is not configured (KAKAO_CLIENT_ID)",
         )
+    redirect_uri = _redirect_uri_from_request(request, "/auth/kakao/callback")
 
     token_url = "https://kauth.kakao.com/oauth/token"
     userinfo_url = "https://kapi.kakao.com/v2/user/me"
@@ -256,7 +273,7 @@ async def kakao_callback(code: str, db: Session = Depends(get_db)):
         name=user.name,
         email=user.email,
     )
-    return _success_redirect_response(payload)
+    return _success_redirect_response(request, payload)
 
 
 #

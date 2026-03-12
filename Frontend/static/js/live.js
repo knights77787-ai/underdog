@@ -90,6 +90,9 @@ function setBadge(state) {
   if (state === "disconnected") {
     wsBadge.classList.add("text-bg-secondary");
     wsBadge.textContent = "Disconnected";
+  } else if (state === "connecting") {
+    wsBadge.classList.add("text-bg-warning");
+    wsBadge.textContent = "Connecting…";
   } else {
     wsBadge.classList.add("text-bg-primary");
     wsBadge.textContent = "Connected";
@@ -122,6 +125,24 @@ function appendCaption(text, danger=false) {
   }
 }
 
+const LOCAL_LOG_KEY = "underdog_event_log";
+const MAX_LOCAL_LOGS = 30;
+
+function saveToLocalLog(entry) {
+  try {
+    let list = [];
+    const raw = localStorage.getItem(LOCAL_LOG_KEY);
+    if (raw) {
+      try {
+        list = JSON.parse(raw);
+      } catch (_) {}
+    }
+    list.unshift(entry);
+    if (list.length > MAX_LOCAL_LOGS) list = list.slice(0, MAX_LOCAL_LOGS);
+    localStorage.setItem(LOCAL_LOG_KEY, JSON.stringify(list));
+  } catch (_) {}
+}
+
 function appendLogRow({ ts, ts_ms, type, text, score, event_type, keyword }) {
   const tr = document.createElement("tr");
   const kind = (type === "alert") ? "경고" : "자막";
@@ -140,18 +161,40 @@ function appendLogRow({ ts, ts_ms, type, text, score, event_type, keyword }) {
   while (logTbody.children.length > 30) {
     logTbody.removeChild(logTbody.lastChild);
   }
+
+  saveToLocalLog({
+    ts_ms: ts_ms ?? ts ?? Date.now(),
+    type,
+    text,
+    category: event_type || (type === "alert" ? "alert" : "caption"),
+    keyword: keyword || null,
+    score: typeof score === "number" ? score : null,
+  });
 }
 
 // 마이크 권한 요청 + 해제 유틸
 function requestMicPermission() {
+  if (!navigator?.mediaDevices?.getUserMedia) {
+    console.error("getUserMedia not available", navigator, navigator?.mediaDevices);
+    micTitle.textContent = "마이크 사용 불가";
+    micDesc.textContent = "이 환경에서는 마이크를 지원하지 않습니다.";
+    if (typeof alert === "function") {
+      alert("이 환경에서는 마이크 기능이 지원되지 않아요 (HTTPS/localhost 또는 브라우저 확인).");
+    }
+    return;
+  }
   navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
     micStream = stream;
+    stream.getTracks().forEach((t) => {
+      t.onended = () => stopAudioSend();
+    });
     micTitle.textContent = "마이크 승인 완료";
     micDesc.textContent = client.isConnected && SESSION_ID
       ? "전송 시작 중…"
       : "Connect 후 자동 전송됩니다.";
     if (client.isConnected && SESSION_ID) startAudioSend().catch(console.error);
-  }).catch(() => {
+  }).catch((err) => {
+    console.error("getUserMedia failed", err);
     micTitle.textContent = "마이크 권한 거부됨";
     micDesc.textContent = "브라우저 설정에서 마이크 허용이 필요합니다.";
   });
@@ -199,6 +242,16 @@ function setHeroDanger(text) {
   heroBadge.textContent = "경고";
   heroTitle.textContent = "위험 감지";
   heroDesc.textContent = text;
+}
+
+// 진동: 위험 단계별 패턴 (API는 세기 미지원, 지속시간·횟수로 구분)
+function vibrateByLevel(eventType) {
+  if (!navigator.vibrate) return;
+  if (eventType === "danger") {
+    navigator.vibrate([300, 100, 300, 100, 300]);  // 위험: 긴 3회 (강한 느낌)
+  } else {
+    navigator.vibrate([150, 100, 150]);             // 일상알림: 짧은 2회 (부드러운 느낌)
+  }
 }
 
 // =======================
@@ -281,6 +334,9 @@ async function startAudioSend() {
 
   try {
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    audioContext.onstatechange = () => {
+      if (audioContext && audioContext.state === "closed") stopAudioSend();
+    };
     currentSr = audioContext.sampleRate;
     audioSource = audioContext.createMediaStreamSource(micStream);
     rawBuffer = [];
@@ -289,9 +345,14 @@ async function startAudioSend() {
       await audioContext.audioWorklet.addModule(WORKLET_URL);
       audioWorkletNode = new AudioWorkletNode(audioContext, "mic-processor");
       audioWorkletNode.port.onmessage = (e) => {
-        if (e.data?.type === "audio" && e.data.samples) {
-          for (let i = 0; i < e.data.samples.length; i++) rawBuffer.push(e.data.samples[i]);
-          flushRawToChunks();
+        try {
+          if (e.data?.type === "audio" && e.data.samples) {
+            for (let i = 0; i < e.data.samples.length; i++) rawBuffer.push(e.data.samples[i]);
+            flushRawToChunks();
+          }
+        } catch (err) {
+          console.error("worklet audio process error", err);
+          stopAudioSend();
         }
       };
       const gain = audioContext.createGain();
@@ -304,24 +365,29 @@ async function startAudioSend() {
       audioProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
       audioBuffer = [];
       audioProcessor.onaudioprocess = (e) => {
-        if (!client.isConnected || !SESSION_ID) return;
-        const input = e.inputBuffer.getChannelData(0);
-        const down = downsample(input, currentSr, TARGET_SR);
-        for (let i = 0; i < down.length; i++) audioBuffer.push(down[i]);
-        while (audioBuffer.length >= CHUNK_SAMPLES) {
-          const chunk = audioBuffer.splice(0, CHUNK_SAMPLES);
-          const floatArr = new Float32Array(chunk);
-          const int16 = float32ToInt16(floatArr);
-          const uint8 = new Uint8Array(int16.buffer);
-          let binary = "";
-          for (let i = 0; i < uint8.length; i++) binary += String.fromCharCode(uint8[i]);
-          client.send("audio_chunk", {
-            session_id: SESSION_ID,
-            ts_ms: Date.now(),
-            sr: TARGET_SR,
-            format: "pcm_s16le",
-            data_b64: btoa(binary),
-          });
+        try {
+          if (!client.isConnected || !SESSION_ID) return;
+          const input = e.inputBuffer.getChannelData(0);
+          const down = downsample(input, currentSr, TARGET_SR);
+          for (let i = 0; i < down.length; i++) audioBuffer.push(down[i]);
+          while (audioBuffer.length >= CHUNK_SAMPLES) {
+            const chunk = audioBuffer.splice(0, CHUNK_SAMPLES);
+            const floatArr = new Float32Array(chunk);
+            const int16 = float32ToInt16(floatArr);
+            const uint8 = new Uint8Array(int16.buffer);
+            let binary = "";
+            for (let i = 0; i < uint8.length; i++) binary += String.fromCharCode(uint8[i]);
+            client.send("audio_chunk", {
+              session_id: SESSION_ID,
+              ts_ms: Date.now(),
+              sr: TARGET_SR,
+              format: "pcm_s16le",
+              data_b64: btoa(binary),
+            });
+          }
+        } catch (err) {
+          console.error("audio_chunk process error", err);
+          stopAudioSend();
         }
       };
       const gain = audioContext.createGain();
@@ -334,6 +400,7 @@ async function startAudioSend() {
     micDesc.textContent = "실시간 음성을 서버로 전송 중입니다.";
   } catch (e) {
     console.error("audio_chunk start failed:", e);
+    stopAudioSend();
     micTitle.textContent = "마이크 오류";
     micDesc.textContent = "오디오 초기화에 실패했습니다.";
   }
@@ -376,6 +443,12 @@ btnMic.addEventListener("click", () => {
 // 4) WS
 // =======================
 const client = new WSClient(WS_URL);
+
+client.on("connecting", () => {
+  setBadge("connecting");
+  btnConnect.disabled = true;
+  btnDisconnect.disabled = false;
+});
 
 client.on("open", () => {
   setBadge("connected");
@@ -420,6 +493,7 @@ client.on("caption", (msg) => {
   if (danger) {
     setHeroDanger(text);
     showToast("위험 감지", text, true);
+    vibrateByLevel("danger");
   }
 });
 
@@ -435,6 +509,7 @@ client.on("alert", (msg) => {
 
   setHeroDanger(`${keyword ? "["+keyword+"] " : ""}${text}`);
   showToast("알림", `${keyword ? "["+keyword+"] " : ""}${text}`, true);
+  vibrateByLevel(event_type);
 });
 
 // Buttons

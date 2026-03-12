@@ -31,6 +31,37 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 정적 파일(CSS/JS)은 `/static/...` 로 서빙됩니다 (예: `/static/js/live.js`).
 
+### Android 에뮬레이터에서 테스트
+
+**방법 A: adb reverse + localhost (마이크 사용 시 권장)**
+
+`10.0.2.2`는 secure-origin이 아니라서 `navigator.mediaDevices`가 비어있거나 막힐 수 있습니다.  
+마이크(실시간 자막)를 쓰려면 아래처럼 **localhost**로 접속하세요.
+
+```bash
+adb reverse tcp:8000 tcp:8000
+```
+
+그 다음 에뮬레이터 Chrome에서 **http://localhost:8000** 으로 접속.
+
+**방법 B: 10.0.2.2 (마이크 없이 API/Connect만 테스트)**
+
+1. 서버를 `--host 0.0.0.0` 으로 실행 (위와 동일)
+2. 에뮬레이터 브라우저에서 **http://10.0.2.2:8000/** 접속
+3. config.js가 현재 페이지 origin을 사용하므로 API/WS가 자동으로 `10.0.2.2`로 연결됨
+4. ⚠️ `10.0.2.2`에서는 `getUserMedia`(마이크)가 동작하지 않을 수 있음
+
+**마이크 안 될 때 디버깅:** 브라우저 콘솔에 아래 입력 후 확인
+```javascript
+console.log("origin:", location.origin);
+console.log("mediaDevices:", navigator.mediaDevices);
+```
+- `mediaDevices`가 `undefined` → (A) 10.0.2.2 주소/보안 문제 (adb reverse + localhost 사용) 또는 (B) WebView 환경
+- 값은 있는데 `getUserMedia`만 없음 → 구형 브라우저/특수 환경
+
+**Google OAuth (에뮬레이터):** Google은 `10.0.2.2` 같은 IP를 redirect URI로 허용하지 않습니다.  
+에뮬레이터에서 구글 로그인을 쓰려면 **ngrok**으로 공개 URL을 만들어 사용하세요. → `Frontend/OAUTH_EMULATOR.md` 참고
+
 ---
 
 ## 3. 테스트 순서
