@@ -1,5 +1,6 @@
 # App/WS/audio_cls_worker.py
 # db 세션은 worker에 넘기지 말고, settings는 handlers에서 미리 읽어 item에 값만 넘김.
+# 커스텀 사운드: 실시간 오디오 embedding → DB 저장 커스텀 소리와 유사도 비교 → Event-builder(alert/로그) 통합.
 import asyncio
 import time
 import numpy as np
@@ -8,6 +9,7 @@ from App.Core.logging import get_logger
 from App.Core.metrics import add_time, inc
 from App.Services.audio_rules import classify_audio
 from App.Services.yamnet_service import YamnetService
+from App.Services.memory_logs import memory_logs
 
 logger = get_logger("yamnet.worker")
 
@@ -46,7 +48,7 @@ class AudioClsWorker:
     def __init__(self, queue: asyncio.Queue, broadcast_fn, persist_alert_fn, cooldown_check_fn):
         """
         broadcast_fn(sid, entry) : WS 브로드캐스트 함수(manager.broadcast_to_session 감싸면 됨)
-        persist_alert_fn(sid, text, keyword, event_type, ts_ms) : DB 저장 함수
+        persist_alert_fn(sid, text, keyword, event_type, ts_ms, *, matched_custom_sound_id, custom_similarity) : DB 저장, event_id 반환
         cooldown_check_fn(sid, keyword, event_type, cooldown_sec, ts_ms)->bool : 쿨다운 True면 스킵
         """
         self.queue = queue
@@ -80,26 +82,34 @@ class AudioClsWorker:
                         sid, kw_custom, best.event_type, cooldown_sec, ts_ms
                     ):
                         text_custom = f"CustomSound:{best.name} (sim={best_sim:.2f})"
-                        await asyncio.to_thread(
+                        event_id = await asyncio.to_thread(
                             self.persist_alert_fn,
                             sid,
                             text_custom,
                             kw_custom,
                             best.event_type,
                             ts_ms,
+                            matched_custom_sound_id=best.custom_sound_id,
+                            custom_similarity=float(best_sim),
                         )
+                        # Event-builder 통합: memory_logs에 추가 (최근 감지 로그·API 일관성)
+                        entry_custom = memory_logs.append_alert(
+                            sid,
+                            text_custom,
+                            kw_custom,
+                            best.event_type,
+                            "warning",
+                            float(best_sim),
+                            ts_ms=ts_ms,
+                            source="custom_sound",
+                        )
+                        if event_id is not None:
+                            entry_custom["event_id"] = event_id
+                        entry_custom["custom_sound_id"] = best.custom_sound_id
+                        entry_custom["custom_similarity"] = best_sim
+                        entry_custom["session_id"] = sid
+                        entry_custom["ts_ms"] = ts_ms
                         if alert_enabled:
-                            entry_custom = {
-                                "type": "alert",
-                                "source": "audio",
-                                "event_type": best.event_type,
-                                "keyword": kw_custom,
-                                "custom_sound_id": best.custom_sound_id,
-                                "custom_similarity": best_sim,
-                                "text": text_custom,
-                                "session_id": sid,
-                                "ts_ms": ts_ms,
-                            }
                             await self.broadcast_fn(sid, entry_custom)
 
                 # 2) 기본 YAMNet 룰 분류(danger/alert)
@@ -133,25 +143,24 @@ class AudioClsWorker:
                 # label은 YamnetService.predict()에서 index_to_label로 반환됨
                 text = f"Audio: {label} ({top_score:.2f})"
 
-                # DB 저장 (to_thread로 이벤트 루프 블로킹 방지)
-                await asyncio.to_thread(
+                # DB 저장 (to_thread로 이벤트 루프 블로킹 방지), event_id 반환
+                event_id = await asyncio.to_thread(
                     self.persist_alert_fn, sid, text, kw_prefixed, event_type, ts_ms
                 )
 
-                # WS 발행 (keyword는 DB/쿨다운과 동일하게 kw_prefixed로 통일, label 추가)
+                # Event-builder 통합: memory_logs에 추가
+                category = "warning" if event_type == "alert" else "danger"
+                entry = memory_logs.append_alert(
+                    sid, text, kw_prefixed, event_type, category,
+                    float(top_score), ts_ms=ts_ms, source="audio",
+                )
+                if event_id is not None:
+                    entry["event_id"] = event_id
+                entry["label"] = label
+                entry["label_index"] = top_i
+
+                # WS 발행
                 if alert_enabled:
-                    entry = {
-                        "type": "alert",
-                        "source": "audio",
-                        "event_type": event_type,
-                        "keyword": kw_prefixed,
-                        "label": label,
-                        "label_index": top_i,
-                        "score": top_score,
-                        "text": text,
-                        "session_id": sid,
-                        "ts_ms": ts_ms,
-                    }
                     await self.broadcast_fn(sid, entry)
 
             except Exception:

@@ -110,6 +110,9 @@ def _persist_alert(
     keyword: str | None,
     event_type: str,
     ts_ms: int,
+    *,
+    matched_custom_sound_id: int | None = None,
+    custom_similarity: float | None = None,
 ) -> int | None:
     """alert 이벤트 DB 저장. 성공 시 event_id 반환 (WS 브로드캐스트용)."""
     from App.db.crud import events as crud_events
@@ -118,7 +121,14 @@ def _persist_alert(
     db = SessionLocal()
     try:
         event_id = crud_events.create_alert_event(
-            db, client_session_uuid, text, keyword or "", event_type, ts_ms
+            db,
+            client_session_uuid,
+            text,
+            keyword or "",
+            event_type,
+            ts_ms,
+            matched_custom_sound_id=matched_custom_sound_id,
+            custom_similarity=custom_similarity,
         )
         return event_id
     except Exception:
