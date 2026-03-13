@@ -27,9 +27,7 @@ const WORKLET_URL = (window.location.origin || "http://127.0.0.1:8000") + "/stat
 // =======================
 // 1) DOM
 // =======================
-const wsBadge = document.getElementById("wsBadge");
-const btnConnect = document.getElementById("btnConnect");
-const btnDisconnect = document.getElementById("btnDisconnect");
+const micStatusBadge = document.getElementById("micStatusBadge");
 
 const saveToggle = document.getElementById("saveToggle");
 
@@ -91,18 +89,24 @@ const settingsCollapse = document.getElementById("settingsCollapse");
 // =======================
 // 2) Helpers
 // =======================
-function setBadge(state) {
-  wsBadge.className = "badge ms-2";
-  if (state === "disconnected") {
-    wsBadge.classList.add("text-bg-secondary");
-    wsBadge.textContent = "Disconnected";
-  } else if (state === "connecting") {
-    wsBadge.classList.add("text-bg-warning");
-    wsBadge.textContent = "Connecting…";
-  } else {
-    wsBadge.classList.add("text-bg-primary");
-    wsBadge.textContent = "Connected";
+// 마이크 스트림 존재 여부 + 트랙 활성 상태로 마이크 켜짐 판단 (브라우저 탭 아이콘과 동기화)
+function isMicOn() {
+  if (!micStream) return false;
+  try {
+    const tracks = micStream.getAudioTracks();
+    if (tracks.length === 0) return true; // 스트림 존재 시 켜짐으로 간주
+    return tracks.some((t) => t.readyState === "live");
+  } catch {
+    return true; // 예외 시 스트림만 있으면 켜짐
   }
+}
+
+function updateMicStatusUI() {
+  if (!micStatusBadge) return;
+  const text = micStatusBadge.querySelector(".mic-status-text");
+  const on = isMicOn();
+  micStatusBadge.className = "badge ms-2 d-flex align-items-center gap-1 " + (on ? "text-bg-success" : "text-bg-secondary");
+  if (text) text.textContent = on ? "마이크 켜짐" : "마이크 끔";
 }
 
 function nowTS() {
@@ -178,7 +182,36 @@ function appendLogRow({ ts, ts_ms, type, text, score, event_type, keyword }) {
   });
 }
 
-// 마이크 권한 요청 + 해제 유틸
+// 세션 확보 + WebSocket 연결 (세션 없으면 /auth/guest 호출)
+async function ensureSessionAndConnect() {
+  if (!SESSION_ID) {
+    try {
+      const res = await fetch(API_BASE + "/auth/guest", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!data.ok || !data.session_id) {
+        const msg = data.detail || (res.ok ? "세션 ID를 받지 못했습니다." : "서버 오류 " + res.status);
+        showToast("세션 발급 실패", msg, true);
+        return false;
+      }
+      SESSION_ID = data.session_id;
+      const url = new URL(document.location.href);
+      url.searchParams.set("session_id", SESSION_ID);
+      history.replaceState(null, "", url.toString());
+      updateSessionLabel();
+      updateUserSection();
+      loadSettings();
+    } catch (e) {
+      showToast("오류", "서버에 연결할 수 없습니다. 백엔드가 실행 중인지 확인하세요.", true);
+      return false;
+    }
+  }
+  if (!client.isConnected) {
+    client.connect();
+  }
+  return true;
+}
+
+// 마이크 권한 요청 + 허용 시 바로 세션·연결·소리 감지 시작
 function requestMicPermission() {
   if (!navigator?.mediaDevices?.getUserMedia) {
     console.error("getUserMedia not available", navigator, navigator?.mediaDevices);
@@ -189,18 +222,28 @@ function requestMicPermission() {
     }
     return;
   }
-  navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(async (stream) => {
     micStream = stream;
     stream.getTracks().forEach((t) => {
-      t.onended = () => stopAudioSend();
+      t.onended = () => {
+        stopAudioSend();
+        updateMicStatusUI();
+      };
     });
+    updateMicStatusUI();
     micTitle.textContent = "마이크 승인 완료";
-    micDesc.textContent = client.isConnected && SESSION_ID
-      ? "전송 시작 중…"
-      : "Connect 후 자동 전송됩니다.";
-    if (client.isConnected && SESSION_ID) startAudioSend().catch(console.error);
+    micDesc.textContent = "연결 중…";
+    const ok = await ensureSessionAndConnect();
+    if (!ok) {
+      micDesc.textContent = "세션 생성 실패. 마이크를 다시 눌러 재시도하세요.";
+      return;
+    }
+    if (client.isConnected && SESSION_ID) {
+      startAudioSend().catch(console.error);
+    }
   }).catch((err) => {
     console.error("getUserMedia failed", err);
+    updateMicStatusUI();
     micTitle.textContent = "마이크 권한 거부됨";
     micDesc.textContent = "브라우저 설정에서 마이크 허용이 필요합니다.";
   });
@@ -214,6 +257,7 @@ function stopMicAndRelease() {
     } catch (_) {}
     micStream = null;
   }
+  updateMicStatusUI();
   micTitle.textContent = "소리 감지 대기중";
   micDesc.textContent = "마이크 사용 승인이 필요합니다.";
 }
@@ -404,6 +448,7 @@ async function startAudioSend() {
     }
     micTitle.textContent = "마이크 전송 중";
     micDesc.textContent = "실시간 음성을 서버로 전송 중입니다.";
+    updateMicStatusUI();
   } catch (e) {
     console.error("audio_chunk start failed:", e);
     stopAudioSend();
@@ -430,19 +475,8 @@ btnMic.addEventListener("click", () => {
     return;
   }
 
-  // 마이크 미사용 → 권한 안내 모달 후 권한 요청
-  if (micPermissionModal && micPermissionConfirm && window.bootstrap) {
-    const modal = new bootstrap.Modal(micPermissionModal);
-    micPermissionModal.removeAttribute("inert");
-    micPermissionModal.setAttribute("aria-hidden", "false");
-    modal.show();
-    micPermissionConfirm.addEventListener("click", () => {
-      modal.hide();
-      requestMicPermission();
-    }, { once: true });
-  } else {
-    requestMicPermission();
-  }
+  // 마이크 미사용 → 바로 브라우저 마이크 권한 요청 (허용 시 자동 연결·소리 감지 시작)
+  requestMicPermission();
 });
 
 // =======================
@@ -450,38 +484,30 @@ btnMic.addEventListener("click", () => {
 // =======================
 const client = new WSClient(WS_URL);
 
-client.on("connecting", () => {
-  setBadge("connecting");
-  btnConnect.disabled = true;
-  btnDisconnect.disabled = false;
-});
-
 client.on("open", () => {
-  setBadge("connected");
-  btnConnect.disabled = true;
-  btnDisconnect.disabled = false;
-
-  // 백엔드는 join을 받아야 이 세션으로 caption/alert를 보냄
+  // 백엔드는 join을 받아야 caption/alert 수신 가능 → 반드시 join 먼저 전송
   client.send("join", { session_id: SESSION_ID });
 
   btnSendCaption.disabled = false;
   btnFeedbackYes.disabled = false;
   btnFeedbackNo.disabled = false;
 
+  updateMicStatusUI();
   micTitle.textContent = micStream ? "마이크 전송 시작" : "소리 감지 대기중";
   micDesc.textContent  = micStream ? "실시간 음성을 서버로 전송 중입니다." : "마이크 권한 요청 후 전송됩니다.";
-  if (micStream && SESSION_ID) startAudioSend().catch(console.error);
+  // join이 서버에서 처리된 뒤 오디오 전송 시작 (STT 수신 보장)
+  if (micStream && SESSION_ID) {
+    setTimeout(() => startAudioSend().catch(console.error), 150);
+  }
 });
 
 client.on("close", () => {
   stopAudioSend();
   if (micStream) {
     micTitle.textContent = "마이크 승인 완료";
-    micDesc.textContent = "Connect 후 자동 전송됩니다.";
+    micDesc.textContent = "마이크를 다시 눌러 재연결하세요.";
   }
-  setBadge("disconnected");
-  btnConnect.disabled = false;
-  btnDisconnect.disabled = true;
+  updateMicStatusUI();
 
   btnSendCaption.disabled = true;
   btnFeedbackYes.disabled = true;
@@ -518,39 +544,6 @@ client.on("alert", (msg) => {
   vibrateByLevel(event_type);
 });
 
-// Buttons
-btnConnect.addEventListener("click", async () => {
-  if (!SESSION_ID) {
-    btnConnect.disabled = true;
-    try {
-      const res = await fetch(API_BASE + "/auth/guest", { method: "POST" });
-      const data = await res.json().catch(() => ({}));
-      if (data.ok && data.session_id) {
-        SESSION_ID = data.session_id;
-        const url = new URL(document.location.href);
-        url.searchParams.set("session_id", SESSION_ID);
-        history.replaceState(null, "", url.toString());
-        updateSessionLabel();
-        updateUserSection();
-        loadSettings();
-      } else {
-        const msg = data.detail || (res.ok ? "세션 ID를 받지 못했습니다." : "서버 오류 " + res.status);
-        showToast("세션 발급 실패", msg, true);
-        btnConnect.disabled = false;
-        return;
-      }
-    } catch (e) {
-      showToast("오류", "서버에 연결할 수 없습니다. 백엔드가 실행 중인지 확인하세요.", true);
-      btnConnect.disabled = false;
-      return;
-    } finally {
-      btnConnect.disabled = false;
-    }
-  }
-  client.connect();
-});
-btnDisconnect.addEventListener("click", () => client.disconnect());
-
 // Feedback: POST /feedback (event_id, vote, session_id)
 async function sendFeedback(vote) {
   if (lastAlertEventId == null) {
@@ -585,7 +578,7 @@ btnSendCaption.addEventListener("click", () => {
   const text = testInput.value.trim();
   if (!text) return;
   if (!SESSION_ID) {
-    if (typeof showToast === "function") showToast("자막 전송", "먼저 Connect를 눌러 세션을 만드세요.", true);
+    if (typeof showToast === "function") showToast("자막 전송", "먼저 마이크를 눌러 시작하세요.", true);
     return;
   }
   const sent = client.send("send_caption", {
@@ -595,7 +588,7 @@ btnSendCaption.addEventListener("click", () => {
   });
   testInput.value = "";
   if (!sent && typeof showToast === "function") {
-    showToast("자막 전송", "WebSocket이 연결되지 않았습니다. Connect 후 다시 시도하세요.", true);
+    showToast("자막 전송", "마이크를 눌러 연결 후 다시 시도하세요.", true);
   }
 });
 
@@ -711,7 +704,7 @@ async function loadSettings() {
 
 async function saveSettings() {
   if (!SESSION_ID) {
-    setSettingsStatus("세션이 없습니다. Connect 하세요.", true);
+    setSettingsStatus("마이크를 눌러 시작하세요.", true);
     return;
   }
   const body = {};
@@ -754,7 +747,7 @@ if (settingsCollapse) {
 }
 
 // Init
-setBadge("disconnected");
+updateMicStatusUI();
 setHeroNormal();
 updateSessionLabel();
 updateUserSection();

@@ -23,12 +23,11 @@
         <img src="/static/img/lumen_logo.png" alt="Lumen" width="70" height="50">
       </a>
 
-      <!-- WS Buttons -->
-      <button id="btnConnect" class="btn btn-sm btn-primary ms-2">Connect</button>
-      <button id="btnDisconnect" class="btn btn-sm btn-outline-secondary" disabled>Disconnect</button>
-
-      <!-- Status -->
-      <span id="wsBadge" class="badge text-bg-secondary ms-2">Disconnected</span>
+      <!-- 마이크 상태 -->
+      <span id="micStatusBadge" class="badge text-bg-secondary ms-2 d-flex align-items-center gap-1">
+        <span class="mic-status-dot"></span>
+        <span class="mic-status-text">마이크 끔</span>
+      </span>
       <span id="sessionLabel" class="small text-muted ms-2 d-none d-md-inline"></span>
 
       <!-- 기록저장 / 설정 / 로그인 (오른쪽 정렬) -->
@@ -198,7 +197,7 @@
             실시간 자막·알림을 위해 <strong>「허용」</strong>을 눌러주세요.
           </p>
           <p class="mb-0 small text-muted">
-            ※ 자막이 나오려면 먼저 상단 <strong>Connect</strong>를 눌러 연결한 뒤, 마이크 권한을 허용해야 합니다.
+            ※ 마이크 허용 후 자동으로 연결되어 실시간 자막이 표시됩니다.
           </p>
         </div>
         <div class="modal-footer">
@@ -238,6 +237,6 @@
 
   <script src="/static/js/config.js"></script>
   <script src="/static/js/wsClient.js"></script>
-  <script src="/static/js/live.js"></script>
+  <script src="/static/js/live.js?v=2"></script>
 </body>
 </html>
