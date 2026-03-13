@@ -23,6 +23,14 @@ const statusEl = document.getElementById("status");
 const soundListEl = document.getElementById("soundList");
 const soundListStatusEl = document.getElementById("soundListStatus");
 
+const btnLogin = document.getElementById("btnLogin");
+const userDropdownWrap = document.getElementById("userDropdownWrap");
+const btnUserIcon = document.getElementById("btnUserIcon");
+const userDropdownName = document.getElementById("userDropdownName");
+const userDropdownEmail = document.getElementById("userDropdownEmail");
+const userDropdownSoundReg = document.getElementById("userDropdownSoundReg");
+const userDropdownLogout = document.getElementById("userDropdownLogout");
+
 // ===== shared state =====
 let selectedAudioFile = null;
 let selectedAudioSource = null; // "upload" | "record" | null
@@ -631,3 +639,49 @@ btnSubmit?.addEventListener("click", async () => {
     btnSubmit.disabled = false;
   }
 });
+
+// ===== 사용자 섹션 =====
+// 새로운 소리 페이지는 로그인한 사용자만 접근 가능(드롭다운 '소리등록'으로만 진입).
+// session_id가 있으면 항상 사용자 아이콘 표시.
+async function updateUserSection() {
+  if (!btnLogin || !userDropdownWrap) return;
+  const urlSessionId = new URLSearchParams(document.location.search).get("session_id");
+  if (!urlSessionId) {
+    btnLogin.classList.remove("d-none");
+    userDropdownWrap.classList.add("d-none");
+    return;
+  }
+  // session_id 있음 = 로그인 사용자. 항상 사용자 아이콘 표시
+  btnLogin.classList.add("d-none");
+  userDropdownWrap.classList.remove("d-none");
+  try {
+    const res = await fetch(API_BASE + "/auth/me?session_id=" + encodeURIComponent(urlSessionId));
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok) {
+      if (userDropdownName) userDropdownName.textContent = data.name || "사용자";
+      if (userDropdownEmail) userDropdownEmail.textContent = data.email || "-";
+    } else {
+      if (userDropdownName) userDropdownName.textContent = "사용자";
+      if (userDropdownEmail) userDropdownEmail.textContent = "-";
+    }
+  } catch (_) {
+    if (userDropdownName) userDropdownName.textContent = "사용자";
+    if (userDropdownEmail) userDropdownEmail.textContent = "-";
+  }
+}
+
+function setupUserDropdown() {
+  if (!userDropdownWrap || !btnUserIcon || !userDropdownSoundReg || !userDropdownLogout) return;
+  userDropdownSoundReg.addEventListener("click", (e) => {
+    e.preventDefault();
+    const url = "/new-sound" + (SESSION_ID && SESSION_ID !== "S1" ? "?session_id=" + encodeURIComponent(SESSION_ID) : "");
+    window.location.href = url;
+  });
+  userDropdownLogout.addEventListener("click", (e) => {
+    e.preventDefault();
+    window.location.href = "/";
+  });
+}
+
+updateUserSection();
+setupUserDropdown();

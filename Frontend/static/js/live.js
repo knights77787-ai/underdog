@@ -71,7 +71,13 @@ const btnSendCaption = document.getElementById("btnSendCaption");
 
 const toastContainer = document.getElementById("toastContainer");
 const sessionLabel = document.getElementById("sessionLabel");
-const loginLabel = document.getElementById("loginLabel");
+const btnLogin = document.getElementById("btnLogin");
+const userDropdownWrap = document.getElementById("userDropdownWrap");
+const btnUserIcon = document.getElementById("btnUserIcon");
+const userDropdownName = document.getElementById("userDropdownName");
+const userDropdownEmail = document.getElementById("userDropdownEmail");
+const userDropdownSoundReg = document.getElementById("userDropdownSoundReg");
+const userDropdownLogout = document.getElementById("userDropdownLogout");
 
 // 설정 패널
 const settingFontSize = document.getElementById("settingFontSize");
@@ -525,7 +531,7 @@ btnConnect.addEventListener("click", async () => {
         url.searchParams.set("session_id", SESSION_ID);
         history.replaceState(null, "", url.toString());
         updateSessionLabel();
-        updateLoginLabel();
+        updateUserSection();
         loadSettings();
       } else {
         const msg = data.detail || (res.ok ? "세션 ID를 받지 못했습니다." : "서버 오류 " + res.status);
@@ -597,25 +603,71 @@ function updateSessionLabel() {
   if (sessionLabel) sessionLabel.textContent = SESSION_ID ? "세션: " + SESSION_ID.slice(0, 8) + "…" : "";
 }
 
-// 로그인 상태 표시 (URL의 provider 또는 게스트)
-function updateLoginLabel() {
-  if (!loginLabel) return;
-  const params = new URLSearchParams(document.location.search);
-  const provider = params.get("provider");
-  if (SESSION_ID) {
-    if (provider === "google") {
-      loginLabel.textContent = "Google 로그인됨";
-      loginLabel.style.display = "";
-    } else if (provider === "kakao") {
-      loginLabel.textContent = "카카오 로그인됨";
-      loginLabel.style.display = "";
-    } else {
-      loginLabel.textContent = "게스트";
-      loginLabel.style.display = "";
-    }
+// 로그인 상태: provider 있으면 사용자 아이콘+드롭다운, 없으면 '다른 계정' 버튼
+function getProvider() {
+  return new URLSearchParams(document.location.search).get("provider");
+}
+
+function updateUserSection() {
+  if (!btnLogin || !userDropdownWrap) return;
+  const provider = getProvider();
+  if (provider === "google" || provider === "kakao") {
+    btnLogin.classList.add("d-none");
+    userDropdownWrap.classList.remove("d-none");
+    if (SESSION_ID) loadUserInfo();
   } else {
-    loginLabel.style.display = "none";
+    btnLogin.classList.remove("d-none");
+    userDropdownWrap.classList.add("d-none");
   }
+}
+
+async function loadUserInfo() {
+  if (!SESSION_ID || !userDropdownName || !userDropdownEmail) return;
+  try {
+    const res = await fetch(API_BASE + "/auth/me?session_id=" + encodeURIComponent(SESSION_ID));
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok) {
+      userDropdownName.textContent = data.name || "사용자";
+      userDropdownEmail.textContent = data.email || "-";
+    } else {
+      userDropdownName.textContent = "사용자";
+      userDropdownEmail.textContent = "-";
+    }
+  } catch (_) {
+    userDropdownName.textContent = "사용자";
+    userDropdownEmail.textContent = "-";
+  }
+}
+
+function setupUserDropdown() {
+  if (!userDropdownWrap || !btnUserIcon || !userDropdownSoundReg || !userDropdownLogout) return;
+
+  // 소리등록: /new-sound?session_id=xxx
+  userDropdownSoundReg.addEventListener("click", (e) => {
+    e.preventDefault();
+    const url = "/new-sound" + (SESSION_ID ? "?session_id=" + encodeURIComponent(SESSION_ID) : "");
+    window.location.href = url;
+  });
+
+  // 로그아웃: 메인으로 이동, session_id·provider 제거
+  userDropdownLogout.addEventListener("click", (e) => {
+    e.preventDefault();
+    window.location.href = "/";
+  });
+
+  // mouseover 시 드롭다운 표시
+  let hideTimer = null;
+  userDropdownWrap.addEventListener("mouseenter", () => {
+    if (hideTimer) clearTimeout(hideTimer);
+    const dropdown = bootstrap.Dropdown.getOrCreateInstance(btnUserIcon);
+    dropdown.show();
+  });
+  userDropdownWrap.addEventListener("mouseleave", () => {
+    hideTimer = setTimeout(() => {
+      const dropdown = bootstrap.Dropdown.getInstance(btnUserIcon);
+      if (dropdown) dropdown.hide();
+    }, 150);
+  });
 }
 
 // =======================
@@ -705,5 +757,6 @@ if (settingsCollapse) {
 setBadge("disconnected");
 setHeroNormal();
 updateSessionLabel();
-updateLoginLabel();
+updateUserSection();
+setupUserDropdown();
 if (SESSION_ID) loadSettings();

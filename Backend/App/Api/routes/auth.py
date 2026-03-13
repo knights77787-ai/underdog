@@ -4,7 +4,7 @@ from typing import Literal
 from urllib.parse import urlparse
 
 import httpx
-from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, Query
 from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 
@@ -24,6 +24,14 @@ def _redirect_uri_from_request(request: Request, path: str) -> str:
     """요청 Host 기반 redirect_uri 생성. 에뮬레이터(10.0.2.2) / PC(localhost) 모두 대응."""
     base = str(request.base_url).rstrip("/")
     return f"{base}{path}"
+
+
+def _get_redirect_uri(request: Request, env_key: str, path: str) -> str:
+    """env에 설정된 redirect_uri 사용(Google/Kakao 콘솔과 일치). 없으면 요청 기반 생성."""
+    env_uri = os.getenv(env_key, "").strip()
+    if env_uri:
+        return env_uri
+    return _redirect_uri_from_request(request, path)
 
 
 Provider = Literal["google", "kakao"]
@@ -84,8 +92,8 @@ async def google_login(request: Request):
             status_code=500,
             detail="Google OAuth is not configured (GOOGLE_CLIENT_ID)",
         )
-    # 요청 Host 기반 redirect_uri (에뮬레이터 10.0.2.2 / PC localhost 자동 대응)
-    redirect_uri = _redirect_uri_from_request(request, "/auth/google/callback")
+    # .env GOOGLE_REDIRECT_URI 사용 시 콘솔 등록값과 정확 일치 (redirect_uri_mismatch 방지)
+    redirect_uri = _get_redirect_uri(request, "GOOGLE_REDIRECT_URI", "/auth/google/callback")
 
     auth_url = "https://accounts.google.com/o/oauth2/v2/auth"
     params = {
@@ -109,8 +117,8 @@ async def google_callback(request: Request, code: str, db: Session = Depends(get
             status_code=500,
             detail="Google OAuth is not configured (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET)",
         )
-    # 콜백 요청의 Host와 동일한 redirect_uri 사용 (login 시 사용한 값과 일치해야 함)
-    redirect_uri = _redirect_uri_from_request(request, "/auth/google/callback")
+    # login 시 사용한 redirect_uri와 동일해야 함 (env 우선)
+    redirect_uri = _get_redirect_uri(request, "GOOGLE_REDIRECT_URI", "/auth/google/callback")
 
     token_url = "https://oauth2.googleapis.com/token"
     userinfo_url = "https://www.googleapis.com/oauth2/v3/userinfo"
@@ -189,13 +197,14 @@ async def kakao_login(request: Request):
             status_code=500,
             detail="Kakao OAuth is not configured (KAKAO_CLIENT_ID)",
         )
-    redirect_uri = _redirect_uri_from_request(request, "/auth/kakao/callback")
+    redirect_uri = _get_redirect_uri(request, "KAKAO_REDIRECT_URI", "/auth/kakao/callback")
 
     auth_url = "https://kauth.kakao.com/oauth/authorize"
     params = {
         "client_id": client_id,
         "redirect_uri": redirect_uri,
         "response_type": "code",
+        "scope": "profile_nickname,account_email",
     }
     url = httpx.URL(auth_url, params=params)
     return RedirectResponse(str(url))
@@ -210,7 +219,7 @@ async def kakao_callback(request: Request, code: str, db: Session = Depends(get_
             status_code=500,
             detail="Kakao OAuth is not configured (KAKAO_CLIENT_ID)",
         )
-    redirect_uri = _redirect_uri_from_request(request, "/auth/kakao/callback")
+    redirect_uri = _get_redirect_uri(request, "KAKAO_REDIRECT_URI", "/auth/kakao/callback")
 
     token_url = "https://kauth.kakao.com/oauth/token"
     userinfo_url = "https://kapi.kakao.com/v2/user/me"
@@ -256,8 +265,12 @@ async def kakao_callback(request: Request, code: str, db: Session = Depends(get_
 
     oauth_provider: Provider = "kakao"
     oauth_sub = str(kakao_id)
-    email = kakao_account.get("email")
-    name = profile.get("nickname")
+    email = kakao_account.get("email") or kakao_account.get("email_address")
+    name = (
+        profile.get("nickname")
+        or kakao_account.get("name")
+        or kakao_account.get("profile_nickname")
+    )
 
     user = crud_users.get_or_create_oauth_user(
         db,
@@ -279,6 +292,35 @@ async def kakao_callback(request: Request, code: str, db: Session = Depends(get_
         email=user.email,
     )
     return _success_redirect_response(request, payload)
+
+
+#
+# 현재 로그인 사용자 정보 (OAuth 로그인 시에만, session_id로 조회)
+#
+
+@router.get("/me")
+def get_me(
+    session_id: str = Query(..., description="client_session_uuid (URL의 session_id)"),
+    db: Session = Depends(get_db),
+):
+    """로그인한 사용자(Google/Kakao)의 name, email 반환. 게스트/미존재 시 404."""
+    from App.db.models import Session as SessionModel, User
+
+    sess = (
+        db.query(SessionModel)
+        .filter(SessionModel.client_session_uuid == session_id)
+        .first()
+    )
+    if not sess or sess.user_id is None:
+        raise HTTPException(status_code=404, detail="User not found or guest session")
+    user = db.query(User).filter(User.user_id == sess.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {
+        "ok": True,
+        "name": user.name or "",
+        "email": user.email or "",
+    }
 
 
 #
