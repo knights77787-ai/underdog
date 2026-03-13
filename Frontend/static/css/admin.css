@@ -1,0 +1,19 @@
+/* 관리자 대시보드 스타일 */
+.admin-section-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--bs-secondary);
+}
+
+.card {
+  border-radius: 0.375rem;
+}
+
+.list-group-item {
+  font-size: 0.875rem;
+}
+
+.table th {
+  font-weight: 600;
+  font-size: 0.75rem;
+}
