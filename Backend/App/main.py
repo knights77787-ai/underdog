@@ -23,7 +23,7 @@ else:
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from App.Api.routes.admin import router as admin_router
@@ -160,8 +160,8 @@ app.include_router(custom_sounds_router)
 app.include_router(custom_phrase_audio_router)
 
 # ---------- 프론트엔드 서빙 (API 라우트보다 나중에 등록) ----------
-# 프로젝트 루트 = Backend의 상위(underdog). Frontend = 루트/Frontend
-_FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "Frontend"
+# 프로젝트 루트 = Backend의 상위(underdog). Frontend = 루트/Frontend (배포 시 _repo_root_dir 기준)
+_FRONTEND_DIR = _repo_root_dir / "Frontend"
 _FRONTEND_STATIC = _FRONTEND_DIR / "static"
 _FRONTEND_TEMPLATES = _FRONTEND_DIR / "templates"
 
@@ -169,14 +169,25 @@ _FRONTEND_TEMPLATES = _FRONTEND_DIR / "templates"
 def _send_html(name: str):
     path = _FRONTEND_TEMPLATES / name
     if not path.is_file():
-        return FileResponse(_FRONTEND_TEMPLATES / "index.html")
+        path = _FRONTEND_TEMPLATES / "index.html"
+    if not path.is_file():
+        return RedirectResponse(url="/docs", status_code=302)
     return FileResponse(path, media_type="text/html; charset=utf-8")
 
 
 @app.get("/", response_class=FileResponse)
 def frontend_index():
-    """라이브 메인 페이지."""
-    return _send_html("index.html")
+    """라이브 메인 페이지. Frontend 없으면 안내 HTML 반환 (배포 환경에서 경로 이슈 시)."""
+    path = _FRONTEND_TEMPLATES / "index.html"
+    if path.is_file():
+        return FileResponse(path, media_type="text/html; charset=utf-8")
+    # Fallback: Frontend 폴더를 못 찾는 배포 환경
+    return HTMLResponse(
+        status_code=200,
+        content="""<!DOCTYPE html><html><head><meta charset="utf-8"><title>Lumen</title></head><body>
+        <p>API is running. <a href="/docs">Open API docs</a> · <a href="/login">Login</a></p>
+        </body></html>""",
+    )
 
 
 @app.get("/login", response_class=FileResponse)
