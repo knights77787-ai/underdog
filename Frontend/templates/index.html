@@ -131,7 +131,7 @@
             <div class="text-muted small" id="micDesc">마이크 사용 승인이 필요합니다.</div>
 
             <button id="btnMic" class="btn btn-sm btn-outline-primary mt-3">
-              마이크 권한 요청
+              마이크 실행
             </button>
           </div>
         </div>
@@ -142,17 +142,6 @@
           <div class="card-body">
             <div id="captionBox" class="caption-box"></div>
           </div>
-
-          <!-- Test sender (optional) -->
-          <div class="card-footer bg-white">
-            <div class="input-group input-group-sm">
-              <input id="testInput" class="form-control" placeholder="(테스트) 불이야 / 도와줘 입력" />
-              <button id="btnSendCaption" class="btn btn-outline-primary" disabled>보내기</button>
-            </div>
-            <div class="small text-muted mt-1">
-              * 서버가 send_caption을 지원하면 동작합니다.
-            </div>
-          </div>
         </div>
       </div>
 
@@ -162,13 +151,13 @@
           <div class="card-header fw-semibold">최근 감지 로그</div>
           <div class="card-body p-0">
             <div class="table-responsive">
-              <table class="table table-sm table-striped mb-0 align-middle">
+              <table id="logTable" class="table table-sm table-striped mb-0 align-middle">
                 <thead class="table-light">
                   <tr>
-                    <th style="width:90px;">시간</th>
-                    <th style="width:110px;">종류</th>
-                    <th>내용</th>
-                    <th style="width:90px;">확률</th>
+                    <th class="col-time">시간</th>
+                    <th class="col-type">종류</th>
+                    <th class="col-content">내용</th>
+                    <th class="col-prob">확률</th>
                   </tr>
                 </thead>
                 <tbody id="logTbody"></tbody>
