@@ -22,3 +22,19 @@
 }
 
 .mic-icon{ font-size: 32px; }
+
+/* 마이크 상태 배지 */
+#micStatusBadge .mic-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+#micStatusBadge.text-bg-secondary .mic-status-dot {
+  background: transparent;
+  border: 1px solid currentColor;
+}
+#micStatusBadge.text-bg-success .mic-status-dot {
+  background: currentColor;
+  border: none;
+}
