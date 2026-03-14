@@ -23,7 +23,7 @@ else:
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from App.Api.routes.admin import router as admin_router
@@ -175,19 +175,13 @@ def _send_html(name: str):
     return FileResponse(path, media_type="text/html; charset=utf-8")
 
 
-@app.get("/", response_class=FileResponse)
-def frontend_index():
-    """라이브 메인 페이지. Frontend 없으면 안내 HTML 반환 (배포 환경에서 경로 이슈 시)."""
+@app.get("/", include_in_schema=False)
+def root():
+    """루트(/) 접속 시: index.html 있으면 서빙, 없으면 /docs 로 리다이렉트."""
     path = _FRONTEND_TEMPLATES / "index.html"
     if path.is_file():
         return FileResponse(path, media_type="text/html; charset=utf-8")
-    # Fallback: Frontend 폴더를 못 찾는 배포 환경
-    return HTMLResponse(
-        status_code=200,
-        content="""<!DOCTYPE html><html><head><meta charset="utf-8"><title>Lumen</title></head><body>
-        <p>API is running. <a href="/docs">Open API docs</a> · <a href="/login">Login</a></p>
-        </body></html>""",
-    )
+    return RedirectResponse(url="/docs", status_code=302)
 
 
 @app.get("/login", response_class=FileResponse)
