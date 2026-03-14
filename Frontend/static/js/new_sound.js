@@ -1,7 +1,18 @@
 const API_BASE = window.APP_CONFIG?.API_BASE || "http://127.0.0.1:8000";
-const SESSION_ID = (function () {
+const SESSION_STORAGE_KEY = "underdog_session_id";
+let SESSION_ID = (function () {
   const params = new URLSearchParams(document.location.search);
-  return params.get("session_id") || "S1";
+  const fromUrl = params.get("session_id");
+  if (fromUrl) return fromUrl;
+  try {
+    const stored = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (stored) return stored;
+    const fallback = "S1";
+    localStorage.setItem(SESSION_STORAGE_KEY, fallback);
+    return fallback;
+  } catch (_) {
+    return "S1";
+  }
 })();
 
 // ===== elements =====
@@ -92,7 +103,7 @@ function formatFileSize(bytes) {
 
 function isAllowedAudioFile(file) {
   if (!file) return false;
-  const allowedExtensions = [".mp3", ".wav", ".webm"];
+  const allowedExtensions = [".mp3", ".wav", ".webm", ".m4a"];
   const lowerName = file.name.toLowerCase();
   return allowedExtensions.some((ext) => lowerName.endsWith(ext));
 }
@@ -139,17 +150,17 @@ function buildAudioUrl(audioPath) {
     return normalized;
   }
 
+  const base = (typeof API_BASE !== "undefined" ? API_BASE : "").replace(/\/$/, "");
+  let path = normalized;
+
   if (normalized.startsWith("/")) {
-    return normalized;
+    path = normalized;
+  } else if (normalized.startsWith("data/")) {
+    path = "/" + normalized;
+  } else {
+    path = "/data/" + normalized;
   }
-
-  // DB 값이 data/custom_sounds/... 형태인 경우
-  if (normalized.startsWith("data/")) {
-    return "/" + normalized;
-  }
-
-  // 혹시 custom_sounds/... 만 들어오면 /data 붙여줌
-  return "/data/" + normalized;
+  return base ? base + path : path;
 }
 
 function resetPlayButtonUi(btn) {
@@ -255,7 +266,7 @@ function validateBeforeSubmit() {
   }
 
   if (!isAllowedAudioFile(selectedAudioFile)) {
-    return { ok: false, message: "지원하는 파일 형식은 mp3, wav, webm 입니다." };
+    return { ok: false, message: "지원하는 파일 형식은 mp3, wav, webm, m4a 입니다." };
   }
 
   return {
@@ -313,16 +324,20 @@ function renderSoundList(list) {
             data-audio-path="${escapeHtml(r.audio_path || "")}"
             aria-label="재생"
             title="재생"
+            tabindex="0"
           >
             <i class="bi bi-play-fill"></i>
           </button>
 
           <button
             type="button"
-            class="btn btn-sm btn-outline-danger delete-sound-btn"
+            class="icon-btn delete-sound-btn"
             data-id="${r.custom_sound_id}"
+            aria-label="삭제"
+            title="삭제"
+            tabindex="0"
           >
-            삭제
+            <i class="bi bi-trash-fill"></i>
           </button>
         </div>
       </div>
@@ -380,7 +395,7 @@ fileInput?.addEventListener("change", () => {
     fileInput.value = "";
     updateFileMeta(null);
     setSelectedAudio(null, null);
-    setStatus("업로드 가능한 파일 형식은 mp3, wav, webm 입니다.", "err");
+    setStatus("업로드 가능한 파일 형식은 mp3, wav, webm, m4a 입니다.", "err");
     return;
   }
 
@@ -550,10 +565,9 @@ soundListEl?.addEventListener("click", async (e) => {
   if (!playBtn) return;
 
   const soundId = playBtn.dataset.id;
-  const audioPath = playBtn.dataset.audioPath;
 
-  if (!audioPath) {
-    setStatus("재생할 오디오 경로가 없습니다.", "err");
+  if (!soundId) {
+    setStatus("재생할 소리 정보가 없습니다.", "err");
     return;
   }
 
@@ -564,7 +578,12 @@ soundListEl?.addEventListener("click", async (e) => {
 
   stopListAudioPlayback();
 
-  const audioUrl = buildAudioUrl(audioPath);
+  const audioUrl =
+    API_BASE +
+    "/custom-sounds/" +
+    encodeURIComponent(soundId) +
+    "/audio?session_id=" +
+    encodeURIComponent(SESSION_ID);
 
   try {
     listAudio = new Audio(audioUrl);
@@ -600,6 +619,10 @@ btnSubmit?.addEventListener("click", async () => {
     return;
   }
 
+  if (!confirm(`"${result.name}" 소리를 등록하시겠습니까?`)) {
+    return;
+  }
+
   const { group_type, event_type } = categoryToApi(result.category);
 
   const form = new FormData();
@@ -625,13 +648,18 @@ btnSubmit?.addEventListener("click", async () => {
       return;
     }
 
-    setStatus(`등록되었습니다. "${data.data?.name || result.name}"`, "ok");
-
     soundName.value = "";
     soundCategory.value = "";
     resetSelection();
 
     await loadSoundList();
+
+    alert(`등록되었습니다. "${data.data?.name || result.name}"\n확인을 누르면 목록으로 이동합니다.`);
+    const listTab = document.getElementById("list-tab");
+    if (listTab && window.bootstrap) {
+      const tab = new bootstrap.Tab(listTab);
+      tab.show();
+    }
   } catch (err) {
     console.error(err);
     setStatus("서버에 연결할 수 없습니다. 백엔드를 확인하세요.", "err");

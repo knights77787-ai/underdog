@@ -4,10 +4,22 @@
 // =======================
 const API_BASE = window.APP_CONFIG?.API_BASE || "http://127.0.0.1:8000";
 const WS_URL = (window.APP_CONFIG?.WS_URL || "ws://127.0.0.1:8000/ws").replace(/^http/, "ws");
+const SESSION_STORAGE_KEY = "underdog_session_id";
 let SESSION_ID = (function () {
   const params = new URLSearchParams(document.location.search);
-  return params.get("session_id") || null;
+  const fromUrl = params.get("session_id");
+  if (fromUrl) return fromUrl;
+  try {
+    return localStorage.getItem(SESSION_STORAGE_KEY) || null;
+  } catch (_) {
+    return null;
+  }
 })();
+if (SESSION_ID) {
+  try {
+    localStorage.setItem(SESSION_STORAGE_KEY, SESSION_ID);
+  } catch (_) {}
+}
 // 피드백 대상: 가장 최근 수신한 alert의 event_id
 let lastAlertEventId = null;
 
@@ -64,9 +76,6 @@ setupModalA11y(micStopModal);
 
 const captionBox = document.getElementById("captionBox");
 
-const testInput = document.getElementById("testInput");
-const btnSendCaption = document.getElementById("btnSendCaption");
-
 const toastContainer = document.getElementById("toastContainer");
 const sessionLabel = document.getElementById("sessionLabel");
 const btnLogin = document.getElementById("btnLogin");
@@ -102,11 +111,13 @@ function isMicOn() {
 }
 
 function updateMicStatusUI() {
-  if (!micStatusBadge) return;
-  const text = micStatusBadge.querySelector(".mic-status-text");
   const on = isMicOn();
-  micStatusBadge.className = "badge ms-2 d-flex align-items-center gap-1 " + (on ? "text-bg-success" : "text-bg-secondary");
-  if (text) text.textContent = on ? "마이크 켜짐" : "마이크 끔";
+  if (micStatusBadge) {
+    const text = micStatusBadge.querySelector(".mic-status-text");
+    micStatusBadge.className = "badge ms-2 d-flex align-items-center gap-1 " + (on ? "text-bg-success" : "text-bg-secondary");
+    if (text) text.textContent = on ? "마이크 켜짐" : "마이크 끔";
+  }
+  if (btnMic) btnMic.textContent = on ? "마이크 중단" : "마이크 실행";
 }
 
 function nowTS() {
@@ -194,6 +205,9 @@ async function ensureSessionAndConnect() {
         return false;
       }
       SESSION_ID = data.session_id;
+      try {
+        localStorage.setItem(SESSION_STORAGE_KEY, SESSION_ID);
+      } catch (_) {}
       const url = new URL(document.location.href);
       url.searchParams.set("session_id", SESSION_ID);
       history.replaceState(null, "", url.toString());
@@ -448,6 +462,7 @@ async function startAudioSend() {
     }
     micTitle.textContent = "마이크 전송 중";
     micDesc.textContent = "실시간 음성을 서버로 전송 중입니다.";
+    if (btnMic) btnMic.textContent = "마이크 중단";
     updateMicStatusUI();
   } catch (e) {
     console.error("audio_chunk start failed:", e);
@@ -488,10 +503,10 @@ client.on("open", () => {
   // 백엔드는 join을 받아야 caption/alert 수신 가능 → 반드시 join 먼저 전송
   client.send("join", { session_id: SESSION_ID });
 
-  btnSendCaption.disabled = false;
   btnFeedbackYes.disabled = false;
   btnFeedbackNo.disabled = false;
 
+  if (btnMic) btnMic.textContent = micStream ? "마이크 중단" : "마이크 실행";
   updateMicStatusUI();
   micTitle.textContent = micStream ? "마이크 전송 시작" : "소리 감지 대기중";
   micDesc.textContent  = micStream ? "실시간 음성을 서버로 전송 중입니다." : "마이크 권한 요청 후 전송됩니다.";
@@ -509,7 +524,6 @@ client.on("close", () => {
   }
   updateMicStatusUI();
 
-  btnSendCaption.disabled = true;
   btnFeedbackYes.disabled = true;
   btnFeedbackNo.disabled = true;
 });
@@ -573,25 +587,6 @@ async function sendFeedback(vote) {
 btnFeedbackYes.addEventListener("click", () => sendFeedback("up"));
 btnFeedbackNo.addEventListener("click", () => sendFeedback("down"));
 
-// 타이핑 자막 전송 (서버 send_caption 처리 필요)
-btnSendCaption.addEventListener("click", () => {
-  const text = testInput.value.trim();
-  if (!text) return;
-  if (!SESSION_ID) {
-    if (typeof showToast === "function") showToast("자막 전송", "먼저 마이크를 눌러 시작하세요.", true);
-    return;
-  }
-  const sent = client.send("send_caption", {
-    text,
-    save: saveToggle.checked,
-    session_id: SESSION_ID,
-  });
-  testInput.value = "";
-  if (!sent && typeof showToast === "function") {
-    showToast("자막 전송", "마이크를 눌러 연결 후 다시 시도하세요.", true);
-  }
-});
-
 function updateSessionLabel() {
   if (sessionLabel) sessionLabel.textContent = SESSION_ID ? "세션: " + SESSION_ID.slice(0, 8) + "…" : "";
 }
@@ -635,10 +630,11 @@ async function loadUserInfo() {
 function setupUserDropdown() {
   if (!userDropdownWrap || !btnUserIcon || !userDropdownSoundReg || !userDropdownLogout) return;
 
-  // 소리등록: /new-sound?session_id=xxx
+  // 소리등록: /new-sound?session_id=xxx (같은 세션으로 커스텀 소리 등록 → 마이크에서 감지)
   userDropdownSoundReg.addEventListener("click", (e) => {
     e.preventDefault();
-    const url = "/new-sound" + (SESSION_ID ? "?session_id=" + encodeURIComponent(SESSION_ID) : "");
+    const sid = SESSION_ID || (typeof localStorage !== "undefined" && localStorage.getItem(SESSION_STORAGE_KEY));
+    const url = "/new-sound" + (sid ? "?session_id=" + encodeURIComponent(sid) : "");
     window.location.href = url;
   });
 

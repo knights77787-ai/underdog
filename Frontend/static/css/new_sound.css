@@ -192,6 +192,8 @@ body {
   justify-content: center;
   cursor: pointer;
   padding: 0;
+  pointer-events: auto;
+  opacity: 1;
 }
 
 .icon-btn.play-toggle-btn:hover {
@@ -201,6 +203,27 @@ body {
 .icon-btn.play-toggle-btn.is-playing {
   border-color: #dc3545;
   color: #dc3545;
+}
+
+.icon-btn.delete-sound-btn {
+  width: 42px;
+  height: 42px;
+  border: 1px solid #cfd4dc;
+  border-radius: 10px;
+  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  pointer-events: auto;
+  opacity: 1;
+  color: #dc3545;
+}
+
+.icon-btn.delete-sound-btn:hover {
+  background: #fff5f5;
+  border-color: #dc3545;
 }
 
 @media (max-width: 768px) {

@@ -38,3 +38,17 @@
   background: currentColor;
   border: none;
 }
+
+/* 최근 감지 로그 테이블 컬럼 균형 조정 */
+#logTable {
+  table-layout: fixed;
+  width: 100%;
+}
+#logTable th { text-align: left; }
+#logTable th:first-child,
+#logTable td:first-child { padding-left: 1rem; }
+#logTable .col-time { width: 12%; }
+#logTable .col-type { width: 12%; }
+#logTable .col-content { width: 64%; }
+#logTable .col-prob { width: 12%; }
+#logTable td:nth-child(4) { text-align: left; }
