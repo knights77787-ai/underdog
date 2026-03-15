@@ -188,3 +188,13 @@ STT(음성→텍스트)를 **로컬 Whisper 모델** 대신 **OpenAI Whisper API
 - **동작:** `OPENAI_API_KEY` 가 있으면 → `WhisperAPISTT` (API 호출), 없으면 → 기존 로컬 `WhisperSTT(small)`.
 - **비용:** OpenAI 사용량에 따라 과금됩니다. [OpenAI 가격](https://openai.com/api/pricing/) 참고.
 - **효과:** API 사용 시 로컬 Whisper 미로드 → ML 워커 켠 상태에서도 **최소 권장 메모리를 4GB → 약 2.5~3GB 수준**으로 낮출 수 있습니다.
+
+### Python 버전 및 TensorFlow (ModuleNotFoundError 방지)
+
+Render 기본 Python이 3.14 등일 수 있고, **TensorFlow는 3.10–3.12** 지원이므로 호환되지 않으면 `ModuleNotFoundError: No module named 'tensorflow'` 또는 설치 실패가 납니다.
+
+- **권장:** Python **3.12** 사용.
+  - **방법 A:** Render **Environment Variables** 에 `PYTHON_VERSION=3.12.11` 추가.
+  - **방법 B:** 레포 루트에 **`.python-version`** 파일 추가, 내용 `3.12` (이미 추가됨).
+- **의존성:** `Backend/requirements.txt` 에 `tensorflow>=2.15.0` 포함됨. CPU만 쓰면 `tensorflow` 만 있으면 됨.
+- **메모리:** `custom_phrase_audio.py` 에서 TensorFlow는 **해당 API(커스텀 구문 오디오 업로드) 호출 시에만** 지연 로드하므로, 앱 기동 시에는 TensorFlow가 로드되지 않아 메모리 부담이 줄어듦.

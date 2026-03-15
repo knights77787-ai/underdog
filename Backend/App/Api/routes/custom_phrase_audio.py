@@ -1,8 +1,8 @@
+"""커스텀 구문 오디오 등록·조회. TensorFlow는 해당 API 호출 시에만 지연 로드 (Render 메모리 절감)."""
 import io
 from pathlib import Path
 
 import numpy as np
-import tensorflow as tf
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
@@ -22,12 +22,14 @@ TARGET_SAMPLES = 16000 * 2  # 2초
 def _resample_to_16k(x: np.ndarray, sr: int) -> np.ndarray:
     if sr == 16000:
         return x
+    import tensorflow as tf  # 지연 로드: 앱 기동 시 미로드 → Render 메모리 절감
     x_tf = tf.convert_to_tensor(x, dtype=tf.float32)[None, :]
     new_len = int(round(x.shape[0] * (16000 / sr)))
     return tf.signal.resample(x_tf, new_len)[0].numpy().astype(np.float32)
 
 
 def _decode_wav_to_16k_mono_f32(wav_bytes: bytes) -> np.ndarray:
+    import tensorflow as tf  # 지연 로드: 해당 API 호출 시에만 로드
     audio, sr = tf.audio.decode_wav(wav_bytes)
     audio = tf.reduce_mean(audio, axis=1)
     sr = int(sr.numpy())
