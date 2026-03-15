@@ -26,16 +26,16 @@
 
 ---
 
-## Phase 2: 로그인
+## Phase 2: 로그인 ✅
 
 | # | 작업 | 내용 |
 |---|------|------|
 | 2-1 | 게스트 로그인 | POST /auth/guest → `session_id` 저장 → Live 화면으로 이동 |
-| 2-2 | 구글 로그인 | `expo-auth-session` 또는 `@react-native-google-signin` → OAuth → 콜백에서 session_id 받기 |
-| 2-3 | 카카오 로그인 | `@react-native-kakao-login` 또는 웹뷰 OAuth → 콜백 처리 |
-| 2-4 | 로그인 화면 UI | 게스트/구글/카카오 버튼, 로딩/에러 상태 표시 |
+| 2-2 | 구글 로그인 | `expo-web-browser`로 `/auth/google/login?mobile=1` 오픈 → 백엔드가 `/auth/mobile-done` → `underdog://live?session_id=...` → 앱에서 Linking으로 수신 후 세션 저장 |
+| 2-3 | 카카오 로그인 | 동일하게 `/auth/kakao/login?mobile=1` → mobile-done → 딥링크 |
+| 2-4 | 로그인 화면 UI | 게스트 / Google / 카카오 버튼, 로딩·에러·토스트 |
 
-**참고:** OAuth 콜백은 백엔드가 `underdog://live?session_id=xxx` 같은 딥링크로 리다이렉트하도록 설정 필요할 수 있음.
+**백엔드:** `Backend/App/Api/routes/auth.py` – `?mobile=1` 시 `state=mobile` 전달, 콜백 후 `/auth/mobile-done`(HTML에서 `underdog://live?...` 리다이렉트). 앱 `app.json`에 `scheme: "underdog"` 등록.
 
 ---
 
