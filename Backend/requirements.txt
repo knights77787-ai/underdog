@@ -4,6 +4,7 @@ setuptools>=60,<82
 fastapi>=0.109.0
 python-multipart>=0.0.6
 numpy>=1.24.0
+scipy>=1.10.0
 openai-whisper>=20231117
 pydub>=0.25.0
 python-dotenv>=1.0.0
