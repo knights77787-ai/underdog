@@ -99,7 +99,16 @@ async def lifespan(app: FastAPI):
         handlers.record_alert_ts(sid, keyword, event_type, ts_ms)
         return event_id
 
+    # YAMNet 워커 2개로 처리 속도 향상 (큐 적체 완화)
     app.state.yamnet_worker = AudioClsWorker(
+        handlers.AUDIOCLS_QUEUE,
+        _broadcast_yamnet,
+        _persist_alert_and_record_ts,
+        lambda sid, kw, et, cooldown_sec, ts_ms: handlers._is_in_cooldown(
+            sid, kw, et, cooldown_sec, ts_ms
+        ),
+    )
+    app.state.yamnet_worker_2 = AudioClsWorker(
         handlers.AUDIOCLS_QUEUE,
         _broadcast_yamnet,
         _persist_alert_and_record_ts,
@@ -109,6 +118,9 @@ async def lifespan(app: FastAPI):
     )
     app.state.yamnet_task = asyncio.create_task(
         app.state.yamnet_worker.run()
+    )
+    app.state.yamnet_task_2 = asyncio.create_task(
+        app.state.yamnet_worker_2.run()
     )
 
     # STT 큐 워커: VAD_END → STT_QUEUE → 3개 워커가 Whisper 병렬 처리
@@ -122,7 +134,7 @@ async def lifespan(app: FastAPI):
     yield
 
     # shutdown: worker tasks 취소
-    for name in ("yamnet_task", "stt_task", "stt_task_2", "stt_task_3"):
+    for name in ("yamnet_task", "yamnet_task_2", "stt_task", "stt_task_2", "stt_task_3"):
         t = getattr(app.state, name, None)
         if t is not None:
             t.cancel()

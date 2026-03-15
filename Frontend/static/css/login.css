@@ -1,11 +1,28 @@
 .login-page {
   min-height: 100vh;
+  background: #f8fafc !important;
 }
 
 .login-page .card {
-  border-radius: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(6, 182, 212, 0.2);
+  box-shadow: 0 4px 20px rgba(30, 64, 175, 0.08) !important;
+}
+
+.login-page .card .h4 {
+  color: var(--lumen-primary-dark);
+}
+
+.login-page .btn-outline-secondary {
+  border-color: rgba(30, 64, 175, 0.4);
+  color: var(--lumen-primary);
+}
+.login-page .btn-outline-secondary:hover {
+  background: rgba(30, 64, 175, 0.08);
+  border-color: var(--lumen-primary);
 }
 
 .login-page .btn-lg {
-  border-radius: 10px;
+  border-radius: 12px;
+  font-weight: 500;
 }

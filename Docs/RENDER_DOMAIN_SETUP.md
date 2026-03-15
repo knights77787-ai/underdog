@@ -185,7 +185,7 @@ Render에서 플랜을 올릴 때 위 용량을 참고해 인스턴스 메모리
 STT(음성→텍스트)를 **로컬 Whisper 모델** 대신 **OpenAI Whisper API** 로 돌리면, 서버에서 Whisper 모델을 로드하지 않아 **메모리 약 1GB 이상 절감**됩니다.
 
 - **설정 방법:** Render(또는 로컬) **Environment Variables** 에 `OPENAI_API_KEY` 를 넣어 두면, 앱이 자동으로 API 방식으로 STT를 사용합니다.
-- **동작:** `OPENAI_API_KEY` 가 있으면 → `WhisperAPISTT` (API 호출), 없으면 → 기존 로컬 `WhisperSTT(small)`.
+- **동작:** `OPENAI_API_KEY` 필수 → `WhisperAPISTT` (OpenAI Whisper API 호출). 키 없으면 STT 비활성화.
 - **비용:** OpenAI 사용량에 따라 과금됩니다. [OpenAI 가격](https://openai.com/api/pricing/) 참고.
 - **효과:** API 사용 시 로컬 Whisper 미로드 → ML 워커 켠 상태에서도 **최소 권장 메모리를 4GB → 약 2.5~3GB 수준**으로 낮출 수 있습니다.
 
