@@ -8,20 +8,20 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Path as ApiPa
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
-from app.db.crud.custom_sounds import (
+from App.db.crud.custom_sounds import (
     create_custom_sound,
     list_custom_sounds,
     delete_custom_sound,
 )
-from app.db.database import get_db
-from app.Services.yamnet_service import YamnetService
+from App.db.database import get_db
+from App.Services.yamnet_service import YamnetService
 
 from scipy.signal import resample
 
 router = APIRouter(prefix="/custom-sounds", tags=["custom-sounds"])
 
 # Backend/data/custom_sounds에 저장 (절대 경로로 CWD 의존 제거)
-from app.Core.config import DATABASE_PATH
+from App.Core.config import DATABASE_PATH
 _UPLOAD_BASE = Path(DATABASE_PATH).resolve().parent / "custom_sounds"
 UPLOAD_DIR = _UPLOAD_BASE
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -166,7 +166,7 @@ def _resolve_audio_path(audio_path: str | None) -> Path | None:
     """DB에 저장된 audio_path → 실제 파일 Path. 없으면 None."""
     if not audio_path or not audio_path.strip():
         return None
-    from app.Core.config import DATABASE_PATH
+    from App.Core.config import DATABASE_PATH
     p = Path(audio_path)
     if p.is_file():
         return p
@@ -185,7 +185,7 @@ def get_custom_sound_audio(
     db: Session = Depends(get_db),
 ):
     """커스텀 소리 오디오 파일 스트리밍 (재생용)."""
-    from app.db.crud.custom_sounds import list_custom_sounds
+    from App.db.crud.custom_sounds import list_custom_sounds
     rows = list_custom_sounds(db, session_id)
     row = next((r for r in rows if r.custom_sound_id == custom_sound_id), None)
     if not row:

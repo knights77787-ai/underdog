@@ -14,15 +14,15 @@ import time
 import numpy as np
 from fastapi import WebSocket
 
-from app.Core.logging import get_logger
-from app.Core.metrics import inc
-from app.Services import keyword_detector
-from app.Services.vad_silero import SileroVADStream, VADConfig
-from app.WS.audio_buffer import decode_pcm16_b64, i16_to_f32
-from app.WS.audio_state import AudioState, AudioStateStore
-from app.WS.manager import manager
-from app.Services.memory_logs import memory_logs
-from app.Services.custom_phrase_matcher import match_phrase
+from App.Core.logging import get_logger
+from App.Core.metrics import inc
+from App.Services import keyword_detector
+from App.Services.vad_silero import SileroVADStream, VADConfig
+from App.WS.audio_buffer import decode_pcm16_b64, i16_to_f32
+from App.WS.audio_state import AudioState, AudioStateStore
+from App.WS.manager import manager
+from App.Services.memory_logs import memory_logs
+from App.Services.custom_phrase_matcher import match_phrase
 
 logger = get_logger("ws.handlers")
 persist_logger = get_logger("ws.persist")
@@ -36,7 +36,7 @@ def _is_heavy_workers_enabled() -> bool:
 if _is_heavy_workers_enabled():
     api_key = os.environ.get("OPENAI_API_KEY", "").strip()
     if api_key:
-        from app.Services.stt_whisper_api import WhisperAPISTT
+        from App.Services.stt_whisper_api import WhisperAPISTT
         WHISPER = WhisperAPISTT()
         logger.info("STT: using OpenAI Whisper API (OPENAI_API_KEY)")
     else:
@@ -87,8 +87,8 @@ def _get_settings(client_session_uuid: str) -> dict:
         cached, cached_at = entry
         if now - cached_at < _settings_cache_ttl_sec:
             return cached
-    from app.db.crud import settings as crud_settings
-    from app.db.database import SessionLocal
+    from App.db.crud import settings as crud_settings
+    from App.db.database import SessionLocal
 
     db = SessionLocal()
     try:
@@ -100,8 +100,8 @@ def _get_settings(client_session_uuid: str) -> dict:
 
 
 def _persist_caption(client_session_uuid: str, text: str, ts_ms: int) -> None:
-    from app.db.crud import events as crud_events
-    from app.db.database import SessionLocal
+    from App.db.crud import events as crud_events
+    from App.db.database import SessionLocal
 
     db = SessionLocal()
     try:
@@ -132,8 +132,8 @@ def _persist_alert(
     custom_similarity: float | None = None,
 ) -> int | None:
     """alert 이벤트 DB 저장. 성공 시 event_id 반환 (WS 브로드캐스트용)."""
-    from app.db.crud import events as crud_events
-    from app.db.database import SessionLocal
+    from App.db.crud import events as crud_events
+    from App.db.database import SessionLocal
 
     db = SessionLocal()
     try:

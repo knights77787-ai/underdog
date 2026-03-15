@@ -11,7 +11,7 @@ import wave
 import numpy as np
 import httpx
 
-from app.Core.logging import get_logger
+from App.Core.logging import get_logger
 
 logger = get_logger("stt.whisper_api")
 

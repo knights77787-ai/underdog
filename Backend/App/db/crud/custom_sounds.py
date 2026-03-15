@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from pathlib import Path
 
-from app.db.models import CustomSound
+from App.db.models import CustomSound
 
 
 def _emb_to_blob(emb: np.ndarray) -> tuple[bytes, int]:
@@ -83,7 +83,7 @@ def delete_custom_sound(
             p = Path(row.audio_path)
             if not p.is_file() and not p.is_absolute():
                 # 상대 경로 "data/custom_sounds/..." → Backend/data/custom_sounds/...
-                from app.Core.config import DATABASE_PATH
+                from App.Core.config import DATABASE_PATH
                 _data_dir = Path(DATABASE_PATH).resolve().parent
                 rel = row.audio_path.replace("\\", "/")
                 if rel.startswith("data/"):

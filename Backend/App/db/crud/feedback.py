@@ -7,7 +7,7 @@
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.db.models import Event, EventFeedback
+from App.db.models import Event, EventFeedback
 
 
 def upsert_feedback(

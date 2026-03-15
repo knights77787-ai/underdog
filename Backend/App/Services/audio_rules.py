@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from threading import RLock
 
-from app.Core.config import EVENT_TYPES_PATH, YAMNET_CLASS_MAP_PATH
+from App.Core.config import EVENT_TYPES_PATH, YAMNET_CLASS_MAP_PATH
 
 _LOCK = RLock()
 

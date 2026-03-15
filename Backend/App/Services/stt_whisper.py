@@ -10,7 +10,7 @@ from dataclasses import dataclass
 import numpy as np
 import whisper
 
-from app.Core.logging import get_logger
+from App.Core.logging import get_logger
 
 logger = get_logger("stt.whisper")
 

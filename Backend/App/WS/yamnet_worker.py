@@ -1,9 +1,9 @@
 # app/WS/yamnet_worker.py
 import asyncio
 import time
-from app.Core.logging import get_logger
-from app.Services.yamnet_service import YamnetService
-from app.Services.audio_rules import classify_audio
+from App.Core.logging import get_logger
+from App.Services.yamnet_service import YamnetService
+from App.Services.audio_rules import classify_audio
 
 logger = get_logger("ws.yamnet")
 
@@ -41,8 +41,8 @@ class YamnetWorker:
                 keyword2 = f"yamnet:{keyword}"
 
                 # 3) 쿨다운/DB/WS는 handlers의 함수 재사용
-                from app.WS.handlers import _is_in_cooldown, record_alert_ts, _persist_alert
-                from app.WS.manager import manager
+                from App.WS.handlers import _is_in_cooldown, record_alert_ts, _persist_alert
+                from App.WS.manager import manager
 
                 if _is_in_cooldown(sid, keyword2, event_type, cooldown_sec, ts_ms):
                     continue

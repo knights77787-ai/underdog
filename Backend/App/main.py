@@ -26,27 +26,27 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.Api.routes.admin import router as admin_router
-from app.Api.routes.auth import router as auth_router
-from app.Api.routes.feedback import router as feedback_router
-from app.Api.routes.health import router as health_router
-from app.Api.routes.custom_phrase_audio import router as custom_phrase_audio_router
-from app.Api.routes.custom_sounds import router as custom_sounds_router
-from app.Api.routes.logs import router as logs_router
-from app.Api.routes.settings import router as settings_router
-from app.Core.config import DATABASE_PATH
-from app.Core.logging import get_logger, setup_logging
-from app.Services.audio_rules import reload_audio_rules
-from app.WS.audio_cls_worker import AudioClsWorker
-from app.WS.endpoint import router as ws_router
-from app.WS import handlers
-from app.WS.manager import manager
-from app.WS.stt_worker import SttWorker
-from app.db.database import create_tables
+from App.Api.routes.admin import router as admin_router
+from App.Api.routes.auth import router as auth_router
+from App.Api.routes.feedback import router as feedback_router
+from App.Api.routes.health import router as health_router
+from App.Api.routes.custom_phrase_audio import router as custom_phrase_audio_router
+from App.Api.routes.custom_sounds import router as custom_sounds_router
+from App.Api.routes.logs import router as logs_router
+from App.Api.routes.settings import router as settings_router
+from App.Core.config import DATABASE_PATH
+from App.Core.logging import get_logger, setup_logging
+from App.Services.audio_rules import reload_audio_rules
+from App.WS.audio_cls_worker import AudioClsWorker
+from App.WS.endpoint import router as ws_router
+from App.WS import handlers
+from App.WS.manager import manager
+from App.WS.stt_worker import SttWorker
+from App.db.database import create_tables
 
 from fastapi import Body
-from app.WS.manager import manager
-from app.WS.handlers import memory_logs, keyword_detector  # 이미 있으면 생략
+from App.WS.manager import manager
+from App.WS.handlers import memory_logs, keyword_detector  # 이미 있으면 생략
 import time
 
 

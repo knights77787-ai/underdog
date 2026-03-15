@@ -4,9 +4,9 @@ from typing import Literal, Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.Core.config import MAX_LOG_LIMIT
-from app.db.crud import events as crud_events
-from app.db.database import get_db
+from App.Core.config import MAX_LOG_LIMIT
+from App.db.crud import events as crud_events
+from App.db.database import get_db
 
 LogType = Literal["all", "caption", "alert"]
 

@@ -1,7 +1,7 @@
 """관리자 API 보호: X-Admin-Token 헤더 또는 admin_token 쿠키 검증."""
 from fastapi import Cookie, Header, HTTPException
 
-from app.Core.config import ADMIN_TOKEN, DEV
+from App.Core.config import ADMIN_TOKEN, DEV
 
 
 def require_admin_token(

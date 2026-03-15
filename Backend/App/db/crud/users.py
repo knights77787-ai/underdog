@@ -1,7 +1,7 @@
 """User CRUD helpers for OAuth and guest flows."""
 from sqlalchemy.orm import Session
 
-from app.db.models import User
+from App.db.models import User
 
 
 def get_or_create_oauth_user(

@@ -9,7 +9,7 @@ import logging
 from threading import RLock
 from typing import Literal
 
-from app.Core.config import EVENT_TYPES_PATH
+from App.Core.config import EVENT_TYPES_PATH
 
 # event_type 순서: danger(경고) 우선, 그 다음 alert(일상)
 _EVENT_TYPE_ORDER: tuple[Literal["danger", "alert"], ...] = ("danger", "alert")

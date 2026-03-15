@@ -5,11 +5,11 @@ import asyncio
 import time
 import numpy as np
 
-from app.Core.logging import get_logger
-from app.Core.metrics import add_time, inc
-from app.Services.audio_rules import classify_audio
-from app.Services.yamnet_service import YamnetService
-from app.Services.memory_logs import memory_logs
+from App.Core.logging import get_logger
+from App.Core.metrics import add_time, inc
+from App.Services.audio_rules import classify_audio
+from App.Services.yamnet_service import YamnetService
+from App.Services.memory_logs import memory_logs
 
 logger = get_logger("yamnet.worker")
 
@@ -18,9 +18,9 @@ CUSTOM_THRESHOLD = 0.75  # 코사인 유사도 임계값 (0.75~0.9, 환경에 �
 
 def _match_custom_sound(session_id: str, emb_live: np.ndarray):
     """세션별 커스텀 사운드 중 emb_live와 가장 유사한 항목 찾기."""
-    from app.db.database import SessionLocal
-    from app.db.models import CustomSound
-    from app.db.crud.custom_sounds import _blob_to_emb
+    from App.db.database import SessionLocal
+    from App.db.models import CustomSound
+    from App.db.crud.custom_sounds import _blob_to_emb
 
     db = SessionLocal()
     try:

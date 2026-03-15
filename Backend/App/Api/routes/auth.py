@@ -8,10 +8,10 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Request, Query
 from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 
-from app.Core.config import ADMIN_TOKEN, DEV
-from app.db.crud import sessions as crud_sessions
-from app.db.crud import users as crud_users
-from app.db.database import get_db
+from App.Core.config import ADMIN_TOKEN, DEV
+from App.db.crud import sessions as crud_sessions
+from App.db.crud import users as crud_users
+from App.db.database import get_db
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -304,7 +304,7 @@ def get_me(
     db: Session = Depends(get_db),
 ):
     """로그인한 사용자(Google/Kakao)의 name, email 반환. 게스트/미존재 시 404."""
-    from app.db.models import Session as SessionModel, User
+    from App.db.models import Session as SessionModel, User
 
     sess = (
         db.query(SessionModel)
