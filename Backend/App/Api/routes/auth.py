@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 
 import httpx
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, Query
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.responses import RedirectResponse, JSONResponse, HTMLResponse
 from sqlalchemy.orm import Session
 
 from App.Core.config import ADMIN_TOKEN, DEV
@@ -56,12 +56,22 @@ def _create_session_payload(
     }
 
 
-def _success_redirect_response(request: Request, payload: dict) -> RedirectResponse:
+def _success_redirect_response(
+    request: Request, payload: dict, *, mobile: bool = False
+) -> RedirectResponse | HTMLResponse:
     """After successful OAuth, redirect to frontend with session info in query.
 
-    FRONTEND_AUTH_REDIRECT_URL 환경변수로 경로 지정. 상대 경로면 요청 Host 사용.
-    127.0.0.1/localhost 절대 URL이면 요청 Host로 교체 (에뮬레이터 대응).
+    mobile=True: 모바일 앱용 → /auth/mobile-done 로 리다이렉트 (앱 딥링크 페이지).
+    else: FRONTEND_AUTH_REDIRECT_URL 환경변수로 경로 지정.
     """
+    session_id = payload["session_id"]
+    provider = payload["user"]["provider"]
+
+    if mobile:
+        base = str(request.base_url).rstrip("/")
+        url = f"{base}/auth/mobile-done?session_id={session_id}&provider={provider}"
+        return RedirectResponse(url)
+
     path = os.getenv("FRONTEND_AUTH_REDIRECT_URL", "/").strip()
     if path.startswith("http://") or path.startswith("https://"):
         parsed = urlparse(path)
@@ -73,10 +83,7 @@ def _success_redirect_response(request: Request, payload: dict) -> RedirectRespo
     else:
         base = str(request.base_url).rstrip("/") + (path if path.startswith("/") else "/" + path)
     sep = "&" if "?" in base else "?"
-    url = (
-        f"{base}{sep}session_id={payload['session_id']}"
-        f"&provider={payload['user']['provider']}"
-    )
+    url = f"{base}{sep}session_id={session_id}&provider={provider}"
     return RedirectResponse(url)
 
 
@@ -85,14 +92,13 @@ def _success_redirect_response(request: Request, payload: dict) -> RedirectRespo
 #
 
 @router.get("/google/login")
-async def google_login(request: Request):
+async def google_login(request: Request, mobile: bool = Query(False, description="모바일 앱: 1이면 콜백 후 /auth/mobile-done으로 리다이렉트")):
     client_id = os.getenv("GOOGLE_CLIENT_ID")
     if not client_id:
         raise HTTPException(
             status_code=500,
             detail="Google OAuth is not configured (GOOGLE_CLIENT_ID)",
         )
-    # .env GOOGLE_REDIRECT_URI 사용 시 콘솔 등록값과 정확 일치 (redirect_uri_mismatch 방지)
     redirect_uri = _get_redirect_uri(request, "GOOGLE_REDIRECT_URI", "/auth/google/callback")
 
     auth_url = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -104,12 +110,19 @@ async def google_login(request: Request):
         "access_type": "offline",
         "prompt": "consent",
     }
+    if mobile:
+        params["state"] = "mobile"
     url = httpx.URL(auth_url, params=params)
     return RedirectResponse(str(url))
 
 
 @router.get("/google/callback")
-async def google_callback(request: Request, code: str, db: Session = Depends(get_db)):
+async def google_callback(
+    request: Request,
+    code: str,
+    state: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
     client_id = os.getenv("GOOGLE_CLIENT_ID")
     client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
     if not client_id or not client_secret:
@@ -182,7 +195,7 @@ async def google_callback(request: Request, code: str, db: Session = Depends(get
         name=user.name,
         email=user.email,
     )
-    return _success_redirect_response(request, payload)
+    return _success_redirect_response(request, payload, mobile=(state == "mobile"))
 
 
 #
@@ -190,7 +203,7 @@ async def google_callback(request: Request, code: str, db: Session = Depends(get
 #
 
 @router.get("/kakao/login")
-async def kakao_login(request: Request):
+async def kakao_login(request: Request, mobile: bool = Query(False, description="모바일 앱: 1이면 콜백 후 /auth/mobile-done으로 리다이렉트")):
     client_id = os.getenv("KAKAO_CLIENT_ID")
     if not client_id:
         raise HTTPException(
@@ -206,12 +219,19 @@ async def kakao_login(request: Request):
         "response_type": "code",
         "scope": "profile_nickname,account_email",
     }
+    if mobile:
+        params["state"] = "mobile"
     url = httpx.URL(auth_url, params=params)
     return RedirectResponse(str(url))
 
 
 @router.get("/kakao/callback")
-async def kakao_callback(request: Request, code: str, db: Session = Depends(get_db)):
+async def kakao_callback(
+    request: Request,
+    code: str,
+    state: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
     client_id = os.getenv("KAKAO_CLIENT_ID")
     client_secret = os.getenv("KAKAO_CLIENT_SECRET", "")
     if not client_id:
@@ -291,7 +311,25 @@ async def kakao_callback(request: Request, code: str, db: Session = Depends(get_
         name=user.name,
         email=user.email,
     )
-    return _success_redirect_response(request, payload)
+    return _success_redirect_response(request, payload, mobile=(state == "mobile"))
+
+
+@router.get("/mobile-done", response_class=HTMLResponse)
+async def auth_mobile_done(
+    session_id: str = Query(..., description="세션 ID (앱으로 전달)"),
+    provider: str = Query(..., description="google | kakao"),
+):
+    """모바일 앱 OAuth 완료 후 이 페이지로 리다이렉트됨. underdog:// 딥링크로 앱을 연다."""
+    # 앱 scheme (Expo app.json scheme과 일치)
+    app_url = f"underdog://live?session_id={session_id}&provider={provider}"
+    html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>로그인 완료</title></head>
+<body>
+<p>로그인되었습니다. 앱으로 돌아가세요.</p>
+<script>window.location.href = {repr(app_url)};</script>
+<noscript><a href="{app_url}">앱 열기</a></noscript>
+</body></html>"""
+    return HTMLResponse(html)
 
 
 #

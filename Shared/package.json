@@ -1,0 +1,11 @@
+{
+  "name": "underdog-shared",
+  "version": "1.0.0",
+  "description": "API/WS contract and types for Underdog frontend and mobile",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {},
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED"
+}

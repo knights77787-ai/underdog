@@ -5,24 +5,24 @@
 
 ---
 
-## Phase 0: 환경 설정
+## Phase 0: 환경 설정 ✅
 
 | # | 작업 | 내용 |
 |---|------|------|
-| 0-1 | Expo 프로젝트 생성 | `npx create-expo-app underdog-mobile` (TypeScript 권장) |
-| 0-2 | 의존성 설치 | `expo-av`(마이크), `@react-navigation/native`, `react-native-screens`, `react-native-safe-area-context` |
-| 0-3 | API/WS 설정 | `API_BASE`, `WS_URL` 환경변수 또는 config 파일 (개발/운영 분리) |
-| 0-4 | 네트워크 테스트 | 에뮬레이터/실기기에서 `http://PC_IP:8000` 접근 가능한지 확인 |
+| 0-1 | Expo 프로젝트 생성 | `Mobile/underdog-mobile` (TypeScript, blank-typescript) |
+| 0-2 | 의존성 설치 | `expo-av`, `@react-navigation/native`, `react-native-screens`, `react-native-safe-area-context` |
+| 0-3 | API/WS 설정 | `src/config.ts` – `API_BASE` / `WS_URL` (기본: `https://api.lumen.ai.kr`, `wss://api.lumen.ai.kr/ws`) |
+| 0-4 | 네트워크 테스트 | `underdog-mobile/README.md` 참고 – REST는 `/health`, WS는 Phase 3에서 연결 시 확인 |
 
 ---
 
-## Phase 1: 기본 구조
+## Phase 1: 기본 구조 ✅
 
 | # | 작업 | 내용 |
 |---|------|------|
-| 1-1 | 네비게이션 구조 | Stack: Login → Live (탭: 라이브, 설정, 커스텀소리 등) |
-| 1-2 | 세션 저장 | AsyncStorage에 `session_id` 저장, 앱 재시작 시 복원 |
-| 1-3 | 공통 컴포넌트 | 버튼, 카드, 토스트(또는 Snackbar) 스타일 통일 |
+| 1-1 | 네비게이션 구조 | Stack: Login → Live. Live는 Bottom Tab(라이브, 설정, 커스텀 소리) |
+| 1-2 | 세션 저장 | `src/storage/session.ts` + `SessionContext`: AsyncStorage에 `session_id` 저장, 앱 재시작 시 복원 |
+| 1-3 | 공통 컴포넌트 | `src/components/`: Button(primary/secondary/outline), Card, Toast + ToastContext |
 
 ---
 
@@ -39,16 +39,16 @@
 
 ---
 
-## Phase 3: 라이브 화면 (핵심)
+## Phase 3: 라이브 화면 (핵심) ✅
 
 | # | 작업 | 내용 |
 |---|------|------|
-| 3-1 | WebSocket 연결 | `ws://host/ws` 연결, `join` 메시지 전송 (`session_id`) |
-| 3-2 | caption 수신 | `caption` 메시지 수신 → 자막 영역에 표시, 스크롤 |
-| 3-3 | alert 수신 | `alert` 메시지 수신 → 로그 테이블에 추가, `event_id` 저장 |
-| 3-4 | Hero 영역 | 최근 위험(alert) 이벤트 표시 |
-| 3-5 | Connect/Disconnect | 버튼으로 WS 연결/해제 |
-| 3-6 | 로그 목록 | caption/alert를 FlatList 등으로 표시 (최신 위) |
+| 3-1 | WebSocket 연결 | `src/hooks/useLiveWs.ts` – `WS_URL` 연결, `join` 전송 (`session_id`) |
+| 3-2 | caption 수신 | `caption` 수신 → 자막 영역 + 로그 목록에 추가 |
+| 3-3 | alert 수신 | `alert` 수신 → 로그 목록 + Hero, `event_id` 보관 |
+| 3-4 | Hero 영역 | 최근 알림 카드 (위험 시 강조) |
+| 3-5 | Connect/Disconnect | 연결하기 / 연결 끊기 버튼 |
+| 3-6 | 로그 목록 | caption/alert FlatList (최신 위, 500건 유지) |
 
 ---
 
