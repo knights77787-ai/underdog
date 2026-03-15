@@ -1,4 +1,4 @@
-# App/WS/audio_cls_worker.py
+# app/WS/audio_cls_worker.py
 # db 세션은 worker에 넘기지 말고, settings는 handlers에서 미리 읽어 item에 값만 넘김.
 # 커스텀 사운드: 실시간 오디오 embedding → DB 저장 커스텀 소리와 유사도 비교 → Event-builder(alert/로그) 통합.
 import asyncio

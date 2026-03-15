@@ -1,5 +1,5 @@
 """
-underdog AI Pipeline - FastAPI 앱 (App 폴더 진입점)
+underdog AI Pipeline - FastAPI 앱 (app 폴더 진입점)
 DB: SQLite 연동, 기동 시 테이블 생성.
 프론트엔드: /, /login, /live → HTML, /static → 정적 파일 (Frontend 폴더 기준).
 """

@@ -104,7 +104,7 @@ console.log("mediaDevices:", navigator.mediaDevices);
 
 | 증상 | 확인할 것 |
 |------|------------|
-| 로그인 페이지가 안 뜸 / 404 | Backend에서 `App/main.py` 에 프론트 서빙 라우트(`/`, `/login`, `/live`, `/static`)가 들어가 있는지 확인 |
+| 로그인 페이지가 안 뜸 / 404 | Backend에서 `app/main.py` 에 프론트 서빙 라우트(`/`, `/login`, `/live`, `/static`)가 들어가 있는지 확인 |
 | CSS/JS가 안 불러와짐 | 주소창이 `http://127.0.0.1:8000/...` 인지 확인. 프론트를 다른 포트에서 열면 API_BASE/WS 주소가 달라져서 CORS/연결 오류 가능 |
 | Connect 시 세션 발급 실패 | 브라우저 개발자 도구(F12) → Network에서 `POST /auth/guest` 요청/응답 확인. 백엔드 로그에 500 등 없는지 확인 |
 | 피드백 "저장되었습니다" 안 나옴 | F12 → Network에서 `POST /feedback` 요청이 가는지, 응답이 200인지 확인. alert에 `event_id`가 있어야 함 (백엔드가 브로드캐스트에 event_id 포함하는지 확인) |

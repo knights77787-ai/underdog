@@ -1,4 +1,4 @@
-# App/Services/audio_rules.py
+# app/Services/audio_rules.py
 import csv
 import json
 from pathlib import Path
@@ -105,7 +105,7 @@ def get_audio_rules_status() -> dict:
         }
 
 
-# YAMNet class map (index → display_name). Backend/App/resources/yamnet_class_map.csv
+# YAMNet class map (index → display_name). Backend/app/resources/yamnet_class_map.csv
 _yamnet_display_names: dict[int, str] = {}
 
 

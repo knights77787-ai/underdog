@@ -1,4 +1,4 @@
-# App/core/metrics.py
+# app/core/metrics.py
 from dataclasses import dataclass
 from threading import Lock
 
