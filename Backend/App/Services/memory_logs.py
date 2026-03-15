@@ -1,12 +1,12 @@
 """메모리 로그 저장소 (마일스톤 5: caption/alert 최근 N건).
 
 ts 스키마는 모두 number(ms)로 통일: ts_ms.
-프로젝트 전체에서 import: from App.Services.memory_logs import memory_logs
+프로젝트 전체에서 import: from app.Services.memory_logs import memory_logs
 """
 from collections import deque
 from time import time
 
-from App.Core.config import MAX_ALERTS, MAX_CAPTIONS
+from app.Core.config import MAX_ALERTS, MAX_CAPTIONS
 
 captions_log: deque = deque(maxlen=MAX_CAPTIONS)
 alerts_log: deque = deque(maxlen=MAX_ALERTS)
@@ -67,7 +67,7 @@ def get_alerts(limit: int, session_id: str | None = None) -> list:
     return list(source)[-limit:][::-1]
 
 
-# A방식 통일: from App.Services.memory_logs import memory_logs
+# A방식 통일: from app.Services.memory_logs import memory_logs
 # (모듈 자체를 memory_logs로 노출해 한 인스턴스만 쓰도록)
 import sys
 memory_logs = sys.modules[__name__]

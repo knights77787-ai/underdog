@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from App.db.crud import settings as crud_settings
-from App.db.database import get_db
+from app.db.crud import settings as crud_settings
+from app.db.database import get_db
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from App.Services.whisper_embed import PHRASE_EMB
+from app.Services.whisper_embed import PHRASE_EMB
 
 
 def match_phrase(session_id: str, speech_audio_16k_f32: np.ndarray):
@@ -13,9 +13,9 @@ def match_phrase(session_id: str, speech_audio_16k_f32: np.ndarray):
     Returns:
         (row or None, sim: float)
     """
-    from App.db.database import SessionLocal
-    from App.db.models import CustomPhraseAudio
-    from App.db.crud.custom_phrase_audio import _blob_to_emb
+    from app.db.database import SessionLocal
+    from app.db.models import CustomPhraseAudio
+    from app.db.crud.custom_phrase_audio import _blob_to_emb
 
     emb_live = PHRASE_EMB.embed_16k_f32(speech_audio_16k_f32)
 

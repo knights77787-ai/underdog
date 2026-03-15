@@ -26,27 +26,27 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from App.Api.routes.admin import router as admin_router
-from App.Api.routes.auth import router as auth_router
-from App.Api.routes.feedback import router as feedback_router
-from App.Api.routes.health import router as health_router
-from App.Api.routes.custom_phrase_audio import router as custom_phrase_audio_router
-from App.Api.routes.custom_sounds import router as custom_sounds_router
-from App.Api.routes.logs import router as logs_router
-from App.Api.routes.settings import router as settings_router
-from App.Core.config import DATABASE_PATH
-from App.Core.logging import get_logger, setup_logging
-from App.Services.audio_rules import reload_audio_rules
-from App.WS.audio_cls_worker import AudioClsWorker
-from App.WS.endpoint import router as ws_router
-from App.WS import handlers
-from App.WS.manager import manager
-from App.WS.stt_worker import SttWorker
-from App.db.database import create_tables
+from app.Api.routes.admin import router as admin_router
+from app.Api.routes.auth import router as auth_router
+from app.Api.routes.feedback import router as feedback_router
+from app.Api.routes.health import router as health_router
+from app.Api.routes.custom_phrase_audio import router as custom_phrase_audio_router
+from app.Api.routes.custom_sounds import router as custom_sounds_router
+from app.Api.routes.logs import router as logs_router
+from app.Api.routes.settings import router as settings_router
+from app.Core.config import DATABASE_PATH
+from app.Core.logging import get_logger, setup_logging
+from app.Services.audio_rules import reload_audio_rules
+from app.WS.audio_cls_worker import AudioClsWorker
+from app.WS.endpoint import router as ws_router
+from app.WS import handlers
+from app.WS.manager import manager
+from app.WS.stt_worker import SttWorker
+from app.db.database import create_tables
 
 from fastapi import Body
-from App.WS.manager import manager
-from App.WS.handlers import memory_logs, keyword_detector  # 이미 있으면 생략
+from app.WS.manager import manager
+from app.WS.handlers import memory_logs, keyword_detector  # 이미 있으면 생략
 import time
 
 
@@ -99,17 +99,26 @@ async def lifespan(app: FastAPI):
         handlers.record_alert_ts(sid, keyword, event_type, ts_ms)
         return event_id
 
-    app.state.yamnet_worker = AudioClsWorker(
-        handlers.AUDIOCLS_QUEUE,
-        _broadcast_yamnet,
-        _persist_alert_and_record_ts,
-        lambda sid, kw, et, cooldown_sec, ts_ms: handlers._is_in_cooldown(
-            sid, kw, et, cooldown_sec, ts_ms
-        ),
-    )
-    app.state.yamnet_task = asyncio.create_task(
-        app.state.yamnet_worker.run()
-    )
+    try:
+        app.state.yamnet_worker = AudioClsWorker(
+            handlers.AUDIOCLS_QUEUE,
+            _broadcast_yamnet,
+            _persist_alert_and_record_ts,
+            lambda sid, kw, et, cooldown_sec, ts_ms: handlers._is_in_cooldown(
+                sid, kw, et, cooldown_sec, ts_ms
+            ),
+        )
+        app.state.yamnet_task = asyncio.create_task(
+            app.state.yamnet_worker.run()
+        )
+    except Exception as e:
+        get_logger("app").warning(
+            "YAMNET 로드 실패 → 소리 분류 비활성화. 자막(STT)은 정상 동작. "
+            "캐시 삭제 후 재시도: 사용자 임시 폴더(AppData\\Local\\Temp) 안 tfhub_modules 삭제. 원인: %s",
+            e,
+        )
+        app.state.yamnet_worker = None
+        app.state.yamnet_task = None
 
     # STT 큐 워커: VAD_END → STT_QUEUE → 3개 워커가 Whisper 병렬 처리
     app.state.stt_worker = SttWorker(handlers.STT_QUEUE)

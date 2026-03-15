@@ -6,9 +6,9 @@ import numpy as np
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
-from App.db.crud.custom_phrase_audio import create_phrase, list_phrases
-from App.db.database import get_db
-from App.Services.whisper_embed import PHRASE_EMB
+from app.db.crud.custom_phrase_audio import create_phrase, list_phrases
+from app.db.database import get_db
+from app.Services.whisper_embed import PHRASE_EMB
 
 router = APIRouter(prefix="/custom-phrase-audio", tags=["custom-phrase-audio"])
 

@@ -7,20 +7,20 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from App.Core.metrics import derived, snapshot
-from App.Core.security import require_admin_token
-from App.WS.handlers import AUDIOCLS_QUEUE, STT_QUEUE, _persist_alert
-from App.WS.manager import manager
-from App.db.crud import events as crud_events
-from App.db.crud.feedback import list_feedback
-from App.db.crud.feedback_reports import feedback_summary, feedback_suspects
-from App.db.database import get_db
-from App.Services.audio_rules import get_audio_rules_status, reload_audio_rules
-from App.Services.keyword_detector import get_keyword_counts, reload_keywords
+from app.Core.metrics import derived, snapshot
+from app.Core.security import require_admin_token
+from app.WS.handlers import AUDIOCLS_QUEUE, STT_QUEUE, _persist_alert
+from app.WS.manager import manager
+from app.db.crud import events as crud_events
+from app.db.crud.feedback import list_feedback
+from app.db.crud.feedback_reports import feedback_summary, feedback_suspects
+from app.db.database import get_db
+from app.Services.audio_rules import get_audio_rules_status, reload_audio_rules
+from app.Services.keyword_detector import get_keyword_counts, reload_keywords
 
 
 from fastapi import Body
-from App.WS.handlers import memory_logs, keyword_detector  # 이미 있으면 생략
+from app.WS.handlers import memory_logs, keyword_detector  # 이미 있으면 생략
 
 
 

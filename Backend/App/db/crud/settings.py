@@ -4,8 +4,8 @@ import json
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from App.db.crud.sessions import get_or_create_by_client_uuid
-from App.db.models import SettingsModel
+from app.db.crud.sessions import get_or_create_by_client_uuid
+from app.db.models import SettingsModel
 
 DEFAULT_SETTINGS = {
     "font_size": 20,

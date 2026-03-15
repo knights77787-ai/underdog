@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 from sqlalchemy.orm import Session
 
-from App.db.models import CustomPhraseAudio
+from app.db.models import CustomPhraseAudio
 
 
 def _emb_to_blob(emb: np.ndarray) -> tuple[bytes, int]:

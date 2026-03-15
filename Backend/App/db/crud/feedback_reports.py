@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, case
 from typing import Optional
 
-from App.db.models import EventFeedback, Event  # 너 모델명에 맞게(import 이름 다르면 수정)
+from app.db.models import EventFeedback, Event  # 너 모델명에 맞게(import 이름 다르면 수정)
 
 def feedback_summary(
     db: Session,

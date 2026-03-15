@@ -2,8 +2,8 @@
 import asyncio
 import time
 
-from App.Core.logging import get_logger
-from App.Core.metrics import add_time, inc
+from app.Core.logging import get_logger
+from app.Core.metrics import add_time, inc
 
 logger = get_logger("ws.stt_worker")
 
@@ -15,7 +15,7 @@ class SttWorker:
         self._queue = queue
 
     async def run(self) -> None:
-        from App.WS import handlers
+        from app.WS import handlers
 
         logger.info("stt_worker_started")
         while True:

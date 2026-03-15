@@ -1,8 +1,8 @@
 """로그 조회 CRUD (메모리 저장소 사용)."""
 from typing import Literal
 
-from App.Core.config import MAX_LOG_LIMIT
-from App.Services.memory_logs import memory_logs
+from app.Core.config import MAX_LOG_LIMIT
+from app.Services.memory_logs import memory_logs
 
 
 def get_logs(

@@ -3,8 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from App.db.crud.feedback import upsert_feedback
-from App.db.database import get_db
+from app.db.crud.feedback import upsert_feedback
+from app.db.database import get_db
 
 router = APIRouter(prefix="/feedback", tags=["feedback"])
 

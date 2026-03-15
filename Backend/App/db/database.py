@@ -2,8 +2,8 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from App.Core.config import DATABASE_PATH, SQLITE_URL
-from App.db.models import Base
+from app.Core.config import DATABASE_PATH, SQLITE_URL
+from app.db.models import Base
 
 DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
 

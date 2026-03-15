@@ -4,9 +4,9 @@ from typing import Literal
 from sqlalchemy import desc
 from sqlalchemy.orm import Session, joinedload
 
-from App.db.crud import sessions as crud_sessions
-from App.db.models import Event, EventTranscript
-from App.db.models import Session as SessionModel
+from app.db.crud import sessions as crud_sessions
+from app.db.models import Event, EventTranscript
+from app.db.models import Session as SessionModel
 
 LogType = Literal["all", "caption", "alert"]
 

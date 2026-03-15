@@ -10,7 +10,7 @@ import uuid
 
 from sqlalchemy.orm import Session
 
-from App.db.models import Session as SessionModel
+from app.db.models import Session as SessionModel
 
 
 def get_or_create_by_client_uuid(db: Session, client_session_uuid: str) -> SessionModel:

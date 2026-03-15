@@ -10,8 +10,8 @@ import uuid
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from App.Core.logging import get_logger
-from App.WS import handlers
+from app.Core.logging import get_logger
+from app.WS import handlers
 
 router = APIRouter()
 logger = get_logger("ws.endpoint")
@@ -77,7 +77,7 @@ async def websocket_endpoint(websocket: WebSocket):
     finally:
         logger.info(f"[conn={conn_id}] ws_disconnected session_id={session_id} client={websocket.client}")
         if session_id:
-            from App.WS.manager import manager
+            from app.WS.manager import manager
 
             handlers.clear_cooldown_for_session(session_id)
             handlers.AUDIO_STATES.remove(session_id)

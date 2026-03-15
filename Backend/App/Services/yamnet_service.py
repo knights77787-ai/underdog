@@ -6,7 +6,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_hub as hub
 
-from App.Core.config import YAMNET_CLASS_MAP_PATH
+from app.Core.config import YAMNET_CLASS_MAP_PATH
 
 
 def _load_class_map(path: Path) -> dict[int, str]:

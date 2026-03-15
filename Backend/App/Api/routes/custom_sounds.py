@@ -8,25 +8,49 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Path as ApiPa
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
-from App.db.crud.custom_sounds import (
+from app.db.crud.custom_sounds import (
     create_custom_sound,
     list_custom_sounds,
     delete_custom_sound,
 )
-from App.db.database import get_db
-from App.Services.yamnet_service import YamnetService
+from app.db.database import get_db
+from app.Services.yamnet_service import YamnetService
 
 from scipy.signal import resample
 
 router = APIRouter(prefix="/custom-sounds", tags=["custom-sounds"])
 
 # Backend/data/custom_sounds에 저장 (절대 경로로 CWD 의존 제거)
-from App.Core.config import DATABASE_PATH
+from app.Core.config import DATABASE_PATH
 _UPLOAD_BASE = Path(DATABASE_PATH).resolve().parent / "custom_sounds"
 UPLOAD_DIR = _UPLOAD_BASE
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-YAMNET = YamnetService()  # 이미 앱 어딘가에서 1회 로드면 거기 재사용해도 OK
+_yamnet_instance: YamnetService | None = None
+_yamnet_error: str | None = None
+
+
+def _get_yamnet() -> YamnetService:
+    """YAMNET 모델 지연 로드. 첫 사용 시에만 로드하며, 실패 시 503 안내."""
+    global _yamnet_instance, _yamnet_error
+    if _yamnet_instance is not None:
+        return _yamnet_instance
+    if _yamnet_error is not None:
+        raise HTTPException(
+            503,
+            f"YAMNET 모델 로드 실패(캐시 손상 가능). "
+            "TF Hub 캐시 삭제 후 재시도: 사용자 임시 폴더(AppData\\Local\\Temp) 안의 tfhub_modules 폴더 삭제. 원인: {_yamnet_error}",
+        )
+    try:
+        _yamnet_instance = YamnetService()
+        return _yamnet_instance
+    except Exception as e:
+        _yamnet_error = str(e)
+        raise HTTPException(
+            503,
+            f"YAMNET 모델 로드 실패. "
+            "캐시 삭제 후 재시도: 사용자 임시 폴더(AppData\\Local\\Temp) 안의 tfhub_modules 폴더 삭제. 원인: {_yamnet_error}",
+        )
 
 ALLOWED_EXTENSIONS = (".wav", ".mp3", ".webm", ".m4a")
 
@@ -118,7 +142,8 @@ async def upload_custom_sound(
     raw_bytes = await file.read()
     x = _decode_audio_to_16k_mono_f32(raw_bytes, ext)
 
-    emb = YAMNET.embedding_1s(x)
+    yamnet = _get_yamnet()
+    emb = yamnet.embedding_1s(x)
 
     # 파일 저장 (원본 확장자 유지). DB에는 "data/custom_sounds/..." 형태로 저장
     save_path = UPLOAD_DIR / f"{session_id}_{file.filename}"
@@ -141,7 +166,7 @@ def _resolve_audio_path(audio_path: str | None) -> Path | None:
     """DB에 저장된 audio_path → 실제 파일 Path. 없으면 None."""
     if not audio_path or not audio_path.strip():
         return None
-    from App.Core.config import DATABASE_PATH
+    from app.Core.config import DATABASE_PATH
     p = Path(audio_path)
     if p.is_file():
         return p
@@ -160,7 +185,7 @@ def get_custom_sound_audio(
     db: Session = Depends(get_db),
 ):
     """커스텀 소리 오디오 파일 스트리밍 (재생용)."""
-    from App.db.crud.custom_sounds import list_custom_sounds
+    from app.db.crud.custom_sounds import list_custom_sounds
     rows = list_custom_sounds(db, session_id)
     row = next((r for r in rows if r.custom_sound_id == custom_sound_id), None)
     if not row:
