@@ -16,3 +16,4 @@ alembic>=1.13.0
 httpx>=0.27.0
 # TensorFlow: Python 3.10–3.12 지원. Render 등에서 PYTHON_VERSION=3.12 권장.
 tensorflow>=2.15.0
+tensorflow_hub>=0.15.0
