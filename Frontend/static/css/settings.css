@@ -1,0 +1,14 @@
+.settings-page {
+  min-height: 100vh;
+}
+
+.settings-page .card {
+  border-radius: 16px;
+  border: 1px solid rgba(6, 182, 212, 0.2);
+}
+
+.settings-page .card-header {
+  color: var(--lumen-primary-dark);
+  border-bottom-color: rgba(6, 182, 212, 0.2);
+  border-radius: 16px 16px 0 0;
+}

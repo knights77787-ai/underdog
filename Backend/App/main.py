@@ -233,6 +233,12 @@ def frontend_new_sound():
     return _send_html("new_sound.html")
 
 
+@app.get("/settings-page", response_class=FileResponse)
+def frontend_settings():
+    """설정 페이지."""
+    return _send_html("settings.html")
+
+
 @app.get("/admin-login", response_class=FileResponse)
 def frontend_admin_login():
     """관리자 로그인 페이지."""
