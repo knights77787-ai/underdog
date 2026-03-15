@@ -1,12 +1,16 @@
+/* Lumen 테마: 메인 페이지 */
+body.bg-light { background-color: #f8fafc !important; }
+
 .caption-box{
   height: 260px;
   overflow-y: auto;
-  background: #0b1220;
+  background: #1e293b;
   color: #e5e7eb;
   border-radius: 12px;
   padding: 12px;
   font-size: 16px;
   line-height: 1.5;
+  border: 1px solid rgba(6, 182, 212, 0.2);
 }
 
 .caption-line{
@@ -21,22 +25,55 @@
   border: 1px solid rgba(239,68,68,0.4);
 }
 
-.mic-icon{ font-size: 32px; }
-
-/* 마이크 상태 배지 */
-#micStatusBadge .mic-status-dot {
-  width: 6px;
-  height: 6px;
+/* 마이크 상태 인디케이터 (아이콘 기반) */
+.mic-status-indicator {
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
 }
-#micStatusBadge.text-bg-secondary .mic-status-dot {
-  background: transparent;
-  border: 1px solid currentColor;
+.mic-status-indicator.mic-off {
+  background: #e5e7eb;
+  color: #9ca3af;
 }
-#micStatusBadge.text-bg-success .mic-status-dot {
-  background: currentColor;
-  border: none;
+.mic-status-indicator.mic-on {
+  background: rgba(6, 182, 212, 0.15);
+  color: var(--lumen-teal);
+  box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.3);
+  animation: mic-pulse 2s ease-in-out infinite;
+}
+.mic-status-indicator .mic-status-icon {
+  font-size: 1.1rem;
+}
+.mic-status-indicator.mic-status-card {
+  width: 56px;
+  height: 56px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.mic-status-indicator.mic-status-card .mic-status-icon {
+  font-size: 1.5rem;
+}
+@keyframes mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.3); }
+  50% { box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.15); }
+}
+
+/* Hero 상태 배지 (Lumen 블루 계열) */
+#heroBadge.bg-secondary-subtle {
+  background-color: rgba(30, 64, 175, 0.12) !important;
+  color: var(--lumen-primary) !important;
+  border-color: rgba(30, 64, 175, 0.3) !important;
+}
+
+/* 카드 헤더 포인트 */
+.card-header.fw-semibold {
+  color: var(--lumen-primary-dark);
+  border-bottom-color: rgba(6, 182, 212, 0.2);
 }
 
 /* 최근 감지 로그 테이블 컬럼 균형 조정 */
@@ -44,7 +81,12 @@
   table-layout: fixed;
   width: 100%;
 }
-#logTable th { text-align: left; }
+#logTable th {
+  text-align: left;
+  background: var(--lumen-bg-subtle) !important;
+  color: var(--lumen-primary-dark);
+  font-weight: 600;
+}
 #logTable th:first-child,
 #logTable td:first-child { padding-left: 1rem; }
 #logTable .col-time { width: 12%; }
@@ -52,3 +94,31 @@
 #logTable .col-content { width: 64%; }
 #logTable .col-prob { width: 12%; }
 #logTable td:nth-child(4) { text-align: left; }
+
+/* 게스트 전용 CTA 카드 */
+.guest-cta-card {
+  background: var(--lumen-bg-subtle);
+  border-radius: 16px;
+  border: 1px solid rgba(6, 182, 212, 0.2);
+}
+
+.guest-cta-icon {
+  font-size: 3rem;
+  line-height: 1;
+}
+
+.guest-cta-card .btn-primary {
+  padding: 0.5rem 1.5rem;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+/* 메인 카드 섹션 */
+.card.shadow-sm {
+  border-color: rgba(6, 182, 212, 0.15);
+  border-radius: 12px;
+}
+
+.card.shadow-sm .card-body {
+  border-radius: 0 0 12px 12px;
+}

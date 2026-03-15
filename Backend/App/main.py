@@ -99,26 +99,29 @@ async def lifespan(app: FastAPI):
         handlers.record_alert_ts(sid, keyword, event_type, ts_ms)
         return event_id
 
-    try:
-        app.state.yamnet_worker = AudioClsWorker(
-            handlers.AUDIOCLS_QUEUE,
-            _broadcast_yamnet,
-            _persist_alert_and_record_ts,
-            lambda sid, kw, et, cooldown_sec, ts_ms: handlers._is_in_cooldown(
-                sid, kw, et, cooldown_sec, ts_ms
-            ),
-        )
-        app.state.yamnet_task = asyncio.create_task(
-            app.state.yamnet_worker.run()
-        )
-    except Exception as e:
-        get_logger("app").warning(
-            "YAMNET 로드 실패 → 소리 분류 비활성화. 자막(STT)은 정상 동작. "
-            "캐시 삭제 후 재시도: 사용자 임시 폴더(AppData\\Local\\Temp) 안 tfhub_modules 삭제. 원인: %s",
-            e,
-        )
-        app.state.yamnet_worker = None
-        app.state.yamnet_task = None
+    # YAMNet 워커 2개로 처리 속도 향상 (큐 적체 완화)
+    app.state.yamnet_worker = AudioClsWorker(
+        handlers.AUDIOCLS_QUEUE,
+        _broadcast_yamnet,
+        _persist_alert_and_record_ts,
+        lambda sid, kw, et, cooldown_sec, ts_ms: handlers._is_in_cooldown(
+            sid, kw, et, cooldown_sec, ts_ms
+        ),
+    )
+    app.state.yamnet_worker_2 = AudioClsWorker(
+        handlers.AUDIOCLS_QUEUE,
+        _broadcast_yamnet,
+        _persist_alert_and_record_ts,
+        lambda sid, kw, et, cooldown_sec, ts_ms: handlers._is_in_cooldown(
+            sid, kw, et, cooldown_sec, ts_ms
+        ),
+    )
+    app.state.yamnet_task = asyncio.create_task(
+        app.state.yamnet_worker.run()
+    )
+    app.state.yamnet_task_2 = asyncio.create_task(
+        app.state.yamnet_worker_2.run()
+    )
 
     # STT 큐 워커: VAD_END → STT_QUEUE → 3개 워커가 Whisper 병렬 처리
     app.state.stt_worker = SttWorker(handlers.STT_QUEUE)
@@ -131,7 +134,7 @@ async def lifespan(app: FastAPI):
     yield
 
     # shutdown: worker tasks 취소
-    for name in ("yamnet_task", "stt_task", "stt_task_2", "stt_task_3"):
+    for name in ("yamnet_task", "yamnet_task_2", "stt_task", "stt_task_2", "stt_task_3"):
         t = getattr(app.state, name, None)
         if t is not None:
             t.cancel()

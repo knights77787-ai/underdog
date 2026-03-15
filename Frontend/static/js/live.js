@@ -39,7 +39,6 @@ const WORKLET_URL = (window.location.origin || "http://127.0.0.1:8000") + "/stat
 // =======================
 // 1) DOM
 // =======================
-const micStatusBadge = document.getElementById("micStatusBadge");
 
 const saveToggle = document.getElementById("saveToggle");
 
@@ -50,6 +49,8 @@ const btnFeedbackYes = document.getElementById("btnFeedbackYes");
 const btnFeedbackNo  = document.getElementById("btnFeedbackNo");
 
 const logTbody = document.getElementById("logTbody");
+const logSection = document.getElementById("logSection");
+const guestCtaSection = document.getElementById("guestCtaSection");
 
 const micTitle = document.getElementById("micTitle");
 const micDesc  = document.getElementById("micDesc");
@@ -112,11 +113,19 @@ function isMicOn() {
 
 function updateMicStatusUI() {
   const on = isMicOn();
-  if (micStatusBadge) {
-    const text = micStatusBadge.querySelector(".mic-status-text");
-    micStatusBadge.className = "badge ms-2 d-flex align-items-center gap-1 " + (on ? "text-bg-success" : "text-bg-secondary");
-    if (text) text.textContent = on ? "마이크 켜짐" : "마이크 끔";
+  const label = on ? "마이크 켜짐" : "마이크 끔";
+  const iconClass = "mic-status-icon bi " + (on ? "bi-mic-fill" : "bi-mic-mute-fill");
+  const baseClass = "mic-status-indicator " + (on ? "mic-on" : "mic-off");
+
+  const micCard = document.getElementById("micStatusCard");
+  if (micCard) {
+    const icon = micCard.querySelector(".mic-status-icon");
+    if (icon) icon.className = iconClass;
+    micCard.className = baseClass + " mic-status-card mb-2";
+    micCard.title = label;
+    micCard.setAttribute("aria-label", label);
   }
+
   if (btnMic) btnMic.textContent = on ? "마이크 중단" : "마이크 실행";
 }
 
@@ -596,6 +605,11 @@ function getProvider() {
   return new URLSearchParams(document.location.search).get("provider");
 }
 
+function isGuest() {
+  const p = getProvider();
+  return p !== "google" && p !== "kakao";
+}
+
 function updateUserSection() {
   if (!btnLogin || !userDropdownWrap) return;
   const provider = getProvider();
@@ -606,6 +620,25 @@ function updateUserSection() {
   } else {
     btnLogin.classList.remove("d-none");
     userDropdownWrap.classList.add("d-none");
+  }
+  updateLogSectionVisibility();
+}
+
+function updateLogSectionVisibility() {
+  const saveWrap = document.getElementById("saveToggleWrap");
+  if (logSection && guestCtaSection) {
+    if (isGuest()) {
+      logSection.classList.add("d-none");
+      guestCtaSection.classList.remove("d-none");
+      document.getElementById("mainContentRow")?.classList.add("guest-layout");
+    } else {
+      logSection.classList.remove("d-none");
+      guestCtaSection.classList.add("d-none");
+      document.getElementById("mainContentRow")?.classList.remove("guest-layout");
+    }
+  }
+  if (saveWrap) {
+    saveWrap.classList.toggle("d-none", isGuest());
   }
 }
 
@@ -628,6 +661,7 @@ async function loadUserInfo() {
 }
 
 function setupUserDropdown() {
+  const userDropdownSettings = document.getElementById("userDropdownSettings");
   if (!userDropdownWrap || !btnUserIcon || !userDropdownSoundReg || !userDropdownLogout) return;
 
   // 소리등록: /new-sound?session_id=xxx (같은 세션으로 커스텀 소리 등록 → 마이크에서 감지)
@@ -637,6 +671,20 @@ function setupUserDropdown() {
     const url = "/new-sound" + (sid ? "?session_id=" + encodeURIComponent(sid) : "");
     window.location.href = url;
   });
+
+  // 설정: 설정 패널 펼치기 + 드롭다운 닫기
+  if (userDropdownSettings) {
+    userDropdownSettings.addEventListener("click", (e) => {
+      e.preventDefault();
+      const collapseEl = document.getElementById("settingsCollapse");
+      if (collapseEl && window.bootstrap) {
+        const collapse = bootstrap.Collapse.getOrCreateInstance(collapseEl);
+        collapse.show();
+        const dropdown = bootstrap.Dropdown.getInstance(btnUserIcon);
+        if (dropdown) dropdown.hide();
+      }
+    });
+  }
 
   // 로그아웃: 메인으로 이동, session_id·provider 제거
   userDropdownLogout.addEventListener("click", (e) => {
@@ -747,5 +795,6 @@ updateMicStatusUI();
 setHeroNormal();
 updateSessionLabel();
 updateUserSection();
+updateLogSectionVisibility();
 setupUserDropdown();
 if (SESSION_ID) loadSettings();

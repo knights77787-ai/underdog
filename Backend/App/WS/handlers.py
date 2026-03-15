@@ -28,20 +28,20 @@ logger = get_logger("ws.handlers")
 persist_logger = get_logger("ws.persist")
 audio_logger = get_logger("ws.audio")
 
-# STT: ENABLE_ML_WORKERS 켜져 있을 때만 Whisper 로드 (꺼져 있으면 로드 안 함 → 2GB 미만 유지)
+# STT: ENABLE_ML_WORKERS 켜져 있을 때만 OpenAI Whisper API 사용 (OPENAI_API_KEY 필수)
 def _is_heavy_workers_enabled() -> bool:
     v = os.environ.get("ENABLE_ML_WORKERS", "").strip().lower()
     return v in ("1", "true", "yes")
 
 if _is_heavy_workers_enabled():
-    if os.environ.get("OPENAI_API_KEY", "").strip():
-        from app.Services.stt_whisper_api import WhisperAPISTT
+    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    if api_key:
+        from App.Services.stt_whisper_api import WhisperAPISTT
         WHISPER = WhisperAPISTT()
         logger.info("STT: using OpenAI Whisper API (OPENAI_API_KEY)")
     else:
-        from app.Services.stt_whisper import WhisperConfig, WhisperSTT
-        WHISPER = WhisperSTT(WhisperConfig(model_name="small", language="ko"))
-        logger.info("STT: using local Whisper model (small)")
+        WHISPER = None
+        logger.warning("STT: disabled — OPENAI_API_KEY required but not set")
 else:
     WHISPER = None  # ML 워커 비활성화 시 Whisper 미로드 → 메모리 2GB 미만
     logger.info("STT: disabled (ENABLE_ML_WORKERS not set)")
@@ -51,10 +51,10 @@ VAD_STREAM = SileroVADStream(
     VADConfig(sr=16000, threshold=0.5, min_silence_ms=300, speech_pad_ms=30)
 )
 AUDIO_STATES = AudioStateStore()
-# 비말(1초) 오디오 분류용 큐. maxsize로 폭주 방지
-AUDIOCLS_QUEUE: asyncio.Queue = asyncio.Queue(maxsize=20)
+# 비말(1초) 오디오 분류용 큐. maxsize로 폭주 방지 (처리 지연 시 버퍼 확대)
+AUDIOCLS_QUEUE: asyncio.Queue = asyncio.Queue(maxsize=80)
 # STT 직렬화: VAD_END → 큐 → 단일 워커가 Whisper 실행 (동시 다중 STT 방지)
-STT_QUEUE: asyncio.Queue = asyncio.Queue(maxsize=8)
+STT_QUEUE: asyncio.Queue = asyncio.Queue(maxsize=32)
 
 # 쿨다운: (session_id, keyword, event_type) -> 마지막 발행 ts_ms (스펙과 동일)
 # disconnect 시 해당 세션 키 제거해 메모리 누적 완화

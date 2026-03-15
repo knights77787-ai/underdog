@@ -1,0 +1,49 @@
+/**
+ * Lumen 로고 기반 통일 테마
+ * 로고 색상: 딥 블루(텍스트), 보라/티얼/오렌지 악센트
+ */
+:root {
+  --lumen-primary: #1e40af;
+  --lumen-primary-light: #3b82f6;
+  --lumen-primary-dark: #1e3a8a;
+  --lumen-purple: #8b5cf6;
+  --lumen-teal: #06b6d4;
+  --lumen-orange: #f97316;
+  --lumen-yellow: #eab308;
+  --lumen-bg-subtle: rgba(6, 182, 212, 0.06);
+}
+
+/* Bootstrap Primary 오버라이드 */
+.btn-primary {
+  background: var(--lumen-primary) !important;
+  border-color: var(--lumen-primary) !important;
+}
+.btn-primary:hover {
+  background: var(--lumen-primary-dark) !important;
+  border-color: var(--lumen-primary-dark) !important;
+}
+.btn-outline-primary {
+  color: var(--lumen-primary) !important;
+  border-color: var(--lumen-primary) !important;
+}
+.btn-outline-primary:hover {
+  background: rgba(30, 64, 175, 0.1) !important;
+  color: var(--lumen-primary-dark) !important;
+  border-color: var(--lumen-primary-dark) !important;
+}
+
+/* 폼 컨트롤 포커스 */
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--lumen-teal);
+  box-shadow: 0 0 0 0.2rem rgba(6, 182, 212, 0.2);
+}
+.form-check-input:checked {
+  background-color: var(--lumen-primary) !important;
+  border-color: var(--lumen-primary) !important;
+}
+
+/* 공통: 상단 네비게이션 라인 */
+.navbar.bg-white.border-bottom {
+  border-bottom: 2px solid var(--lumen-primary) !important;
+}
