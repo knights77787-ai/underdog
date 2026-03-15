@@ -36,7 +36,7 @@ def _is_heavy_workers_enabled() -> bool:
 if _is_heavy_workers_enabled():
     api_key = os.environ.get("OPENAI_API_KEY", "").strip()
     if api_key:
-        from App.Services.stt_whisper_api import WhisperAPISTT
+        from app.Services.stt_whisper_api import WhisperAPISTT
         WHISPER = WhisperAPISTT()
         logger.info("STT: using OpenAI Whisper API (OPENAI_API_KEY)")
     else:
