@@ -9,7 +9,7 @@ ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
 DEV = os.getenv("DEV", "").lower() in ("1", "true", "yes")
 
 # 프로젝트 루트(underdoc) 기준 절대 경로
-# config.py: Backend/app/Core/config.py
+# config.py: Backend/App/Core/config.py
 # parents[3] -> underdoc
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 # Linux/Docker 호환: 경로 소문자(shared) 권장. 폴더명이 Shared면 shared로 통일하세요.
