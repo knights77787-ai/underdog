@@ -33,7 +33,7 @@ let audioBuffer = [];
 let rawBuffer = [];
 let currentSr = 0;
 const TARGET_SR = 16000;
-const CHUNK_SAMPLES = 8000; // 0.5 sec at 16kHz
+const CHUNK_SAMPLES = 32000; // 2 sec at 16kHz (rolling buffer, 문맥 보강)
 const WORKLET_URL = (window.location.origin || "http://127.0.0.1:8000") + "/static/js/audio-processor-worklet.js";
 
 // =======================

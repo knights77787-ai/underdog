@@ -106,6 +106,25 @@ export function useLiveWs(wsUrl: string) {
     [status, connect, disconnect]
   );
 
+  const sendAudioChunk = useCallback(
+    (sessionId: string, tsMs: number, dataB64: string) => {
+      const ws = wsRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+      ws.send(
+        JSON.stringify({
+          type: WS_MSG.AUDIO_CHUNK,
+          session_id: sessionId,
+          ts_ms: tsMs,
+          sr: 16000,
+          format: 'pcm_s16le',
+          data_b64: dataB64,
+        })
+      );
+      return true;
+    },
+    []
+  );
+
   return {
     status,
     connected: status === 'connected',
@@ -113,6 +132,7 @@ export function useLiveWs(wsUrl: string) {
     connect,
     disconnect,
     toggle,
+    sendAudioChunk,
     logs,
     latestAlert,
     currentCaption,

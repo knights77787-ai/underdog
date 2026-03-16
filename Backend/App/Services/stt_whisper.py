@@ -20,8 +20,19 @@ STT_LANGUAGE = "ko"
 STT_INITIAL_PROMPT = ""
 # best_of: 0 또는 1=가장 빠름(1회 디코딩), 2~3=정확하지만 지연 증가
 STT_BEST_OF = 0
-# no_speech_threshold: 높을수록 말 없는 구간을 빈 결과로 (환각·노이즈 감소)
-NO_SPEECH_THRESHOLD = 0.65
+# no_speech_threshold: 높을수록 말 없는 구간을 빈 결과로 (환각·노이즈 감소). 0.7 완화 권장.
+NO_SPEECH_THRESHOLD = 0.7
+# 환각 구간 앞 무음 스킵 (초). 짧은 발화/작은 음량 보존에 유리.
+HALLUCINATION_SILENCE_THRESHOLD = 2.0
+
+# 학습 데이터에 흔한 불필요 문장 필터 (할루시네이션 감소)
+BANNED_TOKENS = frozenset({
+    "네",
+    "네 그렇습니다",
+    "감사합니다",
+    "시청해주셔서 감사합니다",
+    "구독과 좋아요",
+})
 
 
 @dataclass
@@ -67,8 +78,8 @@ class WhisperSTT:
         if peak > 0.01:
             audio = (audio * (0.95 / peak)).astype(np.float32)
         audio = np.clip(audio, -1.0, 1.0)
-        # 최소 0.5초~1초 권장
-        if audio.shape[0] < 16000 * 0.5:
+        # 최소 2초 권장 (rolling buffer로 문맥 보강)
+        if audio.shape[0] < 16000 * 2:
             return ""
         logger.info(
             "WHISPER INPUT shape=%s dtype=%s min=%.4f max=%.4f",
@@ -96,10 +107,13 @@ class WhisperSTT:
             condition_on_previous_text=False,
             initial_prompt=prompt if prompt else None,
             verbose=False,
+            hallucination_silence_threshold=HALLUCINATION_SILENCE_THRESHOLD,
         )
         text = (result.get("text") or "").strip()
         # 프롬프트가 그대로 나오거나 환각(반복 문자)이면 빈 결과로
         if not text:
+            return ""
+        if text in BANNED_TOKENS:
             return ""
         if text == "한국어로 말합니다." or (prompt and text == prompt.strip()):
             return ""

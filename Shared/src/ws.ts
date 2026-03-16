@@ -81,6 +81,6 @@ export function isWsType<T extends WsMessageBase>(
   return msg.type === type;
 }
 
-/** 오디오 청크 규격: 0.5초 = 8000 samples @ 16kHz */
-export const AUDIO_CHUNK_SAMPLES = 8000;
+/** 오디오 청크 규격: 2초 = 32000 samples @ 16kHz (rolling buffer로 문맥 보강) */
+export const AUDIO_CHUNK_SAMPLES = 32000;
 export const AUDIO_TARGET_SR = 16000;
