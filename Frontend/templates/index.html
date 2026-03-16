@@ -13,6 +13,7 @@
   <!-- Lumen 테마 (로고 색상 기반) -->
   <link href="/static/css/theme.css" rel="stylesheet">
   <link href="/static/css/index.css" rel="stylesheet">
+  <link href="/static/css/footer.css" rel="stylesheet">
 </head>
 
 <body class="bg-light">
@@ -148,6 +149,22 @@
       </div>
     </div>
   </main>
+
+  <footer class="app-footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <img src="/static/img/lumen_logo.png" alt="Lumen">
+        <span>Lumen</span>
+      </div>
+      <div class="footer-links">
+        <a href="/">홈</a>
+        <a href="/login">로그인</a>
+        <a href="/new-sound">소리 등록</a>
+        <a href="/settings-page">설정</a>
+      </div>
+      <div class="footer-copy">© Lumen. 실시간 자막·소리 감지 서비스.</div>
+    </div>
+  </footer>
 
   <!-- 마이크 권한 안내 모달 (닫힌 상태에서 inert로 포커스/접근성 경고 방지) -->
   <div class="modal fade" id="micPermissionModal" tabindex="-1" aria-labelledby="micPermissionModalLabel" aria-hidden="true" inert>

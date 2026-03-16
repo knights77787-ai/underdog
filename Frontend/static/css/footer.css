@@ -1,0 +1,70 @@
+/**
+ * Lumen 서비스 공통 푸터
+ */
+.app-footer {
+  margin-top: auto;
+  padding: 1.5rem 0;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  font-size: 0.875rem;
+}
+
+.app-footer .footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+.app-footer .footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.app-footer .footer-brand img {
+  width: 36px;
+  height: 26px;
+  object-fit: contain;
+}
+
+.app-footer .footer-brand span {
+  font-weight: 600;
+  color: var(--lumen-primary, #1e40af);
+}
+
+.app-footer .footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.app-footer .footer-links a {
+  color: #64748b;
+  text-decoration: none;
+}
+
+.app-footer .footer-links a:hover {
+  color: var(--lumen-primary, #1e40af);
+}
+
+.app-footer .footer-copy {
+  color: #94a3b8;
+  font-size: 0.8125rem;
+}
+
+/* full-height 레이아웃: footer가 뷰포트 하단에 붙도록 */
+body.login-page,
+body.settings-page,
+body.bg-light {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+body.login-page main,
+body.settings-page main,
+body.bg-light main {
+  flex: 1;
+}
