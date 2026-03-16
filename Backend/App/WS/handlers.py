@@ -48,7 +48,7 @@ else:
 
 # 전역(프로세스) VAD 스트림 + 세션별 오디오 상태
 VAD_STREAM = SileroVADStream(
-    VADConfig(sr=16000, threshold=0.5, min_silence_ms=300, speech_pad_ms=30)
+    VADConfig(sr=16000, threshold=0.5, min_silence_ms=800, speech_pad_ms=150)
 )
 AUDIO_STATES = AudioStateStore()
 # 비말(1초) 오디오 분류용 큐. maxsize로 폭주 방지 (처리 지연 시 버퍼 확대)
@@ -232,6 +232,7 @@ async def _process_speech_and_enqueue_stt(
     websocket: WebSocket,
 ) -> None:
     """말 구간 오디오 검사 후 STT 큐에 넣기. 짧음/조용함 스킵, 10초 컷, 커스텀 구문 매칭·알림 포함."""
+    # 청크 0.5~3초 지원: 최소 0.5초 구간이면 STT 처리
     min_samples = int(16000 * 0.5)
     if speech_audio.shape[0] < min_samples:
         audio_logger.info(
@@ -417,8 +418,9 @@ async def handle_message(
         if st.in_speech:
             st.speech_chunks.append(audio_f32.copy())
             # 10초 초과 말 구간은 끊어서 STT에 보냄 (큐 적체·지연 완화)
-            # 6초 누적 시 끊어서 전송 (구간당 처리 빠르게)
-            if len(st.speech_chunks) >= 12:
+            # 누적 6초 이상이면 끊어서 전송 (청크 0.5~3초 모두 지원)
+            total_samples = sum(c.shape[0] for c in st.speech_chunks)
+            if total_samples >= 16000 * 6:
                 speech_audio = np.concatenate(st.speech_chunks)[-16000 * 6:]
                 st.speech_chunks = []
                 st.in_speech = False
@@ -434,11 +436,11 @@ async def handle_message(
                     websocket=websocket,
                 )
         else:
-            # 비말(non-speech) 구간: 0.5초 청크 2개 모이면 1초 윈도우로 큐에 넣기
+            # 비말(non-speech) 구간: 2초 청크 2개 모이면 4초 윈도우로 큐에 넣기
             st.non_speech_chunks.append(audio_f32.copy())
             if len(st.non_speech_chunks) >= 2:
                 win = np.concatenate(st.non_speech_chunks[:2])
-                st.non_speech_chunks = st.non_speech_chunks[1:]  # 슬라이딩(0.5초 겹침)
+                st.non_speech_chunks = st.non_speech_chunks[1:]  # 슬라이딩(2초 겹침)
                 settings = await asyncio.to_thread(_get_settings, sid)
                 item = {
                     "sid": sid,

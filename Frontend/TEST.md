@@ -31,6 +31,24 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 정적 파일(CSS/JS)은 `/static/...` 로 서빙됩니다 (예: `/static/js/live.js`).
 
+### 메인 서버(도메인)에서 자막이 안 나올 때
+
+로컬에서는 자막이 나오는데 **메인 서버 도메인**에서만 안 나오면 아래를 순서대로 확인하세요.
+
+1. **STT 활성 여부**  
+   브라우저에서 `https://(메인도메인)/health` 를 열어 보세요.  
+   - `stt_enabled: true` → 서버 설정은 정상. 2번으로.  
+   - `stt_enabled: false` → 서버 환경 변수 점검: `ENABLE_ML_WORKERS=1`, `OPENAI_API_KEY` 가 설정돼 있는지 확인.
+
+2. **WebSocket 연결**  
+   개발자 도구(F12) → Network → WS 탭에서 `/ws` 연결이 성공(101)인지, 끊김/에러는 없는지 확인.  
+   - HTTPS 사이트면 WS 주소가 `wss://` 로 나와야 합니다.  
+   - 리버스 프록시(nginx 등)에서 `/ws` 를 백엔드로 프록시하고 있는지 확인.
+
+3. **API/WS 주소**  
+   같은 도메인에서 페이지를 서빙하면 `config.js` 가 `document.location.origin` 으로 API_BASE/WS_URL 을 잡습니다.  
+   별도 프론트 도메인을 쓰면 해당 도메인 기준으로 설정이 잡히므로, CORS와 쿠키/세션 설정을 확인하세요.
+
 ### Android 에뮬레이터에서 테스트
 
 **방법 A: adb reverse + localhost (마이크 사용 시 권장)**

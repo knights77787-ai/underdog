@@ -52,16 +52,16 @@
 
 ---
 
-## Phase 4: 마이크 (오디오 전송)
+## Phase 4: 마이크 (오디오 전송) ✅
 
 | # | 작업 | 내용 |
 |---|------|------|
-| 4-1 | 마이크 권한 | `expo-av` `Audio.requestPermissionsAsync()` |
-| 4-2 | 오디오 녹음 | 16kHz mono PCM int16 스트림 획득 (expo-av 또는 react-native-audio-api) |
-| 4-3 | 청크 전송 | 0.5초(8000 samples) 단위로 base64 인코딩 후 `audio_chunk` WS 메시지 전송 |
-| 4-4 | 마이크 UI | 권한 요청 모달, 전송 중/중지 버튼 |
+| 4-1 | 마이크 권한 | `expo-av` `Audio.requestPermissionsAsync()`, 거부 시 안내 |
+| 4-2 | 오디오 스트림 | expo-av Recording으로 마이크 사용. 현재 전송은 **침묵 청크**(0.5초 PCM int16)로 파이프라인 검증. 실제 음성 PCM은 개발 빌드 + 네이티브 캡처 모듈로 확장 가능 |
+| 4-3 | 청크 전송 | 0.5초(8000 samples) base64 → `useLiveWs.sendAudioChunk` → `audio_chunk` WS |
+| 4-4 | 마이크 UI | 라이브 탭에 마이크 카드, 켜기/끄기 버튼, 권한 거부 시 문구 |
 
-**참고:** `ws_protocol.md` – `audio_chunk` 형식 (sr: 16000, format: pcm_s16le, data_b64)
+**참고:** `ws_protocol.md` – `audio_chunk` (sr: 16000, format: pcm_s16le, data_b64)
 
 ---
 

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useCallback, useEffect } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   StyleSheet,
   Text,
@@ -9,6 +10,7 @@ import {
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { useLiveWs, type LogEntry } from '../hooks/useLiveWs';
+import { useMic } from '../hooks/useMic';
 import { useSession } from '../context/SessionContext';
 import { WS_URL } from '../config';
 
@@ -32,10 +34,36 @@ export function LiveTab() {
     connected,
     connecting,
     toggle,
+    sendAudioChunk,
     logs,
     latestAlert,
     currentCaption,
   } = useLiveWs(WS_URL);
+  const { permissionStatus, isRecording, requestPermission, start, stop } = useMic();
+
+  useEffect(() => {
+    if (!connected) stop();
+  }, [connected, stop]);
+
+  const handleMicToggle = useCallback(async () => {
+    if (!sessionId) return;
+    if (isRecording) {
+      stop();
+      return;
+    }
+    if (permissionStatus === 'denied') {
+      Alert.alert(
+        '마이크 권한',
+        '설정에서 마이크 권한을 허용해 주세요.',
+        [{ text: '확인' }]
+      );
+      return;
+    }
+    const ok = await start(sessionId, sendAudioChunk);
+    if (!ok) {
+      Alert.alert('마이크', '마이크를 켤 수 없습니다. 권한을 확인해 주세요.');
+    }
+  }, [sessionId, isRecording, permissionStatus, start, stop, sendAudioChunk]);
 
   return (
     <View style={styles.container}>
@@ -70,6 +98,22 @@ export function LiveTab() {
               <Text style={styles.captionText}>{currentCaption}</Text>
             </View>
           ) : null}
+
+          <Card style={styles.micCard}>
+            <Text style={styles.micTitle}>마이크</Text>
+            <Text style={styles.micDesc}>
+              {isRecording ? '전송 중 — 음성이 서버로 전달됩니다.' : '켜면 음성이 실시간으로 전송됩니다.'}
+            </Text>
+            <Button
+              title={isRecording ? '마이크 끄기' : '마이크 켜기'}
+              onPress={handleMicToggle}
+              variant={isRecording ? 'outline' : 'primary'}
+              style={styles.micBtn}
+            />
+            {permissionStatus === 'denied' && (
+              <Text style={styles.micPermissionHint}>마이크 권한이 거부되었습니다.</Text>
+            )}
+          </Card>
 
           <Text style={styles.sectionTitle}>로그</Text>
           <FlatList
@@ -152,6 +196,28 @@ const styles = StyleSheet.create({
   captionText: {
     fontSize: 15,
     color: '#0f172a',
+  },
+  micCard: {
+    marginBottom: 12,
+  },
+  micTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0f172a',
+    marginBottom: 4,
+  },
+  micDesc: {
+    fontSize: 13,
+    color: '#64748b',
+    marginBottom: 12,
+  },
+  micBtn: {
+    alignSelf: 'flex-start',
+  },
+  micPermissionHint: {
+    fontSize: 12,
+    color: '#dc2626',
+    marginTop: 8,
   },
   sectionTitle: {
     fontSize: 14,

@@ -19,6 +19,16 @@ logger = get_logger("stt.whisper_api")
 STT_LANGUAGE = "ko"
 OPENAI_TRANSCRIPTIONS_URL = "https://api.openai.com/v1/audio/transcriptions"
 
+# 학습 데이터에 흔한 불필요 문장 필터 (할루시네이션 감소)
+BANNED_TOKENS = frozenset({
+    "네",
+    "네 그렇습니다",
+    "감사합니다",
+    "고맙습니다",
+    "시청해주셔서 감사합니다",
+    "구독과 좋아요",
+})
+
 
 def _float32_16k_to_wav_bytes(audio: np.ndarray) -> bytes:
     """float32 mono 16kHz [-1, 1] → 16bit PCM WAV bytes."""
@@ -101,6 +111,10 @@ class WhisperAPISTT:
             logger.exception("WHISPER_API request failed")
             return ""
         if not text:
+            return ""
+        # 끝 마침표/공백 제거 후 금지 문구 매칭 (예: "시청해주셔서 감사합니다." → 필터)
+        text_normalized = text.rstrip(".!? \t\n\r")
+        if text_normalized in BANNED_TOKENS:
             return ""
         if text == "한국어로 말합니다." or (prompt and text == prompt.strip()):
             return ""

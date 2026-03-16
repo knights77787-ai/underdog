@@ -16,11 +16,11 @@ from silero_vad import VADIterator, load_silero_vad
 
 @dataclass
 class VADConfig:
-    """VAD 파라미터."""
+    """VAD 파라미터. speech_pad 짧으면 발화 앞뒤 잘림 → 150ms, min_silence 완화로 짧은 발화 보존."""
     sr: int = 16000
     threshold: float = 0.5  # speech prob threshold
-    min_silence_ms: int = 300  # silence to close segment
-    speech_pad_ms: int = 30  # pad around speech
+    min_silence_ms: int = 800  # silence to close segment (완화: 짧은 멈춤에 구간 안 끊김)
+    speech_pad_ms: int = 150  # pad around speech (앞뒤 잘림 방지)
 
 
 class SileroVADStream:
@@ -49,7 +49,7 @@ class SileroVADStream:
         """audio_f32: float32 mono, 16kHz, shape (N,).
 
         Silero VADIterator는 16kHz에서 한 번에 512 샘플만 허용한다.
-        프론트엔드에서는 0.5초(8000샘플) 단위로 audio_chunk를 보내므로,
+        클라이언트는 2초(32000샘플) 단위로 audio_chunk를 보내므로,
         여기에서 512 샘플 단위로 잘라서 iterator에 순차적으로 먹이고
         마지막으로 발생한 이벤트(있다면)를 반환한다.
         """
