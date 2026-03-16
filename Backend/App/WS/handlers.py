@@ -457,12 +457,7 @@ async def handle_message(
                     websocket=websocket,
                 )
         else:
-<<<<<<< HEAD
-            # 비말 구간: 커스텀 소리 경로에서 통합 처리
-            pass
-=======
             pass  # 비말 구간: 커스텀 소리 경로에서 통합 처리
->>>>>>> d8d7de7bffa6ac350e541a04a7654aaff752892f
 
         # 커스텀 소리 매칭: VAD와 무관하게 항상 4초 윈도우 수집·전송
         # (박수·초인종 등 짧은 소리는 VAD가 '음성'으로 오인해 비말 경로를 타지 못하던 문제 해결)
@@ -470,19 +465,7 @@ async def handle_message(
         if len(st.custom_sound_chunks) >= 2:
             win = np.concatenate(st.custom_sound_chunks[:2])
             st.custom_sound_chunks = st.custom_sound_chunks[1:]
-<<<<<<< HEAD
-            # 큐가 이미 많이 찼으면 비말 enqueue 스킵 → Yamnet 부하 감소, STT(자막)에 CPU 양보
-            if AUDIOCLS_QUEUE.qsize() >= 70:
-                inc("yamnet_dropped")
-                audio_logger.debug(
-                    "%s AUDIOCLS_QUEUE_THROTTLE qsize=%s sid=%s",
-                    conn_prefix, AUDIOCLS_QUEUE.qsize(), sid,
-                )
-            else:
-                await _enqueue_audiocls(sid, ts_ms, win, conn_prefix)
-=======
             await _enqueue_audiocls(sid, ts_ms, win, conn_prefix)
->>>>>>> d8d7de7bffa6ac350e541a04a7654aaff752892f
         return sid
 
     if msg_type == "caption":
