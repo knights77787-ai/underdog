@@ -5,9 +5,16 @@
 const API_BASE = window.APP_CONFIG?.API_BASE || "http://127.0.0.1:8000";
 const WS_URL = (window.APP_CONFIG?.WS_URL || "ws://127.0.0.1:8000/ws").replace(/^http/, "ws");
 const SESSION_STORAGE_KEY = "underdog_session_id";
+const PROVIDER_STORAGE_KEY = "underdog_provider";
 let SESSION_ID = (function () {
   const params = new URLSearchParams(document.location.search);
   const fromUrl = params.get("session_id");
+  const providerFromUrl = params.get("provider");
+  if (providerFromUrl) {
+    try {
+      localStorage.setItem(PROVIDER_STORAGE_KEY, providerFromUrl);
+    } catch (_) {}
+  }
   if (fromUrl) return fromUrl;
   try {
     return localStorage.getItem(SESSION_STORAGE_KEY) || null;
@@ -594,7 +601,13 @@ function updateSessionLabel() {
 
 // 로그인 상태: provider 있으면 사용자 아이콘+드롭다운, 없으면 '다른 계정' 버튼
 function getProvider() {
-  return new URLSearchParams(document.location.search).get("provider");
+  const fromUrl = new URLSearchParams(document.location.search).get("provider");
+  if (fromUrl) return fromUrl;
+  try {
+    return localStorage.getItem(PROVIDER_STORAGE_KEY) || null;
+  } catch (_) {
+    return null;
+  }
 }
 
 function isGuest() {
@@ -664,19 +677,27 @@ function setupUserDropdown() {
     window.location.href = url;
   });
 
-  // 설정: 설정 페이지로 이동
+  // 설정: 설정 페이지로 이동 (session_id, provider 전달)
   if (userDropdownSettings) {
     userDropdownSettings.addEventListener("click", (e) => {
       e.preventDefault();
       const sid = SESSION_ID || (typeof localStorage !== "undefined" && localStorage.getItem(SESSION_STORAGE_KEY));
-      const url = "/settings-page" + (sid ? "?session_id=" + encodeURIComponent(sid) : "");
-      window.location.href = url;
+      const prov = getProvider();
+      const params = new URLSearchParams();
+      if (sid) params.set("session_id", sid);
+      if (prov) params.set("provider", prov);
+      const qs = params.toString();
+      window.location.href = "/settings-page" + (qs ? "?" + qs : "");
     });
   }
 
   // 로그아웃: 메인으로 이동, session_id·provider 제거
   userDropdownLogout.addEventListener("click", (e) => {
     e.preventDefault();
+    try {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+      localStorage.removeItem(PROVIDER_STORAGE_KEY);
+    } catch (_) {}
     window.location.href = "/";
   });
 

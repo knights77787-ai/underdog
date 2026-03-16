@@ -74,6 +74,27 @@ def record_alert_ts(session_id: str, keyword: str, event_type: str, ts_ms: int) 
     _last_alert_ts_by_key[(session_id, keyword or "", event_type)] = ts_ms
 
 
+async def _enqueue_audiocls(
+    sid: str, ts_ms: int, win: np.ndarray, conn_prefix: str
+) -> None:
+    """4초 오디오 윈도우를 AUDIOCLS_QUEUE에 넣기 (커스텀 소리·YAMNet 매칭)."""
+    settings = await asyncio.to_thread(_get_settings, sid)
+    item = {
+        "sid": sid,
+        "ts_ms": ts_ms,
+        "audio": win,
+        "conn_prefix": conn_prefix,
+        "cooldown_sec": int(settings.get("cooldown_sec", 5)),
+        "alert_enabled": bool(settings.get("alert_enabled", True)),
+    }
+    try:
+        AUDIOCLS_QUEUE.put_nowait(item)
+        inc("yamnet_enqueued")
+    except asyncio.QueueFull:
+        inc("yamnet_dropped")
+        audio_logger.warning("%s AUDIOCLS_QUEUE_FULL sid=%s", conn_prefix, sid)
+
+
 # 세션별 설정 캐시 (TTL 10초). caption/alert 판정 시 DB 조회 완화
 _settings_cache_ttl_sec = 10
 _settings_cache: dict[str, tuple[dict, float]] = {}  # client_session_uuid -> (settings, cached_at)
@@ -436,28 +457,15 @@ async def handle_message(
                     websocket=websocket,
                 )
         else:
-            # 비말(non-speech) 구간: 2초 청크 2개 모이면 4초 윈도우로 큐에 넣기
-            st.non_speech_chunks.append(audio_f32.copy())
-            if len(st.non_speech_chunks) >= 2:
-                win = np.concatenate(st.non_speech_chunks[:2])
-                st.non_speech_chunks = st.non_speech_chunks[1:]  # 슬라이딩(2초 겹침)
-                settings = await asyncio.to_thread(_get_settings, sid)
-                item = {
-                    "sid": sid,
-                    "ts_ms": ts_ms,
-                    "audio": win,
-                    "conn_prefix": conn_prefix,
-                    "cooldown_sec": int(settings.get("cooldown_sec", 5)),
-                    "alert_enabled": bool(settings.get("alert_enabled", True)),
-                }
-                try:
-                    AUDIOCLS_QUEUE.put_nowait(item)
-                    inc("yamnet_enqueued")
-                except asyncio.QueueFull:
-                    inc("yamnet_dropped")
-                    audio_logger.warning(
-                        "%s AUDIOCLS_QUEUE_FULL sid=%s", conn_prefix, sid
-                    )
+            pass  # 비말 구간: 커스텀 소리 경로에서 통합 처리
+
+        # 커스텀 소리 매칭: VAD와 무관하게 항상 4초 윈도우 수집·전송
+        # (박수·초인종 등 짧은 소리는 VAD가 '음성'으로 오인해 비말 경로를 타지 못하던 문제 해결)
+        st.custom_sound_chunks.append(audio_f32.copy())
+        if len(st.custom_sound_chunks) >= 2:
+            win = np.concatenate(st.custom_sound_chunks[:2])
+            st.custom_sound_chunks = st.custom_sound_chunks[1:]
+            await _enqueue_audiocls(sid, ts_ms, win, conn_prefix)
         return sid
 
     if msg_type == "caption":

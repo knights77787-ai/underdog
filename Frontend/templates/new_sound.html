@@ -33,6 +33,7 @@
               <div id="userDropdownEmail" class="small text-muted"></div>
             </li>
             <li><a class="dropdown-item" href="#" id="userDropdownSoundReg">소리등록</a></li>
+            <li><a class="dropdown-item" href="#" id="userDropdownSettings">설정</a></li>
             <li><a class="dropdown-item" href="#" id="userDropdownLogout">로그아웃</a></li>
           </ul>
         </div>
@@ -94,11 +95,12 @@
                   가능한 주변 소음 없는 조용한 환경에서 녹음해주세요. 더 좋은 품질로 변환할 수 있어요.
                 </p>
 
-                <div class="wave-wrap mb-4">
-                  <div class="wave-bars">
-                    <span></span><span></span><span></span><span></span><span></span>
-                    <span id="recDot" class="rec-dot"></span>
-                    <span></span><span></span><span></span><span></span><span></span>
+                <div class="rec-indicator-wrap mb-4" id="recIndicatorWrap">
+                  <div class="rec-indicator">
+                    <span class="rec-pulse rec-pulse-1"></span>
+                    <span class="rec-pulse rec-pulse-2"></span>
+                    <span class="rec-pulse rec-pulse-3"></span>
+                    <span class="rec-core"></span>
                   </div>
                 </div>
 
@@ -109,11 +111,11 @@
                   <button id="btnStop" type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" disabled>
                     ■ 중지
                   </button>
-                  <button id="btnPlay" type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" disabled>
-                    ▶ 재생
-                  </button>
                   <div id="timer" class="timer-pill">00:00</div>
                 </div>
+                <p id="recRerecordHint" class="text-center text-muted small mt-2 mb-0 d-none">
+                  다시 녹음하려면 녹음 버튼을 눌러주세요
+                </p>
 
                 <audio id="audioPreview" hidden controls class="w-100 mt-3"></audio>
               </div>

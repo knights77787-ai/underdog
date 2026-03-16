@@ -64,7 +64,6 @@ class CustomSound(Base):
     embed_dim: Mapped[int | None] = mapped_column(Integer, nullable=True)
     embed_blob: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class CustomPhraseAudio(Base):

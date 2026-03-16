@@ -29,6 +29,7 @@ def create_custom_sound(
     event_type: str,
     emb: np.ndarray,
     audio_path: str | None = None,
+    user_id: int | None = None,
 ) -> CustomSound:
     """커스텀 사운드 1건 생성."""
     blob, dim = _emb_to_blob(emb)
@@ -40,6 +41,7 @@ def create_custom_sound(
         audio_path=audio_path,
         embed_dim=dim,
         embed_blob=blob,
+        user_id=user_id,
     )
     db.add(row)
     db.commit()

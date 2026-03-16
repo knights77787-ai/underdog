@@ -1,9 +1,15 @@
 const API_BASE = window.APP_CONFIG?.API_BASE || "http://127.0.0.1:8000";
 const SESSION_STORAGE_KEY = "underdog_session_id";
+// 라이브와 동일한 session_id 사용 → 등록한 소리가 실시간 감지에 연동됨
 let SESSION_ID = (function () {
   const params = new URLSearchParams(document.location.search);
   const fromUrl = params.get("session_id");
-  if (fromUrl) return fromUrl;
+  if (fromUrl) {
+    try {
+      localStorage.setItem(SESSION_STORAGE_KEY, fromUrl);
+    } catch (_) {}
+    return fromUrl;
+  }
   try {
     const stored = localStorage.getItem(SESSION_STORAGE_KEY);
     if (stored) return stored;
@@ -18,10 +24,10 @@ let SESSION_ID = (function () {
 // ===== elements =====
 const btnStart = document.getElementById("btnStart");
 const btnStop = document.getElementById("btnStop");
-const btnPlay = document.getElementById("btnPlay");
+const recRerecordHint = document.getElementById("recRerecordHint");
 const timerEl = document.getElementById("timer");
 const audioPreview = document.getElementById("audioPreview");
-const recDot = document.getElementById("recDot");
+const recIndicatorWrap = document.getElementById("recIndicatorWrap");
 
 const fileInput = document.getElementById("fileInput");
 const fileMeta = document.getElementById("fileMeta");
@@ -40,6 +46,7 @@ const btnUserIcon = document.getElementById("btnUserIcon");
 const userDropdownName = document.getElementById("userDropdownName");
 const userDropdownEmail = document.getElementById("userDropdownEmail");
 const userDropdownSoundReg = document.getElementById("userDropdownSoundReg");
+const userDropdownSettings = document.getElementById("userDropdownSettings");
 const userDropdownLogout = document.getElementById("userDropdownLogout");
 
 // ===== shared state =====
@@ -88,6 +95,21 @@ function startTimer() {
 function stopTimer() {
   if (timerId) clearInterval(timerId);
   timerId = null;
+}
+
+/** 녹음 완료 후 실제 오디오 길이로 타이머 표시 갱신 */
+function updateTimerFromAudioDuration(audioEl) {
+  if (!audioEl) return;
+  const onLoaded = () => {
+    if (Number.isFinite(audioEl.duration) && timerEl) {
+      timerEl.textContent = fmtTime(audioEl.duration);
+    }
+    audioEl.removeEventListener("loadedmetadata", onLoaded);
+  };
+  audioEl.addEventListener("loadedmetadata", onLoaded);
+  if (audioEl.readyState >= 1) {
+    onLoaded();
+  }
 }
 
 function formatFileSize(bytes) {
@@ -202,26 +224,31 @@ function revokePreviewUrl() {
   }
 }
 
-function setPreviewFromFile(file) {
+function setPreviewFromFile(file, source) {
   revokePreviewUrl();
 
   if (!file) {
     audioPreview.hidden = true;
     audioPreview.src = "";
-    btnPlay.disabled = true;
+    recRerecordHint?.classList.add("d-none");
+    if (timerEl) timerEl.textContent = "00:00";
     return;
   }
 
   previewUrl = URL.createObjectURL(file);
   audioPreview.src = previewUrl;
   audioPreview.hidden = false;
-  btnPlay.disabled = false;
+  if (source === "record") {
+    recRerecordHint?.classList.remove("d-none");
+  } else {
+    recRerecordHint?.classList.add("d-none");
+  }
 }
 
 function setSelectedAudio(file, source) {
   selectedAudioFile = file;
   selectedAudioSource = source;
-  setPreviewFromFile(file);
+  setPreviewFromFile(file, source);
 }
 
 function updateFileMeta(file) {
@@ -281,7 +308,7 @@ function validateBeforeSubmit() {
 function resetRecordingUi() {
   btnStart.disabled = false;
   btnStop.disabled = true;
-  recDot.classList.remove("on");
+  recIndicatorWrap?.classList.remove("recording");
   stopTimer();
   timerEl.textContent = "00:00";
 }
@@ -388,7 +415,6 @@ async function loadSoundList() {
 // ===== initial ui =====
 updateFileMeta(null);
 btnStop.disabled = true;
-btnPlay.disabled = true;
 audioPreview.hidden = true;
 
 // ===== file select =====
@@ -414,6 +440,7 @@ fileInput?.addEventListener("change", () => {
   }
 
   setSelectedAudio(f, "upload");
+  updateTimerFromAudioDuration(audioPreview);
   updateFileMeta(f);
   setStatus("업로드 파일이 선택되었습니다.", "ok");
 });
@@ -430,6 +457,8 @@ btnStart?.addEventListener("click", async () => {
 
   try {
     resetRecordedState();
+    setSelectedAudio(null, null);
+    updateFileMeta(null);
 
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
@@ -459,25 +488,24 @@ btnStart?.addEventListener("click", async () => {
         type: blobType,
       });
 
+      stopTimer();
       setSelectedAudio(recordedFile, "record");
+      updateTimerFromAudioDuration(audioPreview);
       updateFileMeta(recordedFile);
 
-      btnPlay.disabled = false;
       btnStop.disabled = true;
       btnStart.disabled = false;
 
-      recDot.classList.remove("on");
-      stopTimer();
-      setStatus("녹음이 저장되었습니다. 재생으로 확인하세요.", "ok");
+      recIndicatorWrap?.classList.remove("recording");
+      setStatus("녹음이 저장되었습니다.", "ok");
     };
 
     mediaRecorder.start();
 
     btnStart.disabled = true;
     btnStop.disabled = false;
-    btnPlay.disabled = true;
 
-    recDot.classList.add("on");
+    recIndicatorWrap?.classList.add("recording");
     startTimer();
     setStatus("녹음 중...", "ok");
   } catch (err) {
@@ -503,18 +531,6 @@ btnStop?.addEventListener("click", () => {
   if (!mediaRecorder) return;
   if (mediaRecorder.state !== "inactive") {
     mediaRecorder.stop();
-  }
-});
-
-btnPlay?.addEventListener("click", async () => {
-  try {
-    if (audioPreview.hidden) {
-      audioPreview.hidden = false;
-    }
-    audioPreview.currentTime = 0;
-    await audioPreview.play();
-  } catch (err) {
-    console.error(err);
   }
 });
 
@@ -728,14 +744,38 @@ async function updateUserSection() {
 
 function setupUserDropdown() {
   if (!userDropdownWrap || !btnUserIcon || !userDropdownSoundReg || !userDropdownLogout) return;
+
   userDropdownSoundReg.addEventListener("click", (e) => {
     e.preventDefault();
-    const url = "/new-sound" + (SESSION_ID && SESSION_ID !== "S1" ? "?session_id=" + encodeURIComponent(SESSION_ID) : "");
+    const url = "/new-sound" + (SESSION_ID ? "?session_id=" + encodeURIComponent(SESSION_ID) : "");
     window.location.href = url;
   });
+
+  if (userDropdownSettings) {
+    userDropdownSettings.addEventListener("click", (e) => {
+      e.preventDefault();
+      const url = "/settings-page" + (SESSION_ID ? "?session_id=" + encodeURIComponent(SESSION_ID) : "");
+      window.location.href = url;
+    });
+  }
+
   userDropdownLogout.addEventListener("click", (e) => {
     e.preventDefault();
     window.location.href = "/";
+  });
+
+  // 마우스 올리면 드롭다운 표시
+  let hideTimer = null;
+  userDropdownWrap.addEventListener("mouseenter", () => {
+    if (hideTimer) clearTimeout(hideTimer);
+    const dropdown = bootstrap.Dropdown.getOrCreateInstance(btnUserIcon);
+    dropdown.show();
+  });
+  userDropdownWrap.addEventListener("mouseleave", () => {
+    hideTimer = setTimeout(() => {
+      const dropdown = bootstrap.Dropdown.getInstance(btnUserIcon);
+      if (dropdown) dropdown.hide();
+    }, 150);
   });
 }
 

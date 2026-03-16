@@ -12,11 +12,12 @@ from silero_vad import VADIterator
 
 @dataclass
 class AudioState:
-    """세션당 VAD 이터레이터 + speech 수집 버퍼 + 비말(non-speech) 윈도우용 버퍼."""
+    """세션당 VAD 이터레이터 + speech 수집 버퍼 + 커스텀 소리 윈도우용 버퍼."""
     vad_it: VADIterator
     in_speech: bool = False
     speech_chunks: List[np.ndarray] = field(default_factory=list)
-    non_speech_chunks: List[np.ndarray] = field(default_factory=list)
+    # 커스텀 소리 매칭용: VAD와 무관하게 항상 수집 (박수·초인종 등 짧은 소리도 감지)
+    custom_sound_chunks: List[np.ndarray] = field(default_factory=list)
 
 
 class AudioStateStore:

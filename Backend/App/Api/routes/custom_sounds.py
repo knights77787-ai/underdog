@@ -13,6 +13,7 @@ from App.db.crud.custom_sounds import (
     list_custom_sounds,
     delete_custom_sound,
 )
+from App.db.crud.sessions import get_or_create_by_client_uuid
 from App.db.database import get_db
 from App.Services.yamnet_service import YamnetService
 
@@ -150,6 +151,9 @@ async def upload_custom_sound(
     save_path.write_bytes(raw_bytes)
     audio_path_for_db = f"data/custom_sounds/{session_id}_{file.filename}"
 
+    session_row = get_or_create_by_client_uuid(db, session_id)
+    user_id = session_row.user_id if session_row else None
+
     row = create_custom_sound(
         db=db,
         client_session_uuid=session_id,
@@ -158,6 +162,7 @@ async def upload_custom_sound(
         event_type=event_type,
         emb=emb,
         audio_path=audio_path_for_db,
+        user_id=user_id,
     )
 
     return {"ok": True, "data": {"custom_sound_id": row.custom_sound_id, "name": row.name}}
@@ -216,7 +221,6 @@ def get_custom_sounds(
                 "event_type": r.event_type,
                 "audio_path": r.audio_path,
                 "created_at": r.created_at,
-                "updated_at": r.updated_at,
             } for r in rows
         ]
     }

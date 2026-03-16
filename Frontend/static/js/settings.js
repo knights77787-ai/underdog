@@ -1,10 +1,22 @@
 // 설정 페이지: GET/POST /settings API
 const API_BASE = window.APP_CONFIG?.API_BASE || document.location.origin;
 const SESSION_STORAGE_KEY = "underdog_session_id";
+const PROVIDER_STORAGE_KEY = "underdog_provider";
 
 const SESSION_ID = (function () {
   const params = new URLSearchParams(document.location.search);
   const fromUrl = params.get("session_id");
+  const providerFromUrl = params.get("provider");
+  if (fromUrl) {
+    try {
+      localStorage.setItem(SESSION_STORAGE_KEY, fromUrl);
+    } catch (_) {}
+  }
+  if (providerFromUrl) {
+    try {
+      localStorage.setItem(PROVIDER_STORAGE_KEY, providerFromUrl);
+    } catch (_) {}
+  }
   if (fromUrl) return fromUrl;
   try {
     return localStorage.getItem(SESSION_STORAGE_KEY) || null;
@@ -90,9 +102,26 @@ async function saveSettings(e) {
 
 if (settingsForm) settingsForm.addEventListener("submit", saveSettings);
 
+// 라이브로 돌아가기: session_id + provider 포함해 이동 (로그인 유지)
 const btnBackToLive = document.getElementById("btnBackToLive");
-if (btnBackToLive && SESSION_ID) {
-  btnBackToLive.href = "/live?session_id=" + encodeURIComponent(SESSION_ID);
+if (btnBackToLive) {
+  (function setBackToLiveHref() {
+    let sid = SESSION_ID;
+    if (!sid && typeof localStorage !== "undefined") {
+      sid = localStorage.getItem(SESSION_STORAGE_KEY);
+    }
+    sid = (sid && String(sid).trim()) || null;
+    let prov = new URLSearchParams(document.location.search).get("provider");
+    if (!prov && typeof localStorage !== "undefined") {
+      prov = localStorage.getItem(PROVIDER_STORAGE_KEY);
+    }
+    prov = (prov && String(prov).trim()) || null;
+    const params = new URLSearchParams();
+    if (sid) params.set("session_id", sid);
+    if (prov) params.set("provider", prov);
+    const qs = params.toString();
+    btnBackToLive.href = qs ? "/live?" + qs : "/live";
+  })();
 }
 
 if (SESSION_ID) {

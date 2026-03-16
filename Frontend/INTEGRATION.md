@@ -68,6 +68,16 @@
 
 응답 성공 시: `{"ok": true, "data": {"custom_sound_id": 1, "name": "..."}}`
 
+### 3.4 실시간 감지 연동
+
+등록한 커스텀 소리는 **같은 session_id**로 라이브에서 마이크를 켜면 실시간으로 인식됩니다.
+
+- 마이크 오디오 → WebSocket `audio_chunk` → 서버 VAD → 비음성 구간 → YAMNet embedding
+- DB의 해당 세션 커스텀 소리 embedding과 코사인 유사도 비교
+- 유사도 ≥ 0.75 시 alert 브로드캐스트 → 실시간 자막·경고 표시
+
+자세한 흐름: `Docs/CUSTOM_SOUND_FLOW.md` 참고.
+
 ---
 
 ## 4. 설정 (선택)
