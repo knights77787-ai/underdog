@@ -28,3 +28,18 @@ MAX_CAPTIONS = 300
 MAX_ALERTS = 300
 DEFAULT_LOG_LIMIT = 100
 MAX_LOG_LIMIT = 500
+
+# STT 침묵 스킵: 이 RMS 미만이면 STT로 안 보냄. 도메인(api.lumen.ai.kr)에서만 안 되면 0.001 또는 0/off(비활성) 설정
+def _stt_silence_threshold() -> float:
+    v = os.getenv("STT_SILENCE_RMS_THRESHOLD", "").strip().lower()
+    if v in ("off", "0"):
+        return 0.0  # 비활성: 침묵 스킵 안 함
+    if v == "":
+        return 0.002
+    try:
+        return float(v)
+    except ValueError:
+        return 0.002
+
+
+STT_SILENCE_RMS_THRESHOLD = _stt_silence_threshold()

@@ -14,6 +14,7 @@ import time
 import numpy as np
 from fastapi import WebSocket
 
+from App.Core.config import STT_SILENCE_RMS_THRESHOLD
 from App.Core.logging import get_logger
 from App.Core.metrics import inc
 from App.Services import keyword_detector
@@ -262,11 +263,13 @@ async def _process_speech_and_enqueue_stt(
             conn_prefix, sid, speech_audio.shape[0],
         )
         return
+    # 침묵 스킵: RMS가 임계값 미만이면 STT 생략. 도메인 서버는 음량이 작게 들어올 수 있으므로
+    # .env 에 STT_SILENCE_RMS_THRESHOLD=0.001 또는 0(비활성) 으로 조정 가능
     rms = float(np.sqrt(np.mean(np.square(speech_audio))) + 1e-12)
-    if rms < 0.008:
+    if STT_SILENCE_RMS_THRESHOLD > 0 and rms < STT_SILENCE_RMS_THRESHOLD:
         audio_logger.info(
-            "%s STT_SKIP_SILENT sid=%s rms=%.4f",
-            conn_prefix, sid, rms,
+            "%s STT_SKIP_SILENT sid=%s rms=%.4f threshold=%.4f",
+            conn_prefix, sid, rms, STT_SILENCE_RMS_THRESHOLD,
         )
         return
     # 구간 짧게(6초) 해서 구간당 처리 빠르게 → 반응 텀 감소
@@ -454,7 +457,12 @@ async def handle_message(
                     websocket=websocket,
                 )
         else:
+<<<<<<< HEAD
+            # 비말 구간: 커스텀 소리 경로에서 통합 처리
+            pass
+=======
             pass  # 비말 구간: 커스텀 소리 경로에서 통합 처리
+>>>>>>> 92632a6c84b1d3b96c5c958163c870cc7bf1feea
 
         # 커스텀 소리 매칭: VAD와 무관하게 항상 4초 윈도우 수집·전송
         # (박수·초인종 등 짧은 소리는 VAD가 '음성'으로 오인해 비말 경로를 타지 못하던 문제 해결)
@@ -462,7 +470,19 @@ async def handle_message(
         if len(st.custom_sound_chunks) >= 2:
             win = np.concatenate(st.custom_sound_chunks[:2])
             st.custom_sound_chunks = st.custom_sound_chunks[1:]
+<<<<<<< HEAD
+            # 큐가 이미 많이 찼으면 비말 enqueue 스킵 → Yamnet 부하 감소, STT(자막)에 CPU 양보
+            if AUDIOCLS_QUEUE.qsize() >= 70:
+                inc("yamnet_dropped")
+                audio_logger.debug(
+                    "%s AUDIOCLS_QUEUE_THROTTLE qsize=%s sid=%s",
+                    conn_prefix, AUDIOCLS_QUEUE.qsize(), sid,
+                )
+            else:
+                await _enqueue_audiocls(sid, ts_ms, win, conn_prefix)
+=======
             await _enqueue_audiocls(sid, ts_ms, win, conn_prefix)
+>>>>>>> 92632a6c84b1d3b96c5c958163c870cc7bf1feea
         return sid
 
     if msg_type == "caption":

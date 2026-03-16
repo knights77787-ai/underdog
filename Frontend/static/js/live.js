@@ -3,7 +3,15 @@
 // 0) 서버 주소 · 세션 (백엔드 연동: join 시 사용)
 // =======================
 const API_BASE = window.APP_CONFIG?.API_BASE || "http://127.0.0.1:8000";
-const WS_URL = (window.APP_CONFIG?.WS_URL || "ws://127.0.0.1:8000/ws").replace(/^http/, "ws");
+// config 미적재 시에도 도메인 접속이면 wss 사용 (Mixed Content 방지)
+function getDefaultWsUrl() {
+  if (typeof location !== "undefined" && location.host) {
+    const p = location.protocol === "https:" ? "wss" : "ws";
+    return p + "://" + location.host + "/ws";
+  }
+  return "ws://127.0.0.1:8000/ws";
+}
+const WS_URL = window.APP_CONFIG?.WS_URL || getDefaultWsUrl();
 const SESSION_STORAGE_KEY = "underdog_session_id";
 const PROVIDER_STORAGE_KEY = "underdog_provider";
 let SESSION_ID = (function () {

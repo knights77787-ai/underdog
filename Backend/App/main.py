@@ -147,7 +147,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Underdog AI Backend", version="0.1.0", lifespan=lifespan)
 app_logger = get_logger("app")
 
-# CORS: 프론트(웹/RN)에서 API 호출 시 차단 방지. 개발 중엔 * OK (배포 시 도메인 제한)
+# CORS: 프론트(웹/RN)에서 API 호출 시 차단. api.lumen.ai.kr / lumen.ai.kr 등 허용 (현재 * 로 전부 허용)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -183,7 +183,7 @@ app.include_router(auth_router)
 
 
 
-# WebSocket 라우트 등록
+# WebSocket 라우트 등록 (배포 시 프록시가 /ws 업그레이드 전달해야 함)
 app.include_router(ws_router)
 
 # 커스텀 사운드 / 커스텀 구문 업로드·조회
