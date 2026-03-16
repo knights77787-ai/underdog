@@ -232,7 +232,8 @@ async def _process_speech_and_enqueue_stt(
     websocket: WebSocket,
 ) -> None:
     """말 구간 오디오 검사 후 STT 큐에 넣기. 짧음/조용함 스킵, 10초 컷, 커스텀 구문 매칭·알림 포함."""
-    min_samples = int(16000 * 2)  # 2초 최소 (rolling buffer)
+    # 청크 0.5~3초 지원: 최소 0.5초 구간이면 STT 처리
+    min_samples = int(16000 * 0.5)
     if speech_audio.shape[0] < min_samples:
         audio_logger.info(
             "%s STT_SKIP_SHORT sid=%s samples=%s",
@@ -306,8 +307,8 @@ async def _process_speech_and_enqueue_stt(
                     best_phrase.custom_phrase_id,
                     sim,
                 )
-    # 큐에 넣기 전 길이 검사 (2초 미만이면 worker까지 보내지 않음)
-    if speech_audio is None or getattr(speech_audio, "size", 0) < 16000 * 2:
+    # 큐에 넣기 전 길이 검사 (0.5초 미만이면 worker까지 보내지 않음)
+    if speech_audio is None or getattr(speech_audio, "size", 0) < 16000 * 0.5:
         return
     beam_size = int(settings.get("beam_size", 2))
     stt_initial_prompt = settings.get("stt_initial_prompt") or None
@@ -417,8 +418,9 @@ async def handle_message(
         if st.in_speech:
             st.speech_chunks.append(audio_f32.copy())
             # 10초 초과 말 구간은 끊어서 STT에 보냄 (큐 적체·지연 완화)
-            # 6초 누적 시 끊어서 전송 (2초 청크 3개 = 6초)
-            if len(st.speech_chunks) >= 3:
+            # 누적 6초 이상이면 끊어서 전송 (청크 0.5~3초 모두 지원)
+            total_samples = sum(c.shape[0] for c in st.speech_chunks)
+            if total_samples >= 16000 * 6:
                 speech_audio = np.concatenate(st.speech_chunks)[-16000 * 6:]
                 st.speech_chunks = []
                 st.in_speech = False

@@ -24,6 +24,7 @@ BANNED_TOKENS = frozenset({
     "네",
     "네 그렇습니다",
     "감사합니다",
+    "고맙습니다",
     "시청해주셔서 감사합니다",
     "구독과 좋아요",
 })
@@ -78,7 +79,7 @@ class WhisperAPISTT:
         peak = float(np.max(np.abs(audio)))
         if peak > 0.01:
             audio = (audio * (0.95 / peak)).astype(np.float32)
-        if audio.shape[0] < 16000 * 2:
+        if audio.shape[0] < 16000 * 0.5:
             return ""
         logger.info(
             "WHISPER_API INPUT shape=%s dtype=%s",
@@ -111,7 +112,9 @@ class WhisperAPISTT:
             return ""
         if not text:
             return ""
-        if text in BANNED_TOKENS:
+        # 끝 마침표/공백 제거 후 금지 문구 매칭 (예: "시청해주셔서 감사합니다." → 필터)
+        text_normalized = text.rstrip(".!? \t\n\r")
+        if text_normalized in BANNED_TOKENS:
             return ""
         if text == "한국어로 말합니다." or (prompt and text == prompt.strip()):
             return ""

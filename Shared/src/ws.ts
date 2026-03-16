@@ -81,6 +81,15 @@ export function isWsType<T extends WsMessageBase>(
   return msg.type === type;
 }
 
-/** 오디오 청크 규격: 2초 = 32000 samples @ 16kHz (rolling buffer로 문맥 보강) */
-export const AUDIO_CHUNK_SAMPLES = 32000;
+/** 오디오 청크: 0.5~3초 범위 지원. 기본 2초 (rolling buffer로 문맥 보강) */
+export const CHUNK_DURATION_SEC_MIN = 0.5;
+export const CHUNK_DURATION_SEC_MAX = 3;
+export const CHUNK_DURATION_SEC_DEFAULT = 2;
+export const AUDIO_CHUNK_SAMPLES = 32000; // CHUNK_DURATION_SEC_DEFAULT * 16000
 export const AUDIO_TARGET_SR = 16000;
+
+/** 청크 간격(초) → 샘플 수. 0.5~3초 범위만 유효 (그 외는 clamp). */
+export function getChunkSamples(chunkSec: number): number {
+  const sec = Math.max(CHUNK_DURATION_SEC_MIN, Math.min(CHUNK_DURATION_SEC_MAX, chunkSec));
+  return Math.round(AUDIO_TARGET_SR * sec);
+}

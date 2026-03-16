@@ -33,7 +33,8 @@ let audioBuffer = [];
 let rawBuffer = [];
 let currentSr = 0;
 const TARGET_SR = 16000;
-const CHUNK_SAMPLES = 32000; // 2 sec at 16kHz (rolling buffer, 문맥 보강)
+// 청크 0.5~3초 범위 지원: 8000(0.5s) / 16000(1s) / 32000(2s) / 48000(3s) 등
+const CHUNK_SAMPLES = 32000; // 2 sec at 16kHz (기본값, 변경 시 8000~48000)
 const WORKLET_URL = (window.location.origin || "http://127.0.0.1:8000") + "/static/js/audio-processor-worklet.js";
 
 // =======================

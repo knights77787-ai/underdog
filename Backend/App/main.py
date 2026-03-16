@@ -251,6 +251,15 @@ def favicon():
     return RedirectResponse(url="/static/favicon.svg", status_code=302)
 
 
+@app.get("/health", include_in_schema=False)
+def health():
+    """서버·STT 활성 여부 점검 (메인 서버 자막 미동작 시 확인용)."""
+    ml = os.environ.get("ENABLE_ML_WORKERS", "").strip().lower() in ("1", "true", "yes")
+    api_key = (os.environ.get("OPENAI_API_KEY") or "").strip()
+    stt_enabled = ml and bool(api_key)
+    return {"ok": True, "stt_enabled": stt_enabled}
+
+
 if _FRONTEND_STATIC.is_dir():
     app.mount("/static", StaticFiles(directory=str(_FRONTEND_STATIC)), name="static")
 
