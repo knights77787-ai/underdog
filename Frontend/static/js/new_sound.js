@@ -306,7 +306,7 @@ function renderSoundList(list) {
       <div class="sound-row" data-id="${r.custom_sound_id}">
         <div class="sound-left">
           <div class="sound-title-line">
-            <span class="sound-badge ${r.event_type === "danger" ? "danger" : "alert"}">
+            <span class="sound-badge ${r.event_type === "danger" ? "danger" : "daily"}">
               ${r.event_type === "danger" ? "경고" : "일상생활"}
             </span>
             <span class="sound-name">${escapeHtml(r.name)}</span>
@@ -346,6 +346,19 @@ function renderSoundList(list) {
     .join("");
 }
 
+/** 기존 등록 소리 목록을 API에서 가져옴. { ok, data } 반환 */
+async function fetchExistingSoundList() {
+  try {
+    const url = API_BASE + "/custom-sounds?session_id=" + encodeURIComponent(SESSION_ID);
+    const res = await fetch(url);
+    const data = await res.json().catch(() => ({}));
+    const ok = res.ok && data.ok && Array.isArray(data.data);
+    return { ok, data: ok ? data.data : [] };
+  } catch {
+    return { ok: false, data: [] };
+  }
+}
+
 async function loadSoundList() {
   if (!soundListEl || !soundListStatusEl) return;
 
@@ -353,17 +366,18 @@ async function loadSoundList() {
   soundListStatusEl.textContent = "불러오는 중…";
 
   try {
-    const url = API_BASE + "/custom-sounds?session_id=" + encodeURIComponent(SESSION_ID);
-    const res = await fetch(url);
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok || !data.ok || !Array.isArray(data.data)) {
+    const { ok, data } = await fetchExistingSoundList();
+    if (!ok) {
       soundListStatusEl.textContent = "목록을 불러오지 못했습니다.";
       soundListEl.innerHTML = "";
       return;
     }
-
-    renderSoundList(data.data);
+    if (data.length === 0) {
+      soundListStatusEl.textContent = "등록된 소리가 없습니다.";
+    } else {
+      soundListStatusEl.textContent = `총 ${data.length}건`;
+    }
+    renderSoundList(data);
   } catch (err) {
     console.error(err);
     soundListStatusEl.textContent = "서버에 연결할 수 없습니다.";
@@ -619,6 +633,19 @@ btnSubmit?.addEventListener("click", async () => {
     return;
   }
 
+  // 같은 소리 이름이 이미 등록되어 있는지 검사
+  const { ok, data: existingList } = await fetchExistingSoundList();
+  if (ok && existingList.length > 0) {
+    const nameLower = result.name.trim().toLowerCase();
+    const hasSameName = existingList.some(
+      (r) => (r.name || "").trim().toLowerCase() === nameLower
+    );
+    if (hasSameName) {
+      alert("이미 등록하신 소리입니다.");
+      return;
+    }
+  }
+
   if (!confirm(`"${result.name}" 소리를 등록하시겠습니까?`)) {
     return;
   }
@@ -654,12 +681,13 @@ btnSubmit?.addEventListener("click", async () => {
 
     await loadSoundList();
 
-    alert(`등록되었습니다. "${data.data?.name || result.name}"\n확인을 누르면 목록으로 이동합니다.`);
+    // 등록 직후 목록 탭으로 전환해 방금 등록한 소리를 바로 볼 수 있게
     const listTab = document.getElementById("list-tab");
     if (listTab && window.bootstrap) {
       const tab = new bootstrap.Tab(listTab);
       tab.show();
     }
+    setStatus(`"${data.data?.name || result.name}" 소리가 등록되었습니다.`, "ok");
   } catch (err) {
     console.error(err);
     setStatus("서버에 연결할 수 없습니다. 백엔드를 확인하세요.", "err");

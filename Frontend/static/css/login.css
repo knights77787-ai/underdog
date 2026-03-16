@@ -1,28 +1,181 @@
+/* 로그인 페이지 - 프리미엄 스타일 */
 .login-page {
   min-height: 100vh;
-  background: #f8fafc !important;
+  background: #f1f5f9;
+  display: flex;
+  flex-direction: column;
 }
 
-.login-page .card {
-  border-radius: 16px;
-  border: 1px solid rgba(6, 182, 212, 0.2);
-  box-shadow: 0 4px 20px rgba(30, 64, 175, 0.08) !important;
+.navbar-login {
+  background: #fff;
+  border-bottom: 2px solid var(--lumen-primary);
+  padding: 0.75rem 1rem;
 }
 
-.login-page .card .h4 {
+.navbar-brand-login {
+  text-decoration: none;
+}
+
+/* 메인 영역 */
+.login-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem 1.5rem 3rem;
+}
+
+/* 히어로 섹션 */
+.login-hero {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.login-title {
+  font-size: 1.75rem;
+  font-weight: 700;
   color: var(--lumen-primary-dark);
+  margin-bottom: 0.75rem;
+  letter-spacing: -0.02em;
 }
 
-.login-page .btn-outline-secondary {
-  border-color: rgba(30, 64, 175, 0.4);
+.login-tagline {
+  font-size: 0.95rem;
+  color: #64748b;
+  line-height: 1.6;
+  margin: 0;
+  max-width: 280px;
+}
+
+/* 로그인 카드 */
+.login-card-wrap {
+  width: 100%;
+  max-width: 400px;
+}
+
+.login-card {
+  background: #fff !important;
+  background-image: none !important;
+  border-radius: 20px;
+  border: 1px solid rgba(6, 182, 212, 0.15);
+  overflow: hidden;
+}
+
+.login-card-header {
+  padding: 2rem 2rem 0;
+  text-align: center;
+}
+
+.login-card-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--lumen-primary-dark);
+  margin-bottom: 0.35rem;
+}
+
+.login-card-desc {
+  font-size: 0.9rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.login-card-body {
+  padding: 1.5rem 2rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* 로그인 버튼 */
+.btn-login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.85rem 1.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 12px;
+  border: none;
+  transition: transform 0.15s;
+}
+
+.btn-login:hover {
+  transform: translateY(-1px);
+}
+
+.btn-google {
+  background: #fff !important;
+  background-image: none !important;
+  color: #374151;
+  border: 1.5px solid #e5e7eb;
+}
+
+.btn-google:hover {
+  background: #f9fafb !important;
+  background-image: none !important;
+  border-color: var(--lumen-primary);
   color: var(--lumen-primary);
 }
-.login-page .btn-outline-secondary:hover {
-  background: rgba(30, 64, 175, 0.08);
-  border-color: var(--lumen-primary);
+
+.btn-google i {
+  font-size: 1.2rem;
+  color: #4285f4;
 }
 
-.login-page .btn-lg {
-  border-radius: 12px;
-  font-weight: 500;
+.btn-kakao {
+  background: #fee500 !important;
+  background-image: none !important;
+  color: #191919;
+}
+
+.btn-kakao:hover {
+  background: #f5dd00 !important;
+  background-image: none !important;
+}
+
+.btn-kakao .kakao-icon {
+  flex-shrink: 0;
+}
+
+/* 하단 기능 요약 */
+.login-features {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1.5rem 2rem;
+  margin-top: 2.5rem;
+  padding: 0 1rem;
+}
+
+.login-feature {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.login-feature i {
+  font-size: 1rem;
+  color: var(--lumen-teal);
+}
+
+@media (min-width: 576px) {
+  .login-main {
+    padding: 3rem 2rem 4rem;
+  }
+
+  .login-title {
+    font-size: 2rem;
+  }
+
+  .login-tagline {
+    font-size: 1rem;
+    max-width: 320px;
+  }
+
+  .login-hero {
+    margin-bottom: 3rem;
+  }
 }

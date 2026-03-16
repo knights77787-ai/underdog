@@ -88,15 +88,6 @@ const userDropdownEmail = document.getElementById("userDropdownEmail");
 const userDropdownSoundReg = document.getElementById("userDropdownSoundReg");
 const userDropdownLogout = document.getElementById("userDropdownLogout");
 
-// 설정 패널
-const settingFontSize = document.getElementById("settingFontSize");
-const settingAlertEnabled = document.getElementById("settingAlertEnabled");
-const settingCooldownSec = document.getElementById("settingCooldownSec");
-const settingAutoScroll = document.getElementById("settingAutoScroll");
-const btnSettingsSave = document.getElementById("btnSettingsSave");
-const settingsStatus = document.getElementById("settingsStatus");
-const settingsCollapse = document.getElementById("settingsCollapse");
-
 // =======================
 // 2) Helpers
 // =======================
@@ -223,7 +214,7 @@ async function ensureSessionAndConnect() {
       history.replaceState(null, "", url.toString());
       updateSessionLabel();
       updateUserSection();
-      loadSettings();
+      loadSettingsForCaption();
     } catch (e) {
       showToast("오류", "서버에 연결할 수 없습니다. 백엔드가 실행 중인지 확인하세요.", true);
       return false;
@@ -673,17 +664,13 @@ function setupUserDropdown() {
     window.location.href = url;
   });
 
-  // 설정: 설정 패널 펼치기 + 드롭다운 닫기
+  // 설정: 설정 페이지로 이동
   if (userDropdownSettings) {
     userDropdownSettings.addEventListener("click", (e) => {
       e.preventDefault();
-      const collapseEl = document.getElementById("settingsCollapse");
-      if (collapseEl && window.bootstrap) {
-        const collapse = bootstrap.Collapse.getOrCreateInstance(collapseEl);
-        collapse.show();
-        const dropdown = bootstrap.Dropdown.getInstance(btnUserIcon);
-        if (dropdown) dropdown.hide();
-      }
+      const sid = SESSION_ID || (typeof localStorage !== "undefined" && localStorage.getItem(SESSION_STORAGE_KEY));
+      const url = "/settings-page" + (sid ? "?session_id=" + encodeURIComponent(sid) : "");
+      window.location.href = url;
     });
   }
 
@@ -708,16 +695,7 @@ function setupUserDropdown() {
   });
 }
 
-// =======================
-// 설정 패널 (GET/POST /settings)
-// =======================
-function setSettingsStatus(msg, isError) {
-  if (settingsStatus) {
-    settingsStatus.textContent = msg || "";
-    settingsStatus.className = "col-auto small " + (isError ? "text-danger" : "text-muted");
-  }
-}
-
+// 설정: 자막 글자 크기만 로드 (설정 페이지는 /settings-page 에서 편집)
 function applyFontSizeToCaption(px) {
   if (captionBox && px != null) {
     const num = Math.min(60, Math.max(10, Number(px)));
@@ -725,70 +703,15 @@ function applyFontSizeToCaption(px) {
   }
 }
 
-async function loadSettings() {
-  if (!SESSION_ID || !settingFontSize) return;
-  setSettingsStatus("불러오는 중…", false);
+async function loadSettingsForCaption() {
+  if (!SESSION_ID || !captionBox) return;
   try {
     const res = await fetch(API_BASE + "/settings?session_id=" + encodeURIComponent(SESSION_ID));
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.ok || !data.data) {
-      setSettingsStatus("불러오기 실패", true);
-      return;
+    if (res.ok && data?.ok && data?.data?.font_size != null) {
+      applyFontSizeToCaption(data.data.font_size);
     }
-    const d = data.data;
-    if (settingFontSize) settingFontSize.value = d.font_size ?? 20;
-    if (settingAlertEnabled) settingAlertEnabled.checked = d.alert_enabled !== false;
-    if (settingCooldownSec) settingCooldownSec.value = d.cooldown_sec ?? 5;
-    if (settingAutoScroll) settingAutoScroll.checked = d.auto_scroll !== false;
-    applyFontSizeToCaption(d.font_size);
-    setSettingsStatus("불러옴", false);
-  } catch (e) {
-    setSettingsStatus("연결 실패", true);
-  }
-}
-
-async function saveSettings() {
-  if (!SESSION_ID) {
-    setSettingsStatus("마이크를 눌러 시작하세요.", true);
-    return;
-  }
-  const body = {};
-  if (settingFontSize) {
-    const v = parseInt(settingFontSize.value, 10);
-    if (v >= 10 && v <= 60) body.font_size = v;
-  }
-  if (settingAlertEnabled) body.alert_enabled = settingAlertEnabled.checked;
-  if (settingCooldownSec) {
-    const v = parseInt(settingCooldownSec.value, 10);
-    if (v >= 0 && v <= 60) body.cooldown_sec = v;
-  }
-  if (settingAutoScroll) body.auto_scroll = settingAutoScroll.checked;
-
-  setSettingsStatus("저장 중…", false);
-  try {
-    const res = await fetch(API_BASE + "/settings?session_id=" + encodeURIComponent(SESSION_ID), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok && data.ok) {
-      setSettingsStatus("저장됨", false);
-      applyFontSizeToCaption(body.font_size);
-      showToast("설정", "저장되었습니다.", false);
-    } else {
-      setSettingsStatus(data.detail || "저장 실패", true);
-    }
-  } catch (e) {
-    setSettingsStatus("연결 실패", true);
-  }
-}
-
-if (btnSettingsSave) btnSettingsSave.addEventListener("click", saveSettings);
-if (settingsCollapse) {
-  settingsCollapse.addEventListener("show.bs.collapse", function () {
-    if (SESSION_ID) loadSettings();
-  });
+  } catch (_) {}
 }
 
 // Init
@@ -798,4 +721,4 @@ updateSessionLabel();
 updateUserSection();
 updateLogSectionVisibility();
 setupUserDropdown();
-if (SESSION_ID) loadSettings();
+if (SESSION_ID) loadSettingsForCaption();

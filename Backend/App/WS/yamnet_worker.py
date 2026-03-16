@@ -1,4 +1,4 @@
-# app/WS/yamnet_worker.py
+# App/WS/yamnet_worker.py
 import asyncio
 import time
 from App.Core.logging import get_logger

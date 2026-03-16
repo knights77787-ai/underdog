@@ -140,6 +140,9 @@ body {
 }
 
 .sound-name {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
   font-weight: 700;
   font-size: 18px;
   color: #111827;
@@ -170,17 +173,17 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
+  height: 44px;
   padding: 0 22px;
   border-radius: 999px;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   white-space: nowrap;
   line-height: 1;
   flex-shrink: 0;
 }
 
-.sound-badge.alert {
+.sound-badge.daily {
   background: var(--lumen-teal) !important;
   color: #fff !important;
 }

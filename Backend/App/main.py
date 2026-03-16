@@ -1,5 +1,5 @@
 """
-underdog AI Pipeline - FastAPI 앱 (app 폴더 진입점)
+underdog AI Pipeline - FastAPI 앱 (App 폴더 진입점)
 DB: SQLite 연동, 기동 시 테이블 생성.
 프론트엔드: /, /login, /live → HTML, /static → 정적 파일 (Frontend 폴더 기준).
 """
@@ -231,6 +231,12 @@ def frontend_live():
 def frontend_new_sound():
     """커스텀 소리 등록·목록 페이지."""
     return _send_html("new_sound.html")
+
+
+@app.get("/settings-page", response_class=FileResponse)
+def frontend_settings():
+    """설정 페이지."""
+    return _send_html("settings.html")
 
 
 @app.get("/admin-login", response_class=FileResponse)

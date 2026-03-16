@@ -4,39 +4,61 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Underdog · 로그인</title>
+  <title>Lument | 로그인</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link href="/static/css/theme.css" rel="stylesheet">
   <link href="/static/css/login.css" rel="stylesheet">
 </head>
-<body class="bg-light login-page">
-  <nav class="navbar bg-white border-bottom">
-    <div class="container-fluid d-flex align-items-center gap-2 flex-wrap">
-      <a href="/" class="fw-bold text-dark text-decoration-none">
+<body class="login-page">
+  <nav class="navbar navbar-login">
+    <div class="container-fluid">
+      <a href="/" class="navbar-brand-login">
         <img src="/static/img/lumen_logo.png" alt="Lumen" width="70" height="50">
       </a>
     </div>
   </nav>
 
-  <main class="container py-5">
-    <div class="row justify-content-center">
-      <div class="col-12 col-md-8 col-lg-5">
-        <div class="card shadow-sm">
-          <div class="card-body p-4 p-md-5">
-            <h1 class="h4 fw-bold mb-2">시작하기</h1>
-            <p class="text-muted small mb-4">라이브 자막·알림을 사용하려면 아래 방법 중 하나로 들어가세요.</p>
+  <main class="login-main">
+    <div class="login-hero">
+      <h1 class="login-title">시작하기</h1>
+      <p class="login-tagline">실시간 자막·소리 감지·맞춤 알림까지<br>하나의 서비스에서 경험하세요</p>
+    </div>
 
-            <div class="d-grid gap-2">
-              <a id="linkGoogle" href="#" class="btn btn-outline-secondary btn-lg d-flex align-items-center justify-content-center gap-2">
-                <span>Google로 로그인</span>
-              </a>
-              <a id="linkKakao" href="#" class="btn btn-warning btn-lg text-dark d-flex align-items-center justify-content-center gap-2">
-                <span>카카오로 로그인</span>
-              </a>
-            </div>
-          </div>
+    <div class="login-card-wrap">
+      <div class="login-card">
+        <div class="login-card-header">
+          <h2 class="login-card-title">로그인</h2>
+          <p class="login-card-desc">아래 방법 중 하나로 계속하세요</p>
         </div>
+        <div class="login-card-body">
+          <a id="linkGoogle" href="#" class="btn btn-login btn-google">
+            <i class="bi bi-google"></i>
+            <span>Google로 로그인</span>
+          </a>
+          <a id="linkKakao" href="#" class="btn btn-login btn-kakao">
+            <svg class="kakao-icon" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+              <path d="M12 3c-5.52 0-10 3.58-10 8 0 2.89 1.89 5.43 4.72 6.88-.2.72-.72 2.59-.82 2.99-.13.49.19.48.41.35.17-.1 2.68-1.84 3.76-2.63.53.07 1.08.11 1.63.11 5.52 0 10-3.58 10-8s-4.48-8-10-8z"/>
+            </svg>
+            <span>카카오로 로그인</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="login-features">
+      <div class="login-feature">
+        <i class="bi bi-mic-fill"></i>
+        <span>실시간 음성 인식</span>
+      </div>
+      <div class="login-feature">
+        <i class="bi bi-volume-up-fill"></i>
+        <span>환경음·소리 감지</span>
+      </div>
+      <div class="login-feature">
+        <i class="bi bi-bell-fill"></i>
+        <span>맞춤 알림</span>
       </div>
     </div>
   </main>
