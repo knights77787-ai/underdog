@@ -52,7 +52,8 @@ VAD_STREAM = SileroVADStream(
 )
 AUDIO_STATES = AudioStateStore()
 # 비말(1초) 오디오 분류용 큐. maxsize로 폭주 방지 (처리 지연 시 버퍼 확대)
-AUDIOCLS_QUEUE: asyncio.Queue = asyncio.Queue(maxsize=80)
+# 120으로 여유 두고, 아래에서 큐 과다 시 비말 enqueue 스킵해 STT에 CPU 양보
+AUDIOCLS_QUEUE: asyncio.Queue = asyncio.Queue(maxsize=120)
 # STT 직렬화: VAD_END → 큐 → 단일 워커가 Whisper 실행 (동시 다중 STT 방지)
 STT_QUEUE: asyncio.Queue = asyncio.Queue(maxsize=32)
 
@@ -457,6 +458,7 @@ async def handle_message(
                     websocket=websocket,
                 )
         else:
+<<<<<<< HEAD
             pass  # 비말 구간: 커스텀 소리 경로에서 통합 처리
 
         # 커스텀 소리 매칭: VAD와 무관하게 항상 4초 윈도우 수집·전송
@@ -466,6 +468,38 @@ async def handle_message(
             win = np.concatenate(st.custom_sound_chunks[:2])
             st.custom_sound_chunks = st.custom_sound_chunks[1:]
             await _enqueue_audiocls(sid, ts_ms, win, conn_prefix)
+=======
+            # 비말(non-speech) 구간: 2초 청크 2개 모이면 4초 윈도우로 큐에 넣기
+            st.non_speech_chunks.append(audio_f32.copy())
+            if len(st.non_speech_chunks) >= 2:
+                win = np.concatenate(st.non_speech_chunks[:2])
+                st.non_speech_chunks = st.non_speech_chunks[1:]  # 슬라이딩(2초 겹침)
+                # 큐가 이미 많이 찼으면 비말 enqueue 스킵 → Yamnet 부하 감소, STT(자막)에 CPU 양보
+                if AUDIOCLS_QUEUE.qsize() >= 70:
+                    inc("yamnet_dropped")
+                    audio_logger.debug(
+                        "%s AUDIOCLS_QUEUE_THROTTLE qsize=%s sid=%s",
+                        conn_prefix, AUDIOCLS_QUEUE.qsize(), sid,
+                    )
+                else:
+                    settings = await asyncio.to_thread(_get_settings, sid)
+                    item = {
+                        "sid": sid,
+                        "ts_ms": ts_ms,
+                        "audio": win,
+                        "conn_prefix": conn_prefix,
+                        "cooldown_sec": int(settings.get("cooldown_sec", 5)),
+                        "alert_enabled": bool(settings.get("alert_enabled", True)),
+                    }
+                    try:
+                        AUDIOCLS_QUEUE.put_nowait(item)
+                        inc("yamnet_enqueued")
+                    except asyncio.QueueFull:
+                        inc("yamnet_dropped")
+                        audio_logger.warning(
+                            "%s AUDIOCLS_QUEUE_FULL sid=%s", conn_prefix, sid
+                        )
+>>>>>>> yu01
         return sid
 
     if msg_type == "caption":
