@@ -47,7 +47,7 @@ def _float32_16k_to_wav_bytes(audio: np.ndarray) -> bytes:
 
 class WhisperAPISTT:
     """
-    OpenAI Whisper API로 음성→텍스트. transcribe_16k_f32 시그니처는 로컬 WhisperSTT와 동일.
+    OpenAI Whisper API로 음성→텍스트 변환.
     """
 
     def __init__(self, api_key: str | None = None, model: str = "whisper-1"):
@@ -59,11 +59,9 @@ class WhisperAPISTT:
     def transcribe_16k_f32(
         self,
         audio_f32_16k: np.ndarray,
-        beam_size: int | None = None,
         initial_prompt: str | None = None,
-        best_of: int | None = None,
     ) -> str:
-        """audio_f32_16k: float32 mono 16kHz. beam_size/best_of는 API에서 미지원이라 무시."""
+        """audio_f32_16k: float32 mono 16kHz. initial_prompt로 도메인/어휘 힌트 전달."""
         if audio_f32_16k is None:
             return ""
         audio = np.asarray(audio_f32_16k, dtype=np.float32)
@@ -87,7 +85,11 @@ class WhisperAPISTT:
             audio.dtype,
         )
         wav_bytes = _float32_16k_to_wav_bytes(audio)
-        prompt = (initial_prompt or "").strip() or None
+        prompt = (initial_prompt or "").strip() 
+        if not prompt:
+            prompt = "일상 대화, 안전, 안내 방송, 한국어"  # 기본 힌트트
+        
+        prompt = prompt or None
         try:
             with httpx.Client(timeout=30.0) as client:
                 resp = client.post(

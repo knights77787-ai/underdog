@@ -28,7 +28,7 @@ logger = get_logger("ws.handlers")
 persist_logger = get_logger("ws.persist")
 audio_logger = get_logger("ws.audio")
 
-# STT: ENABLE_ML_WORKERS 켜져 있을 때만 OpenAI Whisper API 사용 (OPENAI_API_KEY 필수)
+# STT: ENABLE_ML_WORKERS=1 + OPENAI_API_KEY 있을 때만 Whisper API 사용
 def _is_heavy_workers_enabled() -> bool:
     v = os.environ.get("ENABLE_ML_WORKERS", "").strip().lower()
     return v in ("1", "true", "yes")
@@ -43,7 +43,7 @@ if _is_heavy_workers_enabled():
         WHISPER = None
         logger.warning("STT: disabled — OPENAI_API_KEY required but not set")
 else:
-    WHISPER = None  # ML 워커 비활성화 시 Whisper 미로드 → 메모리 2GB 미만
+    WHISPER = None  # ML 워커 비활성화 시 Whisper API 미로드
     logger.info("STT: disabled (ENABLE_ML_WORKERS not set)")
 
 # 전역(프로세스) VAD 스트림 + 세션별 오디오 상태
@@ -332,18 +332,14 @@ async def _process_speech_and_enqueue_stt(
     # 큐에 넣기 전 길이 검사 (0.5초 미만이면 worker까지 보내지 않음)
     if speech_audio is None or getattr(speech_audio, "size", 0) < 16000 * 0.5:
         return
-    beam_size = int(settings.get("beam_size", 2))
     stt_initial_prompt = settings.get("stt_initial_prompt") or None
-    stt_best_of = int(settings.get("stt_best_of", 0))
     item = {
         "sid": sid,
         "speech_audio": speech_audio,
         "ts_ms": ts_ms,
         "conn_prefix": conn_prefix,
         "websocket": websocket,
-        "beam_size": beam_size,
         "stt_initial_prompt": stt_initial_prompt,
-        "stt_best_of": stt_best_of,
     }
     try:
         STT_QUEUE.put_nowait(item)
