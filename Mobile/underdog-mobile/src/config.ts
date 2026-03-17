@@ -1,13 +1,13 @@
 /**
  * API / WebSocket 베이스 URL 설정
- * - 배포 서버: https://api.lumen.ai.kr (Render)
+ * - 배포 서버: https://lumen.ai.kr (EC2)
  * - 개발 시 로컬: 개발 PC IP + 포트 (같은 Wi‑Fi에서 실기기 테스트용)
  * - 경로·타입은 Shared(api_contract, ws_protocol)와 동일하게 사용
  */
 import { buildApiUrl } from '../../../Shared/src/api';
 
-const PROD_API_BASE = 'https://api.lumen.ai.kr';
-const PROD_WS_URL = 'wss://api.lumen.ai.kr/ws';
+const PROD_API_BASE = 'https://lumen.ai.kr';
+const PROD_WS_URL = 'wss://lumen.ai.kr/ws';
 
 // 로컬 서버 사용 시 true로 바꾸고, DEV_* 값을 PC IP로 설정
 const USE_LOCAL_SERVER = false;
