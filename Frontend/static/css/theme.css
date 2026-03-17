@@ -47,3 +47,26 @@
 .navbar.bg-white.border-bottom {
   border-bottom: 2px solid var(--lumen-primary) !important;
 }
+
+/* 사용자 아이콘 (드롭다운 트리거) */
+.user-icon-circle {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+.user-icon-svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* 사용자 드롭다운: 구분선~첫 메뉴 / 마지막 메뉴~하단 여백 균형 (동일 0.5rem) */
+#userDropdownMenu {
+  padding-top: 0.5rem;
+  padding-bottom: 0;
+}
+#userDropdownMenu > li.border-bottom {
+  padding-bottom: 0.5rem;
+}
+#userDropdownMenu > li + li .dropdown-item {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}

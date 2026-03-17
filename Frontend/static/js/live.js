@@ -711,19 +711,6 @@ function setupUserDropdown() {
     window.location.href = "/";
   });
 
-  // mouseover 시 드롭다운 표시
-  let hideTimer = null;
-  userDropdownWrap.addEventListener("mouseenter", () => {
-    if (hideTimer) clearTimeout(hideTimer);
-    const dropdown = bootstrap.Dropdown.getOrCreateInstance(btnUserIcon);
-    dropdown.show();
-  });
-  userDropdownWrap.addEventListener("mouseleave", () => {
-    hideTimer = setTimeout(() => {
-      const dropdown = bootstrap.Dropdown.getInstance(btnUserIcon);
-      if (dropdown) dropdown.hide();
-    }, 150);
-  });
 }
 
 // 설정: 자막 글자 크기만 로드 (설정 페이지는 /settings-page 에서 편집)

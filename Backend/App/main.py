@@ -28,7 +28,7 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")  # 0=all 1=INFO 2=WARN 3=ERRO
 from App.Core.logging import setup_logging
 setup_logging(os.environ.get("LOG_LEVEL", "INFO").upper())
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
