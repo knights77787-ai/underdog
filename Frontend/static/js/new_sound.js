@@ -772,6 +772,10 @@ function setupUserDropdown() {
 
   userDropdownLogout.addEventListener("click", (e) => {
     e.preventDefault();
+    try {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+      localStorage.removeItem(PROVIDER_STORAGE_KEY);
+    } catch (_) {}
     window.location.href = "/";
   });
 }

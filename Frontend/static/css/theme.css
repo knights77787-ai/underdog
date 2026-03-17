@@ -2,6 +2,11 @@
  * Lumen 로고 기반 통일 테마
  * 로고 색상: 딥 블루(텍스트), 보라/티얼/오렌지 악센트
  */
+/* 전역 페이지 배경 통일 */
+body {
+  background-color: #f8fafc !important;
+}
+
 :root {
   --lumen-primary: #1e40af;
   --lumen-primary-light: #3b82f6;

@@ -1,7 +1,7 @@
 /* 로그인 페이지 - 프리미엄 스타일 */
 .login-page {
   min-height: 100vh;
-  background: #f1f5f9;
+  background: #f8fafc;
   display: flex;
   flex-direction: column;
 }
@@ -35,11 +35,14 @@
 }
 
 .login-title {
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: var(--lumen-primary-dark);
   margin-bottom: 0.75rem;
-  letter-spacing: -0.02em;
+  line-height: 0;
+}
+.login-title .login-hero-logo {
+  width: 120px;
+  height: auto;
+  display: block;
+  margin: 0 auto;
 }
 
 .login-tagline {
@@ -61,6 +64,7 @@
   background-image: none !important;
   border-radius: 20px;
   border: 1px solid rgba(6, 182, 212, 0.15);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
   overflow: hidden;
 }
 

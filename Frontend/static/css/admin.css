@@ -1,3 +1,13 @@
+/* 관리자 페이지 배경 */
+body {
+  background-color: #f8fafc !important;
+}
+
+/* 관리자 로그인 페이지: 로고 가운데 정렬 (ad_login만 shadow-sm 없음) */
+.navbar.bg-white.border-bottom:not(.shadow-sm) .container-fluid {
+  justify-content: center;
+}
+
 /* 관리자 대시보드 스타일 */
 .admin-section-title {
   font-size: 0.875rem;
