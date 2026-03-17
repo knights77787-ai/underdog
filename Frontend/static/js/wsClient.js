@@ -62,8 +62,12 @@ window.WSClient = class WSClient {
       } catch {
         return;
       }
-      if (!msg.type) return;
-      this.emit(msg.type, msg);
+      if (!msg || typeof msg !== "object" || !msg.type) return;
+      try {
+        this.emit(msg.type, msg);
+      } catch (err) {
+        console.warn("[WSClient] handler error for type=" + msg.type, err);
+      }
     };
   }
 

@@ -11,15 +11,25 @@ from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 
-# .env 로드 (config import 전에 반드시 실행 → ADMIN_TOKEN 등 로드)
+# .env 로드 (config import 전에 반드시 실행 → ADMIN_TOKEN, OAuth 등 로드)
 _backend_dir = Path(__file__).resolve().parent.parent  # .../Backend
 _repo_root_dir = _backend_dir.parent  # .../underdog (repo root)
-for _env_path in (_backend_dir / ".env", _repo_root_dir / ".env"):
+_env_loaded = False
+for _env_path in (_backend_dir / ".env", _repo_root_dir / ".env", Path.cwd() / ".env"):
     if _env_path.is_file():
         load_dotenv(_env_path)
+        _env_loaded = True
         break
-else:
+if not _env_loaded:
     load_dotenv()
+
+# OAuth 미설정 시 로그인 500 원인 안내 (EC2 등에서 .env 없을 때)
+if not os.getenv("GOOGLE_CLIENT_ID") or not os.getenv("GOOGLE_CLIENT_SECRET"):
+    import sys
+    print("WARNING: GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET not set → Google 로그인 시 500 발생. EC2에서는 .env를 프로젝트 루트 또는 Backend/ 에 두세요.", file=sys.stderr)
+if not os.getenv("KAKAO_CLIENT_ID"):
+    import sys
+    print("WARNING: KAKAO_CLIENT_ID not set → 카카오 로그인 불가. .env에 설정하세요.", file=sys.stderr)
 
 # TensorFlow C++ 로그 억제 (INFO 메시지 안 보이게)
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")  # 0=all 1=INFO 2=WARN 3=ERROR only
@@ -41,6 +51,7 @@ from App.Api.routes.custom_phrase_audio import router as custom_phrase_audio_rou
 from App.Api.routes.custom_sounds import router as custom_sounds_router
 from App.Api.routes.logs import router as logs_router
 from App.Api.routes.settings import router as settings_router
+from App.Api.routes.push import router as push_router
 from App.Core.config import DATABASE_PATH
 from App.Core.logging import get_logger
 from App.Services.audio_rules import reload_audio_rules
@@ -196,6 +207,7 @@ app.include_router(admin_router)
 app.include_router(feedback_router)
 app.include_router(settings_router)
 app.include_router(auth_router)
+app.include_router(push_router)
 
 
 

@@ -1,4 +1,5 @@
-const API_BASE = window.APP_CONFIG?.API_BASE || "http://127.0.0.1:8000";
+// 배포(HTTPS)에서는 config 미적재 시에도 현재 오리진 사용 (API/WS 도메인 일치)
+const API_BASE = window.APP_CONFIG?.API_BASE || (typeof location !== "undefined" && location.origin && !/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/i.test(location.origin) ? location.origin : "http://127.0.0.1:8000");
 const SESSION_STORAGE_KEY = "underdog_session_id";
 const PROVIDER_STORAGE_KEY = "underdog_provider";
 

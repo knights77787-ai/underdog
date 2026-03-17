@@ -37,6 +37,27 @@ def _get_redirect_uri(request: Request, env_key: str, path: str) -> str:
 Provider = Literal["google", "kakao"]
 
 
+def _oauth_not_configured_response(request: Request, provider: str, env_hint: str) -> HTMLResponse:
+    """브라우저에서 로그인 시도 시 OAuth 미설정이면 HTML 안내 페이지 반환 (JSON 대신)."""
+    accept = (request.headers.get("accept") or "").lower()
+    if "text/html" in accept:
+        base = str(request.base_url).rstrip("/")
+        html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>로그인 설정 안내</title>
+<style>body{{font-family:system-ui,sans-serif;max-width:480px;margin:2rem auto;padding:0 1rem;}}
+h1{{font-size:1.25rem;}} .msg{{color:#666;margin:1rem 0;}}
+a{{color:#0d6efd;}}</style></head>
+<body>
+<h1>로그인을 사용할 수 없습니다</h1>
+<p class="msg">{provider} 로그인이 서버에 설정되지 않았습니다.</p>
+<p class="msg">관리자: EC2(또는 배포 서버)에 <strong>.env</strong> 파일을 두고, <code>{env_hint}</code> 값을 넣어 주세요. 프로젝트 루트 또는 Backend 폴더의 .env가 앱 기동 시 자동 로드됩니다.</p>
+<p><a href="{base}/login">로그인 페이지로 돌아가기</a></p>
+</body></html>"""
+        return HTMLResponse(content=html, status_code=503)
+    raise HTTPException(status_code=503, detail=f"{provider} OAuth is not configured ({env_hint})")
+
+
 def _create_session_payload(
     provider: Provider | Literal["guest"],
     client_session_uuid: str,
@@ -95,10 +116,7 @@ def _success_redirect_response(
 async def google_login(request: Request, mobile: bool = Query(False, description="모바일 앱: 1이면 콜백 후 /auth/mobile-done으로 리다이렉트")):
     client_id = os.getenv("GOOGLE_CLIENT_ID")
     if not client_id:
-        raise HTTPException(
-            status_code=500,
-            detail="Google OAuth is not configured (GOOGLE_CLIENT_ID)",
-        )
+        return _oauth_not_configured_response(request, "Google", "GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET")
     redirect_uri = _get_redirect_uri(request, "GOOGLE_REDIRECT_URI", "/auth/google/callback")
 
     auth_url = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -126,10 +144,7 @@ async def google_callback(
     client_id = os.getenv("GOOGLE_CLIENT_ID")
     client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
     if not client_id or not client_secret:
-        raise HTTPException(
-            status_code=500,
-            detail="Google OAuth is not configured (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET)",
-        )
+        return _oauth_not_configured_response(request, "Google", "GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET")
     # login 시 사용한 redirect_uri와 동일해야 함 (env 우선)
     redirect_uri = _get_redirect_uri(request, "GOOGLE_REDIRECT_URI", "/auth/google/callback")
 
@@ -206,10 +221,7 @@ async def google_callback(
 async def kakao_login(request: Request, mobile: bool = Query(False, description="모바일 앱: 1이면 콜백 후 /auth/mobile-done으로 리다이렉트")):
     client_id = os.getenv("KAKAO_CLIENT_ID")
     if not client_id:
-        raise HTTPException(
-            status_code=500,
-            detail="Kakao OAuth is not configured (KAKAO_CLIENT_ID)",
-        )
+        return _oauth_not_configured_response(request, "카카오", "KAKAO_CLIENT_ID (및 KAKAO_CLIENT_SECRET)")
     redirect_uri = _get_redirect_uri(request, "KAKAO_REDIRECT_URI", "/auth/kakao/callback")
 
     auth_url = "https://kauth.kakao.com/oauth/authorize"
@@ -235,10 +247,7 @@ async def kakao_callback(
     client_id = os.getenv("KAKAO_CLIENT_ID")
     client_secret = os.getenv("KAKAO_CLIENT_SECRET", "")
     if not client_id:
-        raise HTTPException(
-            status_code=500,
-            detail="Kakao OAuth is not configured (KAKAO_CLIENT_ID)",
-        )
+        return _oauth_not_configured_response(request, "카카오", "KAKAO_CLIENT_ID (및 KAKAO_CLIENT_SECRET)")
     redirect_uri = _get_redirect_uri(request, "KAKAO_REDIRECT_URI", "/auth/kakao/callback")
 
     token_url = "https://kauth.kakao.com/oauth/token"

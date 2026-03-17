@@ -2,16 +2,24 @@
 // =======================
 // 0) 서버 주소 · 세션 (백엔드 연동: join 시 사용)
 // =======================
-const API_BASE = window.APP_CONFIG?.API_BASE || "http://127.0.0.1:8000";
-// config 미적재 시에도 도메인 접속이면 wss 사용 (Mixed Content 방지)
+// 배포(HTTPS)에서는 config 미적재 시에도 현재 오리진 사용. 로컬만 127.0.0.1 폴백
+function getDefaultApiBase() {
+  if (window.APP_CONFIG?.API_BASE) return window.APP_CONFIG.API_BASE;
+  if (typeof location !== "undefined" && location.origin && !/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/i.test(location.origin))
+    return location.origin;
+  return "http://127.0.0.1:8000";
+}
+const API_BASE = getDefaultApiBase();
+// config 미적재 시에도 HTTPS면 wss 사용 (Mixed Content 방지)
 function getDefaultWsUrl() {
+  if (window.APP_CONFIG?.WS_URL) return window.APP_CONFIG.WS_URL;
   if (typeof location !== "undefined" && location.host) {
     const p = location.protocol === "https:" ? "wss" : "ws";
     return p + "://" + location.host + "/ws";
   }
   return "ws://127.0.0.1:8000/ws";
 }
-const WS_URL = window.APP_CONFIG?.WS_URL || getDefaultWsUrl();
+const WS_URL = getDefaultWsUrl();
 const SESSION_STORAGE_KEY = "underdog_session_id";
 const PROVIDER_STORAGE_KEY = "underdog_provider";
 let SESSION_ID = (function () {
@@ -215,14 +223,15 @@ function appendLogRow({ ts, ts_ms, type, text, score, event_type, keyword }) {
 async function ensureSessionAndConnect() {
   if (!SESSION_ID) {
     try {
-      const res = await fetch(API_BASE + "/auth/guest", { method: "POST" });
+        const res = await fetch(API_BASE + "/auth/guest", { method: "POST" });
       const data = await res.json().catch(() => ({}));
-      if (!data.ok || !data.session_id) {
-        const msg = data.detail || (res.ok ? "세션 ID를 받지 못했습니다." : "서버 오류 " + res.status);
+      const sid = data && (data.session_id ?? data.sessionId);
+      if (!data || !(data.ok === true || data.ok === "true") || !sid) {
+        const msg = (data && data.detail) || (res.ok ? "세션 ID를 받지 못했습니다." : "서버 오류 " + res.status);
         showToast("세션 발급 실패", msg, true);
         return false;
       }
-      SESSION_ID = data.session_id;
+      SESSION_ID = String(sid);
       try {
         localStorage.setItem(SESSION_STORAGE_KEY, SESSION_ID);
       } catch (_) {}
@@ -546,13 +555,14 @@ client.on("close", () => {
   btnFeedbackNo.disabled = true;
 });
 
-// 서버가 caption 보내면 (백엔드는 ts_ms 필드 사용)
+// 서버가 caption 보내면 (백엔드는 ts_ms 필드 사용). payload 래핑 대비 안전 접근
 client.on("caption", (msg) => {
-  const text = msg.text || "";
+  if (!msg || typeof msg !== "object") return;
+  const text = (msg.text ?? msg.payload?.text ?? "").toString();
   const danger = isDanger(text);
 
   appendCaption(text, danger);
-  appendLogRow({ ts_ms: msg.ts_ms, ts: msg.ts, type: "caption", text, score: msg.score });
+  appendLogRow({ ts_ms: msg.ts_ms ?? msg.payload?.ts_ms, ts: msg.ts ?? msg.payload?.ts, type: "caption", text, score: msg.score ?? msg.payload?.score });
 
   if (danger) {
     setHeroDanger(text);
@@ -561,15 +571,17 @@ client.on("caption", (msg) => {
   }
 });
 
-// 서버가 alert 보내면 (백엔드는 ts_ms, event_id 필드 사용)
+// 서버가 alert 보내면 (백엔드는 ts_ms, event_id 필드 사용). payload 래핑 대비 안전 접근
 client.on("alert", (msg) => {
-  const text = msg.text || "";
-  const keyword = msg.keyword || "";
-  const event_type = msg.event_type || "danger";
-  if (msg.event_id != null) lastAlertEventId = msg.event_id;
+  if (!msg || typeof msg !== "object") return;
+  const p = (msg && typeof msg.payload === "object" && msg.payload !== null) ? msg.payload : undefined;
+  const text = (msg.text ?? p?.text ?? "").toString();
+  const keyword = (msg.keyword ?? p?.keyword ?? "").toString();
+  const event_type = msg.event_type ?? p?.event_type ?? "danger";
+  if ((msg.event_id ?? p?.event_id) != null) lastAlertEventId = msg.event_id ?? p?.event_id;
 
   appendCaption(`[ALERT] ${text}`, true);
-  appendLogRow({ ts_ms: msg.ts_ms, ts: msg.ts, type: "alert", text, keyword, event_type, score: msg.score });
+  appendLogRow({ ts_ms: msg.ts_ms ?? p?.ts_ms, ts: msg.ts ?? p?.ts, type: "alert", text, keyword, event_type, score: msg.score ?? p?.score });
 
   setHeroDanger(`${keyword ? "["+keyword+"] " : ""}${text}`);
   showToast("알림", `${keyword ? "["+keyword+"] " : ""}${text}`, true);
@@ -662,16 +674,14 @@ async function loadUserInfo() {
   try {
     const res = await fetch(API_BASE + "/auth/me?session_id=" + encodeURIComponent(SESSION_ID));
     const data = await res.json().catch(() => ({}));
-    if (res.ok && data.ok) {
-      userDropdownName.textContent = data.name || "사용자";
-      userDropdownEmail.textContent = data.email || "-";
-    } else {
-      userDropdownName.textContent = "사용자";
-      userDropdownEmail.textContent = "-";
-    }
+    const ok = res.ok && data && (data.ok === true || data.ok === "true");
+    const name = (data && (data.name ?? data.user?.name)) || "사용자";
+    const email = (data && (data.email ?? data.user?.email)) || "-";
+    userDropdownName.textContent = ok ? name : "사용자";
+    userDropdownEmail.textContent = ok ? email : "-";
   } catch (_) {
-    userDropdownName.textContent = "사용자";
-    userDropdownEmail.textContent = "-";
+    if (userDropdownName) userDropdownName.textContent = "사용자";
+    if (userDropdownEmail) userDropdownEmail.textContent = "-";
   }
 }
 
@@ -711,6 +721,32 @@ function setupUserDropdown() {
     window.location.href = "/";
   });
 
+<<<<<<< HEAD
+=======
+  // mouseover 시 드롭다운 표시 (Bootstrap/요소 없으면 무시)
+  let hideTimer = null;
+  userDropdownWrap.addEventListener("mouseenter", () => {
+    if (hideTimer) clearTimeout(hideTimer);
+    try {
+      if (window.bootstrap && btnUserIcon) {
+        const dropdown = bootstrap.Dropdown.getOrCreateInstance(btnUserIcon);
+        if (dropdown) dropdown.show();
+      }
+    } catch (e) {
+      console.warn("[Lumen] dropdown show", e);
+    }
+  });
+  userDropdownWrap.addEventListener("mouseleave", () => {
+    hideTimer = setTimeout(() => {
+      try {
+        if (window.bootstrap && btnUserIcon) {
+          const dropdown = bootstrap.Dropdown.getInstance(btnUserIcon);
+          if (dropdown) dropdown.hide();
+        }
+      } catch (_) {}
+    }, 150);
+  });
+>>>>>>> yh_01
 }
 
 // 설정: 자막 글자 크기만 로드 (설정 페이지는 /settings-page 에서 편집)
@@ -726,17 +762,35 @@ async function loadSettingsForCaption() {
   try {
     const res = await fetch(API_BASE + "/settings?session_id=" + encodeURIComponent(SESSION_ID));
     const data = await res.json().catch(() => ({}));
-    if (res.ok && data?.ok && data?.data?.font_size != null) {
-      applyFontSizeToCaption(data.data.font_size);
+    const fontSize = data?.data?.font_size ?? data?.font_size;
+    if (res.ok && data?.ok && fontSize != null) {
+      applyFontSizeToCaption(fontSize);
     }
   } catch (_) {}
 }
 
-// Init
-updateMicStatusUI();
-setHeroNormal();
-updateSessionLabel();
-updateUserSection();
-updateLogSectionVisibility();
-setupUserDropdown();
-if (SESSION_ID) loadSettingsForCaption();
+// Init (한 곳에서 예외 나와도 나머지 동작하도록 보호)
+(function init() {
+  try {
+    updateMicStatusUI();
+    setHeroNormal();
+    updateSessionLabel();
+    updateUserSection();
+    updateLogSectionVisibility();
+    setupUserDropdown();
+    if (SESSION_ID) loadSettingsForCaption();
+  } catch (e) {
+    console.warn("[Lumen] init error", e);
+  }
+})();
+
+// 확장 프로그램 등 외부 스크립트(core.js 등) 또는 OAuth 에러 페이지에서 나는 unhandledrejection 처리
+// (예: Cannot read properties of undefined (reading 'payload')) — 앱 중단·콘솔 노이즈 방지
+window.addEventListener("unhandledrejection", function (ev) {
+  const msg = ev.reason && (ev.reason.message || String(ev.reason));
+  if (msg && typeof msg === "string" && (msg.includes("payload") || msg.includes("reading 'payload'"))) {
+    console.warn("[Lumen] 외부/OAuth 관련 예외로 보이는 rejection (무시):", msg);
+    ev.preventDefault();
+    ev.stopImmediatePropagation();
+  }
+});

@@ -132,3 +132,18 @@ class EventFeedback(Base):
     vote: Mapped[str] = mapped_column(String(8), nullable=False)  # "up" | "down"
     comment: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class DeviceToken(Base):
+    __tablename__ = "device_tokens"
+    __table_args__ = (
+        UniqueConstraint("token", name="uq_device_tokens_token"),
+    )
+
+    device_token_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.user_id"), nullable=True)
+    client_session_uuid: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    platform: Mapped[str] = mapped_column(String(16), default="android")  # android | ios | web
+    token: Mapped[str] = mapped_column(String(512), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

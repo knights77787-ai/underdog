@@ -5,3 +5,4 @@ sqlalchemy
 pydantic
 aiofiles
 websockets
+firebase-admin
