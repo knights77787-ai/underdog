@@ -9,20 +9,23 @@
 .navbar-login {
   background: #fff;
   border-bottom: 2px solid var(--lumen-primary);
-  padding: 0.75rem 1rem;
 }
 
 .navbar-brand-login {
   text-decoration: none;
 }
 
-/* 메인 영역 */
+/* 메인 영역 - footer-inner와 같은 max-width·padding으로 안쪽 정렬 */
 .login-main {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 2rem 1.5rem 3rem;
+  padding: 2rem 0.75rem 3rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* 히어로 섹션 */
@@ -92,7 +95,9 @@
   align-items: center;
   justify-content: center;
   gap: 0.6rem;
+  width: 100%;
   padding: 0.85rem 1.25rem;
+  min-height: 48px;
   font-size: 1rem;
   font-weight: 600;
   border-radius: 12px;
@@ -118,9 +123,10 @@
   color: var(--lumen-primary);
 }
 
-.btn-google i {
-  font-size: 1.2rem;
-  color: #4285f4;
+.btn-google .google-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
 }
 
 .btn-kakao {
@@ -135,6 +141,8 @@
 }
 
 .btn-kakao .kakao-icon {
+  width: 24px;
+  height: 24px;
   flex-shrink: 0;
 }
 
@@ -163,7 +171,7 @@
 
 @media (min-width: 576px) {
   .login-main {
-    padding: 3rem 2rem 4rem;
+    padding: 3rem 0.75rem 4rem;
   }
 
   .login-title {

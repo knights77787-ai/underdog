@@ -21,6 +21,13 @@ for _env_path in (_backend_dir / ".env", _repo_root_dir / ".env"):
 else:
     load_dotenv()
 
+# TensorFlow C++ 로그 억제 (INFO 메시지 안 보이게)
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")  # 0=all 1=INFO 2=WARN 3=ERROR only
+
+# 로깅 먼저 설정 (handlers/STT 로드 시 진행상황 출력)
+from App.Core.logging import setup_logging
+setup_logging(os.environ.get("LOG_LEVEL", "INFO").upper())
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
@@ -35,7 +42,7 @@ from App.Api.routes.custom_sounds import router as custom_sounds_router
 from App.Api.routes.logs import router as logs_router
 from App.Api.routes.settings import router as settings_router
 from App.Core.config import DATABASE_PATH
-from App.Core.logging import get_logger, setup_logging
+from App.Core.logging import get_logger
 from App.Services.audio_rules import reload_audio_rules
 from App.WS.audio_cls_worker import AudioClsWorker
 from App.WS.endpoint import router as ws_router
@@ -59,7 +66,6 @@ def _is_heavy_workers_enabled() -> bool:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
-    setup_logging(log_level)  # 서버가 무슨일을 했는지 콘솔/파일에 기록 남기는것
     create_tables()     # 서버 켤 때 한번 '없으면 생성' 을 해두는 안전장치.
     get_logger("app").info(
         "app_started level=%s db=%s", log_level, DATABASE_PATH
@@ -81,7 +87,9 @@ async def lifespan(app: FastAPI):
         return
 
     # 오디오 분류(Yamnet) worker: 비언어 1초 윈도우 → AUDIOCLS_QUEUE → 분류/alert
+    print("[시작] 오디오 룰 로드 중...", flush=True)
     reload_audio_rules()
+    print("[시작] 오디오 룰 로드 완료. YAMNet 워커 생성 중...", flush=True)
 
     async def _broadcast_yamnet(sid: str, entry: dict) -> None:
         await manager.broadcast_to_session(sid, entry)
@@ -122,6 +130,7 @@ async def lifespan(app: FastAPI):
     app.state.yamnet_task_2 = asyncio.create_task(
         app.state.yamnet_worker_2.run()
     )
+    print("[시작] YAMNet 워커 시작 완료. STT 워커 시작 중...", flush=True)
 
     # STT 큐 워커: VAD_END → STT_QUEUE → 3개 워커가 Whisper 병렬 처리
     app.state.stt_worker = SttWorker(handlers.STT_QUEUE)
@@ -130,6 +139,7 @@ async def lifespan(app: FastAPI):
     app.state.stt_task_2 = asyncio.create_task(app.state.stt_worker_2.run())
     app.state.stt_worker_3 = SttWorker(handlers.STT_QUEUE)
     app.state.stt_task_3 = asyncio.create_task(app.state.stt_worker_3.run())
+    print("[시작] STT 워커 시작 완료. 서버 준비됨.", flush=True)
 
     yield
 

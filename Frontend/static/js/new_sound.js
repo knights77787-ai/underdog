@@ -334,7 +334,7 @@ function renderSoundList(list) {
         <div class="sound-left">
           <div class="sound-title-line">
             <span class="sound-badge ${r.event_type === "danger" ? "danger" : "daily"}">
-              ${r.event_type === "danger" ? "경고" : "일상생활"}
+              ${r.event_type === "danger" ? "경고" : "생활알림"}
             </span>
             <span class="sound-name">${escapeHtml(r.name)}</span>
           </div>
@@ -716,15 +716,15 @@ btnSubmit?.addEventListener("click", async () => {
 // 새로운 소리 페이지는 로그인한 사용자만 접근 가능(드롭다운 '소리등록'으로만 진입).
 // session_id가 있으면 항상 사용자 아이콘 표시.
 async function updateUserSection() {
-  if (!btnLogin || !userDropdownWrap) return;
+  if (!userDropdownWrap) return;
   const urlSessionId = new URLSearchParams(document.location.search).get("session_id");
   if (!urlSessionId) {
-    btnLogin.classList.remove("d-none");
+    if (btnLogin) btnLogin.classList.remove("d-none");
     userDropdownWrap.classList.add("d-none");
     return;
   }
   // session_id 있음 = 로그인 사용자. 항상 사용자 아이콘 표시
-  btnLogin.classList.add("d-none");
+  if (btnLogin) btnLogin.classList.add("d-none");
   userDropdownWrap.classList.remove("d-none");
   try {
     const res = await fetch(API_BASE + "/auth/me?session_id=" + encodeURIComponent(urlSessionId));

@@ -25,6 +25,9 @@ class SttWorker:
                 logger.info("stt_worker_cancelled")
                 raise
             try:
+                if handlers.WHISPER is None:
+                    logger.warning("STT skipped: WHISPER not loaded (check OPENAI_API_KEY)")
+                    continue
                 logger.info(
                     "STT INPUT sid=%s samples=%s dtype=%s",
                     item["sid"],

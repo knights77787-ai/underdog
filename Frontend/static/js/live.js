@@ -182,7 +182,9 @@ function saveToLocalLog(entry) {
 
 function appendLogRow({ ts, ts_ms, type, text, score, event_type, keyword }) {
   const tr = document.createElement("tr");
-  const kind = (type === "alert") ? "경고" : "자막";
+  const kind = (type === "alert")
+    ? (event_type === "danger" ? "경고" : "생활알림")
+    : "자막";
   const prob = (typeof score === "number") ? `${Math.round(score * 100)}%` : "-";
   const extra = keyword ? ` [${keyword}]` : "";
   const timeStr = formatTs(ts_ms ?? ts);
@@ -288,7 +290,7 @@ function stopMicAndRelease() {
     micStream = null;
   }
   updateMicStatusUI();
-  micTitle.textContent = "소리 감지 대기중";
+  micTitle.textContent = "마이크 대기 중";
   micDesc.textContent = "마이크 사용 승인이 필요합니다.";
 }
 
@@ -476,8 +478,8 @@ async function startAudioSend() {
       audioSource.connect(audioProcessor);
       audioProcessor.connect(gain);
     }
-    micTitle.textContent = "마이크 전송 중";
-    micDesc.textContent = "실시간 음성을 서버로 전송 중입니다.";
+    micTitle.textContent = "소리 듣는 중";
+    micDesc.textContent = "주변 소리를 감지하고 있어요.";
     if (btnMic) btnMic.textContent = "마이크 중단";
     updateMicStatusUI();
   } catch (e) {
@@ -524,8 +526,8 @@ client.on("open", () => {
 
   if (btnMic) btnMic.textContent = micStream ? "마이크 중단" : "마이크 실행";
   updateMicStatusUI();
-  micTitle.textContent = micStream ? "마이크 전송 시작" : "소리 감지 대기중";
-  micDesc.textContent  = micStream ? "실시간 음성을 서버로 전송 중입니다." : "마이크 권한 요청 후 전송됩니다.";
+  micTitle.textContent = micStream ? "소리 듣는 중" : "마이크 대기 중";
+  micDesc.textContent  = micStream ? "주변 소리를 감지하고 있어요." : "마이크를 켜면 이벤트를 감지해요.";
   // join이 서버에서 처리된 뒤 오디오 전송 시작 (STT 수신 보장)
   if (micStream && SESSION_ID) {
     setTimeout(() => startAudioSend().catch(console.error), 150);
@@ -624,14 +626,14 @@ function isGuest() {
 }
 
 function updateUserSection() {
-  if (!btnLogin || !userDropdownWrap) return;
+  if (!userDropdownWrap) return;
   const provider = getProvider();
   if (provider === "google" || provider === "kakao") {
-    btnLogin.classList.add("d-none");
+    if (btnLogin) btnLogin.classList.add("d-none");
     userDropdownWrap.classList.remove("d-none");
     if (SESSION_ID) loadUserInfo();
   } else {
-    btnLogin.classList.remove("d-none");
+    if (btnLogin) btnLogin.classList.remove("d-none");
     userDropdownWrap.classList.add("d-none");
   }
   updateLogSectionVisibility();
