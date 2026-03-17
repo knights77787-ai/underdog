@@ -1,5 +1,14 @@
 const API_BASE = window.APP_CONFIG?.API_BASE || "http://127.0.0.1:8000";
 const SESSION_STORAGE_KEY = "underdog_session_id";
+const PROVIDER_STORAGE_KEY = "underdog_provider";
+
+function getProvider() {
+  try {
+    return (localStorage.getItem(PROVIDER_STORAGE_KEY) || "").toLowerCase();
+  } catch (_) {
+    return "";
+  }
+}
 // 라이브와 동일한 session_id 사용 → 등록한 소리가 실시간 감지에 연동됨
 let SESSION_ID = (function () {
   const params = new URLSearchParams(document.location.search);
@@ -714,20 +723,22 @@ btnSubmit?.addEventListener("click", async () => {
 
 // ===== 사용자 섹션 =====
 // 새로운 소리 페이지는 로그인한 사용자만 접근 가능(드롭다운 '소리등록'으로만 진입).
-// session_id가 있으면 항상 사용자 아이콘 표시.
+// session_id + provider(google/kakao)가 있으면 사용자 드롭다운 표시.
 async function updateUserSection() {
   if (!userDropdownWrap) return;
   const urlSessionId = new URLSearchParams(document.location.search).get("session_id");
-  if (!urlSessionId) {
+  const provider = getProvider();
+  const showDropdown =
+    urlSessionId && (provider === "google" || provider === "kakao");
+  if (!showDropdown) {
     if (btnLogin) btnLogin.classList.remove("d-none");
     userDropdownWrap.classList.add("d-none");
     return;
   }
-  // session_id 있음 = 로그인 사용자. 항상 사용자 아이콘 표시
   if (btnLogin) btnLogin.classList.add("d-none");
   userDropdownWrap.classList.remove("d-none");
   try {
-    const res = await fetch(API_BASE + "/auth/me?session_id=" + encodeURIComponent(urlSessionId));
+    const res = await fetch(API_BASE + "/auth/me?session_id=" + encodeURIComponent(urlSessionId || ""));
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.ok) {
       if (userDropdownName) userDropdownName.textContent = data.name || "사용자";
@@ -761,21 +772,11 @@ function setupUserDropdown() {
 
   userDropdownLogout.addEventListener("click", (e) => {
     e.preventDefault();
+    try {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+      localStorage.removeItem(PROVIDER_STORAGE_KEY);
+    } catch (_) {}
     window.location.href = "/";
-  });
-
-  // 마우스 올리면 드롭다운 표시
-  let hideTimer = null;
-  userDropdownWrap.addEventListener("mouseenter", () => {
-    if (hideTimer) clearTimeout(hideTimer);
-    const dropdown = bootstrap.Dropdown.getOrCreateInstance(btnUserIcon);
-    dropdown.show();
-  });
-  userDropdownWrap.addEventListener("mouseleave", () => {
-    hideTimer = setTimeout(() => {
-      const dropdown = bootstrap.Dropdown.getInstance(btnUserIcon);
-      if (dropdown) dropdown.hide();
-    }, 150);
   });
 }
 

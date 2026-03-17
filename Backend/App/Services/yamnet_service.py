@@ -1,5 +1,8 @@
 # App/Services/yamnet_service.py
 import csv
+import os
+import shutil
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -7,6 +10,11 @@ import tensorflow as tf
 import tensorflow_hub as hub
 
 from App.Core.config import YAMNET_CLASS_MAP_PATH
+
+# TFHub 기본 캐시 경로 (손상된 캐시 삭제용, resolver와 동일)
+_TFHUB_CACHE = os.environ.get("TFHUB_CACHE_DIR") or os.path.join(
+    tempfile.gettempdir(), "tfhub_modules"
+)
 
 
 def _load_class_map(path: Path) -> dict[int, str]:
@@ -26,10 +34,30 @@ def _load_class_map(path: Path) -> dict[int, str]:
     return out
 
 
+def _load_yamnet(model_url: str):
+    """캐시 손상 시 재다운로드 retry."""
+    try:
+        return hub.load(model_url)
+    except ValueError as e:
+        err_msg = str(e)
+        if "saved_model.pb" in err_msg and "saved_model.pbtxt" in err_msg:
+            cache = Path(_TFHUB_CACHE)
+            if cache.exists():
+                print("[YAMNet] 캐시 손상 감지, 삭제 후 재다운로드 시도...", flush=True)
+                try:
+                    shutil.rmtree(cache)
+                except OSError as ex:
+                    print(f"[YAMNet] 캐시 삭제 실패: {ex}", flush=True)
+                return hub.load(model_url)
+        raise
+    except Exception:
+        raise
+
+
 class YamnetService:
     def __init__(self, model_url: str = "https://tfhub.dev/google/yamnet/1"):
         print("[YAMNet] 모델 로드 중... (최초 1회 다운로드 시 수십 초 소요)", flush=True)
-        self.model = hub.load(model_url)
+        self.model = _load_yamnet(model_url)
         self.index_to_label = _load_class_map(YAMNET_CLASS_MAP_PATH)
         print("[YAMNet] 모델 로드 완료.", flush=True)
 

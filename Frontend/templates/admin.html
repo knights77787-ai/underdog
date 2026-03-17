@@ -11,7 +11,10 @@
 <body class="bg-light">
   <nav class="navbar bg-white border-bottom shadow-sm">
     <div class="container-fluid">
-      <a class="navbar-brand fw-bold" href="/admin">Underdog</a>
+      <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="/admin">
+        <img src="/static/img/lumen_logo.png" alt="Lumen" width="70" height="50">
+        Lumen
+      </a>
       <div class="d-flex align-items-center gap-2">
         <span class="text-muted small">관리자 대시보드</span>
         <form id="logoutForm" action="/auth/admin/logout" method="post" class="d-inline">
