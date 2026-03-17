@@ -1,4 +1,5 @@
-const API_BASE = window.APP_CONFIG?.API_BASE || "http://127.0.0.1:8000";
+// 배포(HTTPS)에서는 config 미적재 시에도 현재 오리진 사용 (API/WS 도메인 일치)
+const API_BASE = window.APP_CONFIG?.API_BASE || (typeof location !== "undefined" && location.origin && !/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/i.test(location.origin) ? location.origin : "http://127.0.0.1:8000");
 const SESSION_STORAGE_KEY = "underdog_session_id";
 // 라이브와 동일한 session_id 사용 → 등록한 소리가 실시간 감지에 연동됨
 let SESSION_ID = (function () {
