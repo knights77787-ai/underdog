@@ -20,14 +20,14 @@
 
   <!-- Topbar -->
   <nav class="navbar bg-white border-bottom">
-    <div class="container-fluid d-flex align-items-center gap-2 flex-wrap">
+    <div class="header-inner container-fluid d-flex align-items-center gap-2 flex-wrap">
       <a href="/" class="fw-bold text-dark text-decoration-none">
         <img src="/static/img/lumen_logo.png" alt="Lumen" width="70" height="50">
       </a>
 
       <span id="sessionLabel" class="small text-muted ms-2 d-none d-md-inline"></span>
 
-      <!-- 기록저장 / 설정 / 로그인 (오른쪽 정렬) -->
+      <!-- 기록저장 / 설정 / 사용자 (오른쪽 정렬) -->
       <div class="ms-auto d-flex align-items-center gap-2">
         <div class="d-flex align-items-center gap-2" id="saveToggleWrap">
           <span class="small text-muted">기록저장</span>
@@ -35,9 +35,6 @@
             <input class="form-check-input" type="checkbox" role="switch" id="saveToggle">
           </div>
         </div>
-        <!-- 로그인 버튼 (게스트): /login 이동 -->
-        <a id="btnLogin" href="/login" class="btn btn-sm border-0 text-body" aria-label="로그인">로그인</a>
-
         <!-- 사용자 아이콘 + 드롭다운 (로그인 후) -->
         <div id="userDropdownWrap" class="dropdown d-none">
           <button id="btnUserIcon" class="btn btn-sm border-0 dropdown-toggle d-flex align-items-center" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" aria-label="사용자 메뉴">
@@ -60,7 +57,8 @@
   </nav>
 
   <main class="container-fluid py-3" id="mainContent">
-    <div class="row g-3" id="mainContentRow">
+    <div class="main-inner">
+      <div class="row g-3" id="mainContentRow">
       <!-- 경고 알림 표시 섹션 (상단) -->
       <div class="col-12">
         <div class="card shadow-sm">
@@ -93,8 +91,8 @@
             <div id="micStatusCard" class="mic-status-indicator mic-status-card mic-off mb-2" title="마이크 끔" aria-label="마이크 끔">
               <i class="bi bi-mic-mute-fill mic-status-icon"></i>
             </div>
-            <div class="fw-semibold" id="micTitle">소리 감지 대기중</div>
-            <div class="text-muted small" id="micDesc">마이크 사용 승인이 필요합니다.</div>
+            <div class="fw-semibold" id="micTitle">마이크 대기 중</div>
+            <div class="text-muted small" id="micDesc">마이크를 켜면 이벤트를 감지해요.</div>
 
             <button id="btnMic" class="btn btn-sm btn-outline-primary mt-3">
               마이크 실행
@@ -148,6 +146,7 @@
         </div>
       </div>
     </div>
+    </div>
   </main>
 
   <footer class="app-footer">
@@ -158,7 +157,6 @@
       </div>
       <div class="footer-links">
         <a href="/">홈</a>
-        <a href="/login">로그인</a>
         <a href="/new-sound">소리 등록</a>
         <a href="/settings-page">설정</a>
       </div>
@@ -207,7 +205,7 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
-          <button type="button" class="btn btn-primary" id="micStopConfirm">승인</button>
+          <button type="button" class="btn btn-primary" id="micStopConfirm">확인</button>
         </div>
       </div>
     </div>

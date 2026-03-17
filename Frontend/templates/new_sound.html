@@ -14,13 +14,11 @@
 <body class="bg-light">
 
   <nav class="navbar navbar-expand bg-white border-bottom shadow-sm">
-    <div class="container-fluid d-flex align-items-center gap-2 flex-wrap px-3">
+    <div class="header-inner container-fluid d-flex align-items-center gap-2 flex-wrap">
       <a href="/" class="fw-bold text-dark text-decoration-none">
         <img src="/static/img/lumen_logo.png" alt="Lumen" width="70" height="50">
       </a>
       <div class="ms-auto d-flex align-items-center gap-2">
-        <!-- 로그인 버튼 (게스트): /login 이동 -->
-        <a id="btnLogin" href="/login" class="btn btn-sm border-0 text-body" aria-label="로그인">로그인</a>
         <!-- 사용자 아이콘 + 드롭다운 (로그인 후) -->
         <div id="userDropdownWrap" class="dropdown d-none">
           <button id="btnUserIcon" class="btn btn-sm border-0 dropdown-toggle d-flex align-items-center" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" aria-label="사용자 메뉴">
@@ -43,7 +41,8 @@
   </nav>
 
   <main class="container-fluid py-4">
-    <div class="center-shell">
+    <div class="main-inner">
+      <div class="center-shell">
       <div class="card shadow-sm border-0 main-card">
         <div class="card-body p-4 p-lg-5">
 
@@ -145,8 +144,8 @@
                 <label for="soundCategory" class="form-label fw-semibold">소리 알림 분류</label>
                 <select id="soundCategory" class="form-select">
                   <option value="">선택</option>
-                  <option value="danger">위험/경고 소리</option>
-                  <option value="alert">생활알림 소리</option>
+                  <option value="danger">위험/경고</option>
+                  <option value="alert">생활알림</option>
                 </select>
               </div>
 
@@ -187,6 +186,7 @@
         </div> <!-- end of card-body-->
       </div>
     </div>
+    </div>
   </main>
 
   <footer class="app-footer">
@@ -198,7 +198,6 @@
       <div class="footer-links">
         <a href="/">홈</a>
         <a href="/live">라이브</a>
-        <a href="/login">로그인</a>
         <a href="/settings-page">설정</a>
       </div>
       <div class="footer-copy">© Lumen. 실시간 자막·소리 감지 서비스.</div>

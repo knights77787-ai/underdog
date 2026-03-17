@@ -13,7 +13,7 @@
 </head>
 <body class="bg-light settings-page">
   <nav class="navbar bg-white border-bottom">
-    <div class="container-fluid d-flex align-items-center gap-2 flex-wrap">
+    <div class="header-inner container-fluid d-flex align-items-center gap-2 flex-wrap">
       <a href="/" class="fw-bold text-dark text-decoration-none">
         <img src="/static/img/lumen_logo.png" alt="Lumen" width="70" height="50">
       </a>
@@ -21,8 +21,9 @@
     </div>
   </nav>
 
-  <main class="container py-5">
-    <div class="row justify-content-center">
+  <main class="container-fluid py-5">
+    <div class="main-inner">
+      <div class="row justify-content-center">
       <div class="col-12 col-md-8 col-lg-6">
         <div class="card shadow-sm">
           <div class="card-header fw-semibold">설정</div>
@@ -61,6 +62,7 @@
         </div>
       </div>
     </div>
+    </div>
   </main>
 
   <footer class="app-footer">
@@ -73,7 +75,6 @@
         <a href="/">홈</a>
         <a href="/live">라이브</a>
         <a href="/new-sound">소리 등록</a>
-        <a href="/login">로그인</a>
       </div>
       <div class="footer-copy">© Lumen. 실시간 자막·소리 감지 서비스.</div>
     </div>

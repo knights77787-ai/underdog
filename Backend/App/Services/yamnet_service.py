@@ -28,8 +28,10 @@ def _load_class_map(path: Path) -> dict[int, str]:
 
 class YamnetService:
     def __init__(self, model_url: str = "https://tfhub.dev/google/yamnet/1"):
+        print("[YAMNet] 모델 로드 중... (최초 1회 다운로드 시 수십 초 소요)", flush=True)
         self.model = hub.load(model_url)
         self.index_to_label = _load_class_map(YAMNET_CLASS_MAP_PATH)
+        print("[YAMNet] 모델 로드 완료.", flush=True)
 
     def predict_index(self, waveform_16k_f32: np.ndarray) -> tuple[int, float]:
         """

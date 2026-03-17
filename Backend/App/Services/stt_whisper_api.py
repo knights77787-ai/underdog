@@ -85,11 +85,9 @@ class WhisperAPISTT:
             audio.dtype,
         )
         wav_bytes = _float32_16k_to_wav_bytes(audio)
-        prompt = (initial_prompt or "").strip() 
+        prompt = (initial_prompt or "").strip()
         if not prompt:
-            prompt = "일상 대화, 안전, 안내 방송, 한국어"  # 기본 힌트트
-        
-        prompt = prompt or None
+            prompt = "일상 대화, 안전, 안내 방송, 한국어"  # 기본 힌트
         try:
             with httpx.Client(timeout=30.0) as client:
                 resp = client.post(
