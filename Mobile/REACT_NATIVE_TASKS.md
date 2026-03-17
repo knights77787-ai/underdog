@@ -11,7 +11,7 @@
 |---|------|------|
 | 0-1 | Expo 프로젝트 생성 | `Mobile/underdog-mobile` (TypeScript, blank-typescript) |
 | 0-2 | 의존성 설치 | `expo-av`, `@react-navigation/native`, `react-native-screens`, `react-native-safe-area-context` |
-| 0-3 | API/WS 설정 | `src/config.ts` – `API_BASE` / `WS_URL` (기본: `https://api.lumen.ai.kr`, `wss://api.lumen.ai.kr/ws`) |
+| 0-3 | API/WS 설정 | `src/config.ts` – `API_BASE` / `WS_URL` (기본: `https://lumen.ai.kr`, `wss://lumen.ai.kr/ws`) |
 | 0-4 | 네트워크 테스트 | `underdog-mobile/README.md` 참고 – REST는 `/health`, WS는 Phase 3에서 연결 시 확인 |
 
 ---
