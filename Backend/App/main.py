@@ -93,39 +93,26 @@ async def lifespan(app: FastAPI):
         return
 
     # 오디오 분류(Yamnet) worker: 비언어 1초 윈도우 → AUDIOCLS_QUEUE → 분류/alert
-<<<<<<< HEAD
     print("[시작] 오디오 룰 로드 중...", flush=True)
     reload_audio_rules()
     print("[시작] 오디오 룰 로드 완료. YAMNet 워커 생성 중...", flush=True)
-=======
-<<<<<<< HEAD
-    print("[시작] 오디오 룰 로드 중...", flush=True)
-    reload_audio_rules()
-    print("[시작] 오디오 룰 로드 완료. YAMNet 워커 생성 중...", flush=True)
-=======
-    # 메모리 사용량이 커서 Render 등 제한된 환경에서는 ENABLE_YAMNET=0 으로 비활성화 가능.
-    if _is_yamnet_enabled():
-        reload_audio_rules()
->>>>>>> ym04
->>>>>>> develop
 
-        async def _broadcast_yamnet(sid: str, entry: dict) -> None:
-            await manager.broadcast_to_session(sid, entry)
+    async def _broadcast_yamnet(sid: str, entry: dict) -> None:
+        await manager.broadcast_to_session(sid, entry)
 
-        def _persist_alert_and_record_ts(
+    def _persist_alert_and_record_ts(
+        sid, text, keyword, event_type, ts_ms,
+        *, matched_custom_sound_id=None, custom_similarity=None,
+    ):
+        """DB 저장 + 쿨다운 기록. event_id 반환 (커스텀 사운드 등 WS 브로드캐스트용)."""
+        event_id = handlers._persist_alert(
             sid, text, keyword, event_type, ts_ms,
-            *, matched_custom_sound_id=None, custom_similarity=None,
-        ):
-            """DB 저장 + 쿨다운 기록. event_id 반환 (커스텀 사운드 등 WS 브로드캐스트용)."""
-            event_id = handlers._persist_alert(
-                sid, text, keyword, event_type, ts_ms,
-                matched_custom_sound_id=matched_custom_sound_id,
-                custom_similarity=custom_similarity,
-            )
-            handlers.record_alert_ts(sid, keyword, event_type, ts_ms)
-            return event_id
+            matched_custom_sound_id=matched_custom_sound_id,
+            custom_similarity=custom_similarity,
+        )
+        handlers.record_alert_ts(sid, keyword, event_type, ts_ms)
+        return event_id
 
-<<<<<<< HEAD
     # YAMNet 워커 2개로 처리 속도 향상 (큐 적체 완화)
     app.state.yamnet_worker = AudioClsWorker(
         handlers.AUDIOCLS_QUEUE,
@@ -150,40 +137,6 @@ async def lifespan(app: FastAPI):
         app.state.yamnet_worker_2.run()
     )
     print("[시작] YAMNet 워커 시작 완료. STT 워커 시작 중...", flush=True)
-<<<<<<< HEAD
-=======
-=======
-        # YAMNet 워커 2개로 처리 속도 향상 (큐 적체 완화)
-        app.state.yamnet_worker = AudioClsWorker(
-            handlers.AUDIOCLS_QUEUE,
-            _broadcast_yamnet,
-            _persist_alert_and_record_ts,
-            lambda sid, kw, et, cooldown_sec, ts_ms: handlers._is_in_cooldown(
-                sid, kw, et, cooldown_sec, ts_ms
-            ),
-        )
-        app.state.yamnet_worker_2 = AudioClsWorker(
-            handlers.AUDIOCLS_QUEUE,
-            _broadcast_yamnet,
-            _persist_alert_and_record_ts,
-            lambda sid, kw, et, cooldown_sec, ts_ms: handlers._is_in_cooldown(
-                sid, kw, et, cooldown_sec, ts_ms
-            ),
-        )
-        app.state.yamnet_task = asyncio.create_task(
-            app.state.yamnet_worker.run()
-        )
-        app.state.yamnet_task_2 = asyncio.create_task(
-            app.state.yamnet_worker_2.run()
-        )
-    else:
-        get_logger("app").info("ENABLE_YAMNET not set; skipping yamnet workers (STT only)")
-        app.state.yamnet_worker = None
-        app.state.yamnet_worker_2 = None
-        app.state.yamnet_task = None
-        app.state.yamnet_task_2 = None
->>>>>>> ym04
->>>>>>> develop
 
     # STT 큐 워커: VAD_END → STT_QUEUE → 3개 워커가 Whisper 병렬 처리
     app.state.stt_worker = SttWorker(handlers.STT_QUEUE)
