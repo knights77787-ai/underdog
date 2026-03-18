@@ -212,6 +212,27 @@
     </div>
   </div>
 
+  <!-- 오탐 피드백 모달: 이벤트 정보 + comment 필수 -->
+  <div class="modal fade" id="feedbackCommentModal" tabindex="-1" aria-labelledby="feedbackCommentModalLabel" aria-hidden="true" inert>
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="feedbackCommentModalLabel">아니에요(오탐) 피드백</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+        </div>
+        <div class="modal-body">
+          <div id="feedbackModalEventInfo" class="mb-3 p-2 rounded bg-light small"></div>
+          <label for="feedbackCommentInput" class="form-label">코멘트 <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="feedbackCommentInput" placeholder="오탐 이유를 한 줄로 적어주세요" maxlength="255" required>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+          <button type="button" class="btn btn-primary" id="feedbackCommentSubmit">제출</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast container -->
   <div class="toast-container position-fixed top-0 end-0 p-3" id="toastContainer"></div>
 

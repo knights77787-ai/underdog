@@ -43,8 +43,8 @@ if (SESSION_ID) {
     localStorage.setItem(SESSION_STORAGE_KEY, SESSION_ID);
   } catch (_) {}
 }
-// 피드백 대상: 가장 최근 수신한 alert의 event_id
-let lastAlertEventId = null;
+// 피드백 대상: 가장 최근 수신한 alert 정보
+let lastAlertEventInfo = null;
 
 // 마이크 → audio_chunk 전송
 let micStream = null;
@@ -576,7 +576,11 @@ client.on("alert", (msg) => {
   const text = (msg.text ?? p?.text ?? "").toString();
   const keyword = (msg.keyword ?? p?.keyword ?? "").toString();
   const event_type = msg.event_type ?? p?.event_type ?? "danger";
-  if ((msg.event_id ?? p?.event_id) != null) lastAlertEventId = msg.event_id ?? p?.event_id;
+  const event_id = msg.event_id ?? p?.event_id;
+  const ts_ms = msg.ts_ms ?? p?.ts_ms;
+  if (event_id != null) {
+    lastAlertEventInfo = { event_id, text, keyword, event_type, ts_ms };
+  }
 
   appendLogRow({ ts_ms: msg.ts_ms ?? p?.ts_ms, ts: msg.ts ?? p?.ts, type: "alert", text, keyword, event_type, score: msg.score ?? p?.score });
 
@@ -585,25 +589,28 @@ client.on("alert", (msg) => {
   vibrateByLevel(event_type);
 });
 
-// Feedback: POST /feedback (event_id, vote, session_id)
-async function sendFeedback(vote) {
-  if (lastAlertEventId == null) {
+// Feedback: 맞아요=즉시 POST, 아니에요=모달에서 comment 필수 후 POST
+async function sendFeedback(vote, comment) {
+  if (!lastAlertEventInfo) {
     showToast("피드백", "대상 알림이 없습니다. 알림이 온 뒤에 눌러주세요.", true);
     return;
   }
+  const body = {
+    event_id: lastAlertEventInfo.event_id,
+    vote: vote,
+    session_id: SESSION_ID || undefined,
+  };
+  if (comment != null && comment.trim() !== "") body.comment = comment.trim();
   try {
     const res = await fetch(API_BASE + "/feedback", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        event_id: lastAlertEventId,
-        vote: vote,
-        session_id: SESSION_ID || undefined,
-      }),
+      body: JSON.stringify(body),
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.ok) {
       showToast("피드백", "저장되었습니다.", false);
+      lastAlertEventInfo = null;  // 제출 후 초기화
     } else {
       showToast("피드백 실패", data.detail || res.statusText || "다시 시도해 주세요.", true);
     }
@@ -611,8 +618,48 @@ async function sendFeedback(vote) {
     showToast("오류", "연결할 수 없습니다. 서버를 확인하세요.", true);
   }
 }
+
+function showFeedbackCommentModal() {
+  if (!lastAlertEventInfo) {
+    showToast("피드백", "대상 알림이 없습니다.", true);
+    return;
+  }
+  const info = lastAlertEventInfo;
+  const kind = info.event_type === "danger" ? "위험/경고" : info.event_type === "caution" ? "주의" : "일상";
+  const timeStr = formatTs(info.ts_ms);
+  const eventInfoEl = document.getElementById("feedbackModalEventInfo");
+  const inputEl = document.getElementById("feedbackCommentInput");
+  if (eventInfoEl) {
+    eventInfoEl.innerHTML = `<strong>${kind}</strong> · ${info.keyword ? "[" + info.keyword + "] " : ""}${info.text || "-"} · ${timeStr}`;
+  }
+  if (inputEl) inputEl.value = "";
+  const modal = new bootstrap.Modal(document.getElementById("feedbackCommentModal"));
+  modal.show();
+  inputEl?.focus();
+}
+
+function setupFeedbackCommentModal() {
+  const modalEl = document.getElementById("feedbackCommentModal");
+  const inputEl = document.getElementById("feedbackCommentInput");
+  const submitBtn = document.getElementById("feedbackCommentSubmit");
+  if (!modalEl || !inputEl || !submitBtn) return;
+  modalEl.addEventListener("shown.bs.modal", () => modalEl.removeAttribute("inert"));
+  modalEl.addEventListener("hidden.bs.modal", () => modalEl.setAttribute("inert", ""));
+  submitBtn.addEventListener("click", () => {
+    const comment = (inputEl.value || "").trim();
+    if (!comment) {
+      showToast("피드백", "코멘트를 입력해 주세요.", true);
+      inputEl.focus();
+      return;
+    }
+    bootstrap.Modal.getInstance(modalEl)?.hide();
+    sendFeedback("down", comment);
+  });
+}
+
 btnFeedbackYes.addEventListener("click", () => sendFeedback("up"));
-btnFeedbackNo.addEventListener("click", () => sendFeedback("down"));
+btnFeedbackNo.addEventListener("click", () => showFeedbackCommentModal());
+setupFeedbackCommentModal();
 
 function updateSessionLabel() {
   if (sessionLabel) sessionLabel.textContent = SESSION_ID ? "세션: " + SESSION_ID.slice(0, 8) + "…" : "";

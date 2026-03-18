@@ -13,10 +13,9 @@
     <div class="container-fluid">
       <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="/admin">
         <img src="/static/img/lumen_logo.png" alt="Lumen" width="70" height="50">
-        Lumen
+        관리자 대시보드
       </a>
       <div class="d-flex align-items-center gap-2">
-        <span class="text-muted small">관리자 대시보드</span>
         <form id="logoutForm" action="/auth/admin/logout" method="post" class="d-inline">
           <button type="submit" class="btn btn-outline-secondary btn-sm">로그아웃</button>
         </form>
@@ -40,82 +39,47 @@
       </div>
     </section>
 
-    <!-- 2. 이벤트·알림 -->
+    <!-- 2. 피드백 목록 -->
     <section class="mb-4">
-      <h2 class="h6 fw-bold mb-3 text-secondary">2. 이벤트·알림</h2>
+      <h2 class="h6 fw-bold mb-3 text-secondary">2. 피드백 목록</h2>
       <div class="card shadow-sm">
         <div class="card-header d-flex flex-wrap align-items-center gap-2 py-2">
-          <div class="d-flex gap-2 flex-wrap">
-            <input type="date" id="filterDate" class="form-control form-control-sm" style="width:auto">
-            <input type="text" id="filterSession" class="form-control form-control-sm" placeholder="세션 ID" style="width:8rem">
-            <button id="btnLoadAlerts" class="btn btn-sm btn-primary">조회</button>
-          </div>
-          <span id="summaryText" class="ms-auto small text-muted"></span>
+          <input type="date" id="filterDateFrom" class="form-control form-control-sm" style="width:auto" title="시작일">
+          <span class="text-muted">~</span>
+          <input type="date" id="filterDateTo" class="form-control form-control-sm" style="width:auto" title="종료일">
+          <select id="filterEventType" class="form-select form-select-sm" style="width:auto">
+            <option value="">전체 분류</option>
+            <option value="danger">위험/경고</option>
+            <option value="caution">주의</option>
+            <option value="alert">일상</option>
+          </select>
+          <select id="filterVote" class="form-select form-select-sm" style="width:auto">
+            <option value="">전체</option>
+            <option value="up">맞아요</option>
+            <option value="down">아니에요(오탐)</option>
+          </select>
+          <button id="btnLoadFeedback" class="btn btn-sm btn-primary">조회</button>
         </div>
         <div class="card-body p-0">
           <div class="table-responsive">
-            <table class="table table-sm table-hover mb-0">
+            <table class="table table-sm mb-0">
               <thead class="table-light">
                 <tr>
-                  <th style="width:90px">시간</th>
-                  <th style="width:70px">유형</th>
-                  <th style="width:120px">키워드</th>
+                  <th style="width:90px">일시</th>
+                  <th style="width:70px">구분</th>
+                  <th style="width:90px">분류</th>
+                  <th style="width:100px">키워드</th>
                   <th>내용</th>
-                  <th style="width:90px">세션</th>
+                  <th style="width:80px">세션</th>
+                  <th style="width:120px">코멘트</th>
                 </tr>
               </thead>
-              <tbody id="alertsTbody"></tbody>
+              <tbody id="feedbackTbody"></tbody>
             </table>
           </div>
-          <div class="card-footer py-2">
-            <button id="btnLoadMoreAlerts" class="btn btn-sm btn-outline-secondary" style="display:none">더 보기</button>
-            <span id="alertsStatus" class="ms-2 small text-muted"></span>
-          </div>
         </div>
-        <div id="alertsError" class="alert alert-warning py-2 mx-3 mb-3 d-none"></div>
-      </div>
-    </section>
-
-    <!-- 3. 피드백 분석 -->
-    <section class="mb-4">
-      <h2 class="h6 fw-bold mb-3 text-secondary">3. 피드백 분석</h2>
-      <div class="row g-3">
-        <!-- 키워드별 피드백 -->
-        <div class="col-12 col-lg-7">
-          <div class="card shadow-sm h-100">
-            <div class="card-header py-2 fw-semibold">키워드별 피드백 (down_rate 순)</div>
-            <div class="card-body p-0">
-              <div class="table-responsive">
-                <table class="table table-sm mb-0">
-                  <thead class="table-light">
-                    <tr>
-                      <th>키워드</th>
-                      <th>유형</th>
-                      <th>up</th>
-                      <th>down</th>
-                      <th>down_rate</th>
-                    </tr>
-                  </thead>
-                  <tbody id="feedbackSummaryTbody"></tbody>
-                </table>
-              </div>
-            </div>
-            <div id="feedbackSummaryEmpty" class="card-body text-muted small d-none">피드백 데이터가 없습니다.</div>
-            <div id="feedbackSummaryError" class="alert alert-warning py-2 mx-3 mb-3 d-none"></div>
-          </div>
-        </div>
-        <!-- 오탐 의심 키워드 -->
-        <div class="col-12 col-lg-5">
-          <div class="card shadow-sm h-100">
-            <div class="card-header py-2 fw-semibold">오탐 의심 키워드</div>
-            <div class="card-body">
-              <p class="small text-muted mb-2">down ≥ 60%, 건수 ≥ 5 건</p>
-              <ul id="feedbackSuspectsList" class="list-group list-group-flush list-group-sm"></ul>
-              <div id="feedbackSuspectsEmpty" class="text-muted small d-none">해당 조건의 키워드가 없습니다.</div>
-            </div>
-            <div id="feedbackSuspectsError" class="alert alert-warning py-2 mx-3 mb-3 d-none"></div>
-          </div>
-        </div>
+        <div id="feedbackEmpty" class="card-body text-muted small d-none">피드백 데이터가 없습니다.</div>
+        <div id="feedbackError" class="alert alert-warning py-2 mx-3 mb-3 d-none"></div>
       </div>
     </section>
   </main>
