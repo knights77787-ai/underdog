@@ -49,38 +49,43 @@
       <div class="card shadow-sm border-0 main-card">
         <div class="card-body p-4 p-lg-5">
 
-          <!-- Bootstrap Toggleable 메뉴 Tabs -->
-          <ul class="nav nav-tabs sound-tabs mb-4" role="tablist">
-            <li class="nav-item" role="presentation">
-              <button
-                class="nav-link active"
-                id="register-tab"
-                data-bs-toggle="tab"
-                data-bs-target="#registerPanel"
-                type="button"
-                role="tab"
-                aria-controls="registerPanel"
-                aria-selected="true"
-              >
-                새로운 소리 등록
-              </button>
-            </li>
+          <!-- Bootstrap Toggleable 메뉴 Tabs + 도움말 -->
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+            <ul class="nav nav-tabs sound-tabs mb-0" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button
+                  class="nav-link active"
+                  id="register-tab"
+                  data-bs-toggle="tab"
+                  data-bs-target="#registerPanel"
+                  type="button"
+                  role="tab"
+                  aria-controls="registerPanel"
+                  aria-selected="true"
+                >
+                  새로운 소리 등록
+                </button>
+              </li>
 
-            <li class="nav-item" role="presentation">
-              <button
-                class="nav-link"
-                id="list-tab"
-                data-bs-toggle="tab"
-                data-bs-target="#listPanel"
-                type="button"
-                role="tab"
-                aria-controls="listPanel"
-                aria-selected="false"
-              >
-                내가 등록한 소리 목록
-              </button>
-            </li>
-          </ul>
+              <li class="nav-item" role="presentation">
+                <button
+                  class="nav-link"
+                  id="list-tab"
+                  data-bs-toggle="tab"
+                  data-bs-target="#listPanel"
+                  type="button"
+                  role="tab"
+                  aria-controls="listPanel"
+                  aria-selected="false"
+                >
+                  내가 등록한 소리 목록
+                </button>
+              </li>
+            </ul>
+            <button id="btnNewSoundHelp" type="button" class="btn btn-sm btn-outline-secondary" aria-label="도움말">
+              <i class="bi bi-question-circle"></i> 도움말
+            </button>
+          </div>
 
           <!-- Tab panels -->
           <div class="tab-content">
@@ -192,6 +197,62 @@
     </div>
     </div>
   </main>
+
+  <!-- 도움말 모달 -->
+  <div
+    class="modal fade"
+    id="newSoundHelpModal"
+    tabindex="-1"
+    aria-labelledby="newSoundHelpModalLabel"
+    aria-hidden="true"
+    data-bs-backdrop="true"
+    data-bs-keyboard="true"
+  >
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content rounded-4">
+        <div class="modal-header px-4 py-3">
+          <h5 class="modal-title fw-bold fs-3" id="newSoundHelpModalLabel">소리 등록 도움말</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+        </div>
+
+        <div class="modal-body px-4 py-4">
+          <ul class="list-unstyled mb-0">
+
+            <li class="mb-3">
+              <h6 class="fw-bold mb-1">녹음</h6>
+              <p class="small text-secondary mb-1">조용한 곳에서 2~5초, 소리가 선명하게 들리도록 녹음하세요.</p>
+              <p class="small text-secondary mb-0"><strong>추천:</strong> 세탁기 종료음, 초인종, 전자레인지 완료음 · <strong>피할 것:</strong> 대화, TV, 잡음</p>
+            </li>
+
+            <li class="mb-3">
+              <h6 class="fw-bold mb-1">파일 업로드</h6>
+              <p class="small text-secondary mb-0">MP3, WAV, WebM, M4A 지원. 원하는 소리만 담긴 짧은 파일이 인식률이 좋습니다.</p>
+            </li>
+
+            <li class="mb-3">
+              <h6 class="fw-bold mb-1">소리 이름</h6>
+              <p class="small text-secondary mb-0">알림에 표시될 이름 (예: 세탁기 완료음, 우리집 초인종)</p>
+            </li>
+
+            <li class="mb-3">
+              <h6 class="fw-bold mb-1">소리 알림 분류</h6>
+              <p class="small text-secondary mb-0"><strong>위험/경고</strong> 화재·비상벨 · <strong>주의</strong> 열차·출입문 안내 · <strong>생활알림</strong> 초인종·가전 완료음</p>
+            </li>
+
+            <li class="mb-0">
+              <h6 class="fw-bold mb-1">등록</h6>
+              <p class="small text-secondary mb-0">등록 버튼 → 서버 저장 → 메인화면에서 소리 감지 시 알림</p>
+            </li>
+
+          </ul>
+        </div>
+
+        <div class="modal-footer px-4 py-3">
+          <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">닫기</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <footer class="app-footer">
     <div class="footer-inner">

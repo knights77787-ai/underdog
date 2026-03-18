@@ -556,6 +556,15 @@ document.getElementById("register-tab")?.addEventListener("shown.bs.tab", () => 
   clearStatus();
 });
 
+// ===== 도움말 모달 =====
+document.getElementById("btnNewSoundHelp")?.addEventListener("click", () => {
+  const modalEl = document.getElementById("newSoundHelpModal");
+  if (modalEl && window.bootstrap) {
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    modal.show();
+  }
+});
+
 // ===== list audio play / stop / delete =====
 soundListEl?.addEventListener("click", async (e) => {
   const playBtn = e.target.closest(".play-toggle-btn");
