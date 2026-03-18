@@ -30,6 +30,11 @@ let SESSION_ID = (function () {
     return "S1";
   }
 })();
+if (SESSION_ID) {
+  try {
+    window.UnderdogApp?.setSessionId(SESSION_ID);
+  } catch (_) {}
+}
 
 // ===== elements =====
 const btnStart = document.getElementById("btnStart");

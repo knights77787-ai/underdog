@@ -42,6 +42,9 @@ if (SESSION_ID) {
   try {
     localStorage.setItem(SESSION_STORAGE_KEY, SESSION_ID);
   } catch (_) {}
+  try {
+    window.UnderdogApp?.setSessionId(SESSION_ID);
+  } catch (_) {}
 }
 // 피드백 대상: 가장 최근 수신한 alert의 event_id
 let lastAlertEventId = null;
@@ -238,6 +241,9 @@ async function ensureSessionAndConnect() {
       const url = new URL(document.location.href);
       url.searchParams.set("session_id", SESSION_ID);
       history.replaceState(null, "", url.toString());
+      try {
+        window.UnderdogApp?.setSessionId(SESSION_ID);
+      } catch (_) {}
       updateSessionLabel();
       updateUserSection();
       loadSettingsForCaption();

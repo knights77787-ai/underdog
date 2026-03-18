@@ -24,6 +24,11 @@ const SESSION_ID = (function () {
     return null;
   }
 })();
+if (SESSION_ID) {
+  try {
+    window.UnderdogApp?.setSessionId(SESSION_ID);
+  } catch (_) {}
+}
 
 const settingFontSize = document.getElementById("settingFontSize");
 const settingAlertEnabled = document.getElementById("settingAlertEnabled");
