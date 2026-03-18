@@ -4,6 +4,7 @@
 - 중복 정책: (event_id, client_session_uuid) 당 1건, 있으면 업데이트(upsert)
 - insert 시 IntegrityError(레이스) → rollback 후 재조회하여 update
 """
+from datetime import datetime
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -113,7 +114,7 @@ def list_feedback_admin(
     until_ts_ms: int | None = None,
 ) -> list:
     """관리자: 피드백 목록 조회. Event 조인하여 event_type, 날짜 필터.
-    event_type: danger|caution|alert, vote: up|down"""
+    날짜 필터: event_feedback.created_at 기준. event_type: danger|caution|alert, vote: up|down"""
     from App.db.models import Event, EventTranscript
 
     q = (
@@ -129,9 +130,11 @@ def list_feedback_admin(
     if vote is not None:
         q = q.filter(EventFeedback.vote == vote)
     if since_ts_ms is not None:
-        q = q.filter(Event.segment_start_ms >= since_ts_ms)
+        since_dt = datetime.utcfromtimestamp(since_ts_ms / 1000)
+        q = q.filter(EventFeedback.created_at >= since_dt)
     if until_ts_ms is not None:
-        q = q.filter(Event.segment_start_ms <= until_ts_ms)
+        until_dt = datetime.utcfromtimestamp(until_ts_ms / 1000)
+        q = q.filter(EventFeedback.created_at <= until_dt)
 
     rows = q.order_by(EventFeedback.feedback_id.desc()).limit(limit).all()
 

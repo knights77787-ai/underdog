@@ -160,8 +160,21 @@ async function loadFeedback() {
   }
 }
 
+// 최근 30일 날짜 기본값 설정
+function setDefaultFeedbackDates() {
+  const to = new Date();
+  const from = new Date();
+  from.setDate(from.getDate() - 30);
+  const fmt = (d) => d.toISOString().slice(0, 10);
+  const fromEl = document.getElementById("filterDateFrom");
+  const toEl = document.getElementById("filterDateTo");
+  if (fromEl && !fromEl.value) fromEl.value = fmt(from);
+  if (toEl && !toEl.value) toEl.value = fmt(to);
+}
+
 // ========== 초기화 ==========
 document.addEventListener("DOMContentLoaded", () => {
+  setDefaultFeedbackDates();
   loadOverview();
   loadFeedback();
 

@@ -171,23 +171,31 @@ def get_feedback_list(
     date_from: Optional[str] = Query(None, description="YYYY-MM-DD"),
     date_to: Optional[str] = Query(None, description="YYYY-MM-DD"),
 ):
-    """관리자: 피드백 목록 조회. 날짜·이벤트분류·up/down 필터."""
+    """관리자: 피드백 목록 조회. 최근 30일까지. 날짜·이벤트분류·up/down 필터."""
+    from datetime import datetime, timedelta
+
     since_ts_ms = None
     until_ts_ms = None
     if date_from:
-        from datetime import datetime
         try:
             d = datetime.strptime(date_from, "%Y-%m-%d")
             since_ts_ms = int(d.timestamp() * 1000)
         except ValueError:
             pass
     if date_to:
-        from datetime import datetime
         try:
             d = datetime.strptime(date_to, "%Y-%m-%d")
             until_ts_ms = int(d.timestamp() * 1000) + 86399999  # 해당일 23:59:59.999
         except ValueError:
             pass
+
+    # 최근 30일 제한: 그 이전 데이터는 조회 불가
+    cutoff = datetime.now() - timedelta(days=30)
+    cutoff_ts_ms = int(cutoff.timestamp() * 1000)
+    if since_ts_ms is None:
+        since_ts_ms = cutoff_ts_ms
+    elif since_ts_ms < cutoff_ts_ms:
+        since_ts_ms = cutoff_ts_ms
 
     data = list_feedback_admin(
         db=db,
