@@ -102,113 +102,33 @@ async function loadOverview() {
   }
 }
 
-// ========== 2. 이벤트·알림 ==========
-let nextUntilTsMs = null;
-let hasMoreAlerts = false;
+const EVENT_TYPE_LABEL = { danger: "위험/경고", caution: "주의", alert: "일상" };
+const VOTE_LABEL = { up: "맞아요", down: "아니에요" };
 
-async function loadAlerts(append = false) {
-  const tbody = document.getElementById("alertsTbody");
-  const statusEl = document.getElementById("alertsStatus");
-  const errEl = document.getElementById("alertsError");
-  const btnMore = document.getElementById("btnLoadMoreAlerts");
-  const summaryEl = document.getElementById("summaryText");
+// ========== 2. 피드백 목록 ==========
+async function loadFeedback() {
+  const tbody = document.getElementById("feedbackTbody");
+  const emptyEl = document.getElementById("feedbackEmpty");
+  const errEl = document.getElementById("feedbackError");
 
-  const dateVal = document.getElementById("filterDate").value;
-  const sessionVal = document.getElementById("filterSession").value.trim() || undefined;
+  const dateFrom = document.getElementById("filterDateFrom")?.value || "";
+  const dateTo = document.getElementById("filterDateTo")?.value || "";
+  const eventType = document.getElementById("filterEventType")?.value || "";
+  const vote = document.getElementById("filterVote")?.value || "";
 
-  let sinceTs = null;
-  let untilTs = null;
-  if (append) {
-    untilTs = nextUntilTsMs;
-  } else if (dateVal) {
-    const start = new Date(dateVal);
-    start.setHours(0, 0, 0, 0);
-    sinceTs = start.getTime();
-  }
+  let url = "/admin/feedback?limit=100";
+  if (dateFrom) url += "&date_from=" + encodeURIComponent(dateFrom);
+  if (dateTo) url += "&date_to=" + encodeURIComponent(dateTo);
+  if (eventType) url += "&event_type=" + encodeURIComponent(eventType);
+  if (vote) url += "&vote=" + encodeURIComponent(vote);
 
   try {
-    let url = "/admin/alerts?limit=30";
-    if (sessionVal) url += "&session_id=" + encodeURIComponent(sessionVal);
-    if (sinceTs) url += "&since_ts_ms=" + sinceTs;
-    if (untilTs) url += "&until_ts_ms=" + untilTs;
-
     const res = await adminFetch(url);
     const data = await res.json();
 
-    if (!data.ok) throw new Error("알림 로드 실패");
+    if (!data.ok) throw new Error("피드백 로드 실패");
 
     const items = data.data || [];
-
-    if (!append) tbody.innerHTML = "";
-
-    items.forEach((it) => {
-      const tr = document.createElement("tr");
-      const typeBadge = it.event_type === "danger" ? "danger" : "warning";
-      tr.innerHTML = `
-        <td>${formatTs(it.ts_ms)}</td>
-        <td><span class="badge bg-${typeBadge}">${it.event_type || "-"}</span></td>
-        <td class="text-truncate" style="max-width:120px" title="${(it.keyword || "").replace(/"/g, "&quot;")}">${it.keyword || "-"}</td>
-        <td class="text-truncate" style="max-width:200px" title="${(it.text || "").replace(/"/g, "&quot;")}">${it.text || "-"}</td>
-        <td class="small">${it.session_id ? it.session_id.slice(0, 8) + "…" : "-"}</td>
-      `;
-      tbody.appendChild(tr);
-    });
-
-    nextUntilTsMs = data.next_until_ts_ms ?? null;
-    hasMoreAlerts = data.has_more ?? false;
-    btnMore.style.display = hasMoreAlerts ? "inline-block" : "none";
-    statusEl.textContent = `${items.length}건 로드됨${hasMoreAlerts ? " (더 있음)" : ""}`;
-
-    // 요약 (같은 조건으로 summary 호출)
-    loadSummary(sessionVal, sinceTs, dateVal ? 86400 : 300).then((s) => {
-      if (s) summaryEl.textContent = s;
-    });
-
-    errEl.classList.add("d-none");
-  } catch (e) {
-    errEl.textContent = "알림 로드 실패: " + (e.message || "알 수 없음");
-    errEl.classList.remove("d-none");
-  }
-}
-
-async function loadSummary(sessionId, sinceTs, recentSec = 300) {
-  try {
-    let url = "/admin/summary?recent_window_sec=" + recentSec;
-    if (sessionId) url += "&session_id=" + encodeURIComponent(sessionId);
-    if (sinceTs) url += "&since_ts_ms=" + sinceTs;
-
-    const res = await adminFetch(url);
-    const data = await res.json();
-    if (!data.ok || !data.summary) return null;
-
-    const s = data.summary;
-    const recent = s.alerts_recent || {};
-    return `caption ${s.total_captions ?? 0}건 / alert ${s.total_alerts ?? 0}건 / 최근 ${recent.window_sec ?? 300}초 ${recent.count ?? 0}건`;
-  } catch (_) {
-    return null;
-  }
-}
-
-// ========== 3. 피드백 분석 ==========
-async function loadFeedback() {
-  const tbody = document.getElementById("feedbackSummaryTbody");
-  const emptyEl = document.getElementById("feedbackSummaryEmpty");
-  const errEl = document.getElementById("feedbackSummaryError");
-  const listEl = document.getElementById("feedbackSuspectsList");
-  const suspectsEmpty = document.getElementById("feedbackSuspectsEmpty");
-  const suspectsErr = document.getElementById("feedbackSuspectsError");
-
-  try {
-    const [summaryRes, suspectsRes] = await Promise.all([
-      adminFetch("/admin/feedback-summary?limit=50"),
-      adminFetch("/admin/feedback-suspects?min_count=5&min_down_rate=0.6&limit=20"),
-    ]);
-
-    const summaryData = await summaryRes.json();
-    const suspectsData = await suspectsRes.json();
-
-    // 키워드별 피드백
-    const items = summaryData.ok ? (summaryData.data || []) : [];
     tbody.innerHTML = "";
     if (items.length === 0) {
       emptyEl.classList.remove("d-none");
@@ -216,58 +136,49 @@ async function loadFeedback() {
       emptyEl.classList.add("d-none");
       items.forEach((it) => {
         const tr = document.createElement("tr");
-        const rate = (it.down_rate * 100).toFixed(1);
-        const suspect = rate >= 60 ? ' <span class="badge bg-warning text-dark">의심</span>' : "";
+        const tsStr = it.segment_start_ms ? formatTs(it.segment_start_ms) : (it.created_at ? it.created_at.slice(11, 19) : "-");
+        const dateStr = it.segment_start_ms ? formatDate(it.segment_start_ms) : "-";
+        const typeLabel = EVENT_TYPE_LABEL[it.event_type] || it.event_type || "-";
+        const voteLabel = VOTE_LABEL[it.vote] || it.vote || "-";
+        const sess = (it.client_session_uuid || "").slice(0, 8) + (it.client_session_uuid && it.client_session_uuid.length > 8 ? "…" : "");
         tr.innerHTML = `
-          <td class="text-truncate" style="max-width:150px" title="${(it.keyword || "").replace(/"/g, "&quot;")}">${it.keyword || "-"}${suspect}</td>
-          <td>${it.event_type || "-"}</td>
-          <td>${it.up ?? 0}</td>
-          <td>${it.down ?? 0}</td>
-          <td>${rate}%</td>
+          <td class="small">${dateStr} ${tsStr}</td>
+          <td><span class="badge bg-${it.vote === "up" ? "success" : "danger"}">${voteLabel}</span></td>
+          <td class="small">${typeLabel}</td>
+          <td class="text-truncate small" style="max-width:100px" title="${(it.keyword || "").replace(/"/g, "&quot;")}">${it.keyword || "-"}</td>
+          <td class="text-truncate small" style="max-width:180px" title="${(it.text || "").replace(/"/g, "&quot;")}">${it.text || "-"}</td>
+          <td class="small">${sess || "-"}</td>
+          <td class="text-truncate small" style="max-width:120px" title="${(it.comment || "").replace(/"/g, "&quot;")}">${it.comment || "-"}</td>
         `;
         tbody.appendChild(tr);
       });
     }
     errEl.classList.add("d-none");
-
-    // 오탐 의심
-    const suspects = suspectsData.ok ? (suspectsData.data || []) : [];
-    listEl.innerHTML = "";
-    suspectsEmpty.classList.add("d-none");
-    if (suspects.length === 0) {
-      suspectsEmpty.classList.remove("d-none");
-    } else {
-      suspects.forEach((it) => {
-        const li = document.createElement("li");
-        li.className = "list-group-item py-2 small";
-        const rate = (it.down_rate * 100).toFixed(1);
-        li.innerHTML = `<strong>${it.keyword || "-"}</strong> (${rate}%, 총 ${it.total}건)`;
-        listEl.appendChild(li);
-      });
-    }
-    suspectsErr.classList.add("d-none");
   } catch (e) {
     errEl.textContent = "피드백 로드 실패: " + (e.message || "알 수 없음");
     errEl.classList.remove("d-none");
-    suspectsErr.textContent = "오탐 의심 로드 실패: " + (e.message || "알 수 없음");
-    suspectsErr.classList.remove("d-none");
   }
+}
+
+// 최근 30일 날짜 기본값 설정
+function setDefaultFeedbackDates() {
+  const to = new Date();
+  const from = new Date();
+  from.setDate(from.getDate() - 30);
+  const fmt = (d) => d.toISOString().slice(0, 10);
+  const fromEl = document.getElementById("filterDateFrom");
+  const toEl = document.getElementById("filterDateTo");
+  if (fromEl && !fromEl.value) fromEl.value = fmt(from);
+  if (toEl && !toEl.value) toEl.value = fmt(to);
 }
 
 // ========== 초기화 ==========
 document.addEventListener("DOMContentLoaded", () => {
+  setDefaultFeedbackDates();
   loadOverview();
-  loadAlerts();
   loadFeedback();
 
-  document.getElementById("btnLoadAlerts").addEventListener("click", () => {
-    nextUntilTsMs = null;
-    loadAlerts(false);
-  });
-
-  document.getElementById("btnLoadMoreAlerts").addEventListener("click", () => {
-    loadAlerts(true);
-  });
+  document.getElementById("btnLoadFeedback")?.addEventListener("click", loadFeedback);
 
   // 주기적 갱신 (개요만 30초마다)
   setInterval(loadOverview, 30000);

@@ -4,6 +4,7 @@
 - 중복 정책: (event_id, client_session_uuid) 당 1건, 있으면 업데이트(upsert)
 - insert 시 IntegrityError(레이스) → rollback 후 재조회하여 update
 """
+from datetime import datetime
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -100,3 +101,63 @@ def list_feedback(
         q = q.filter(EventFeedback.event_id == event_id)
     q = q.order_by(EventFeedback.feedback_id.desc())
     return q.limit(limit).all()
+
+
+def list_feedback_admin(
+    db: Session,
+    limit: int = 50,
+    session_id: str | None = None,
+    event_id: int | None = None,
+    event_type: str | None = None,
+    vote: str | None = None,
+    since_ts_ms: int | None = None,
+    until_ts_ms: int | None = None,
+) -> list:
+    """관리자: 피드백 목록 조회. Event 조인하여 event_type, 날짜 필터.
+    날짜 필터: event_feedback.created_at 기준. event_type: danger|caution|alert, vote: up|down"""
+    from App.db.models import Event, EventTranscript
+
+    q = (
+        db.query(EventFeedback, Event)
+        .join(Event, Event.event_id == EventFeedback.event_id)
+    )
+    if session_id is not None:
+        q = q.filter(EventFeedback.client_session_uuid == session_id)
+    if event_id is not None:
+        q = q.filter(EventFeedback.event_id == event_id)
+    if event_type is not None:
+        q = q.filter(Event.event_type == event_type)
+    if vote is not None:
+        q = q.filter(EventFeedback.vote == vote)
+    if since_ts_ms is not None:
+        since_dt = datetime.utcfromtimestamp(since_ts_ms / 1000)
+        q = q.filter(EventFeedback.created_at >= since_dt)
+    if until_ts_ms is not None:
+        until_dt = datetime.utcfromtimestamp(until_ts_ms / 1000)
+        q = q.filter(EventFeedback.created_at <= until_dt)
+
+    rows = q.order_by(EventFeedback.feedback_id.desc()).limit(limit).all()
+
+    event_ids = [ev.event_id for _, ev in rows]
+    texts_map = {}
+    if event_ids:
+        for et in db.query(EventTranscript).filter(EventTranscript.event_id.in_(event_ids)).all():
+            if et.event_id not in texts_map:
+                texts_map[et.event_id] = et.text
+
+    out = []
+    for fb, ev in rows:
+        text = texts_map.get(ev.event_id, "")
+        out.append({
+            "feedback_id": fb.feedback_id,
+            "event_id": fb.event_id,
+            "keyword": ev.keyword,
+            "event_type": ev.event_type,
+            "text": text,
+            "vote": fb.vote,
+            "comment": fb.comment,
+            "client_session_uuid": fb.client_session_uuid,
+            "created_at": fb.created_at.isoformat() if fb.created_at else None,
+            "segment_start_ms": ev.segment_start_ms,
+        })
+    return out

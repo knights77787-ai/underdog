@@ -130,8 +130,7 @@ def _decode_audio_to_16k_mono_f32(data: bytes, ext: str) -> np.ndarray:
 async def upload_custom_sound(
     session_id: str = Query(..., description="클라이언트 세션 문자열 예: S1"),
     name: str = Form(...),
-    group_type: str = Form(..., description="warning | daily"),
-    event_type: str = Form(..., description="danger | alert"),
+    event_type: str = Form(..., description="danger | caution | alert"),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
@@ -158,7 +157,6 @@ async def upload_custom_sound(
         db=db,
         client_session_uuid=session_id,
         name=name,
-        group_type=group_type,
         event_type=event_type,
         emb=emb,
         audio_path=audio_path_for_db,
@@ -217,7 +215,6 @@ def get_custom_sounds(
             {
                 "custom_sound_id": r.custom_sound_id,
                 "name": r.name,
-                "group_type": r.group_type,
                 "event_type": r.event_type,
                 "audio_path": r.audio_path,
                 "created_at": r.created_at,

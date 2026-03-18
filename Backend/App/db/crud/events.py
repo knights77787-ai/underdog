@@ -5,10 +5,33 @@ from sqlalchemy import desc
 from sqlalchemy.orm import Session, joinedload
 
 from App.db.crud import sessions as crud_sessions
-from App.db.models import Event, EventTranscript
+from App.db.models import Event, EventTranscript, EventFeedback
 from App.db.models import Session as SessionModel
 
 LogType = Literal["all", "caption", "alert"]
+
+
+def delete_events_older_than(db: Session, cutoff_ts_ms: int) -> int:
+    """cutoff_ts_ms보다 오래된 이벤트 삭제 (event_feedback → event_transcripts → events 순).
+    Returns: 삭제된 events 개수."""
+    from datetime import datetime
+    from sqlalchemy import delete, select, or_, and_
+    cutoff_dt = datetime.utcfromtimestamp(cutoff_ts_ms / 1000.0)
+    subq = select(Event.event_id).where(
+        or_(
+            Event.segment_start_ms < cutoff_ts_ms,
+            and_(Event.segment_start_ms.is_(None), Event.created_at < cutoff_dt),
+        )
+    )
+    to_delete = [r[0] for r in db.execute(subq).fetchall()]
+    if not to_delete:
+        return 0
+    n = len(to_delete)
+    db.execute(delete(EventFeedback).where(EventFeedback.event_id.in_(to_delete)))
+    db.execute(delete(EventTranscript).where(EventTranscript.event_id.in_(to_delete)))
+    db.execute(delete(Event).where(Event.event_id.in_(to_delete)))
+    db.commit()
+    return n
 
 
 def _ts_ms_from_event(e: Event) -> int:
@@ -30,26 +53,6 @@ def _source_from_keyword(keyword: str | None) -> str:
     if keyword.startswith("phrase:"):
         return "custom_phrase"
     return "text"
-
-
-def create_caption_event(
-    db: Session,
-    client_session_uuid: str,
-    text: str,
-    ts_ms: int,
-) -> int:
-    sess = crud_sessions.get_or_create_by_client_uuid(db, client_session_uuid)
-    event = Event(session_id=sess.session_id, event_type="pass", segment_start_ms=ts_ms)
-    try:
-        db.add(event)
-        db.flush()  # event_id 할당 (commit 전)
-        transcript = EventTranscript(event_id=event.event_id, text=text)
-        db.add(transcript)
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise
-    return event.event_id  # flush() 후 이미 채워짐, refresh 불필요
 
 
 def create_alert_event(
@@ -111,7 +114,7 @@ def get_logs_from_db(
     if log_type == "caption":
         q = q.filter(Event.event_type == "pass")
     elif log_type == "alert":
-        q = q.filter(Event.event_type.in_(["danger", "alert"]))
+        q = q.filter(Event.event_type.in_(["danger", "caution", "alert"]))
 
     # 정렬: ts_ms 내림차순 + event_id 내림차순(tie-breaker)으로 커서 안정성 확보
     events = q.order_by(desc(Event.segment_start_ms), desc(Event.event_id)).limit(limit + 1).all()
@@ -169,7 +172,7 @@ def get_admin_summary_from_db(
     now_ms = int(time.time() * 1000)
     cutoff = now_ms - (recent_window_sec * 1000)
     captions = [e for e in events if e.event_type == "pass"]
-    alerts = [e for e in events if e.event_type in ("danger", "alert")]
+    alerts = [e for e in events if e.event_type in ("danger", "caution", "alert")]
     recent_alerts = [e for e in alerts if (e.segment_start_ms or 0) >= cutoff]
     session_ids = sorted(
         {e.session.client_session_uuid for e in events if e.session and e.session.client_session_uuid}

@@ -46,8 +46,8 @@ if (SESSION_ID) {
     window.UnderdogApp?.setSessionId(SESSION_ID);
   } catch (_) {}
 }
-// 피드백 대상: 가장 최근 수신한 alert의 event_id
-let lastAlertEventId = null;
+// 피드백 대상: 가장 최근 수신한 alert 정보
+let lastAlertEventInfo = null;
 
 // 마이크 → audio_chunk 전송
 let micStream = null;
@@ -106,7 +106,6 @@ const captionBox = document.getElementById("captionBox");
 
 const toastContainer = document.getElementById("toastContainer");
 const sessionLabel = document.getElementById("sessionLabel");
-const btnLogin = document.getElementById("btnLogin");
 const userDropdownWrap = document.getElementById("userDropdownWrap");
 const btnUserIcon = document.getElementById("btnUserIcon");
 const userDropdownName = document.getElementById("userDropdownName");
@@ -561,14 +560,13 @@ client.on("close", () => {
   btnFeedbackNo.disabled = true;
 });
 
-// 서버가 caption 보내면 (백엔드는 ts_ms 필드 사용). payload 래핑 대비 안전 접근
+// 서버가 caption 보내면 (STT 결과 = 말한 내용). 실시간 자막에만 표시.
 client.on("caption", (msg) => {
   if (!msg || typeof msg !== "object") return;
   const text = (msg.text ?? msg.payload?.text ?? "").toString();
   const danger = isDanger(text);
 
   appendCaption(text, danger);
-  appendLogRow({ ts_ms: msg.ts_ms ?? msg.payload?.ts_ms, ts: msg.ts ?? msg.payload?.ts, type: "caption", text, score: msg.score ?? msg.payload?.score });
 
   if (danger) {
     setHeroDanger(text);
@@ -577,16 +575,19 @@ client.on("caption", (msg) => {
   }
 });
 
-// 서버가 alert 보내면 (백엔드는 ts_ms, event_id 필드 사용). payload 래핑 대비 안전 접근
+// 서버가 alert 보내면 (키워드/YAMNet/커스텀 소리 등). 최근 감지 로그에만 표시. 실시간 자막에는 안 나옴.
 client.on("alert", (msg) => {
   if (!msg || typeof msg !== "object") return;
   const p = (msg && typeof msg.payload === "object" && msg.payload !== null) ? msg.payload : undefined;
   const text = (msg.text ?? p?.text ?? "").toString();
   const keyword = (msg.keyword ?? p?.keyword ?? "").toString();
   const event_type = msg.event_type ?? p?.event_type ?? "danger";
-  if ((msg.event_id ?? p?.event_id) != null) lastAlertEventId = msg.event_id ?? p?.event_id;
+  const event_id = msg.event_id ?? p?.event_id;
+  const ts_ms = msg.ts_ms ?? p?.ts_ms;
+  if (event_id != null) {
+    lastAlertEventInfo = { event_id, text, keyword, event_type, ts_ms };
+  }
 
-  appendCaption(`[ALERT] ${text}`, true);
   appendLogRow({ ts_ms: msg.ts_ms ?? p?.ts_ms, ts: msg.ts ?? p?.ts, type: "alert", text, keyword, event_type, score: msg.score ?? p?.score });
 
   setHeroDanger(`${keyword ? "["+keyword+"] " : ""}${text}`);
@@ -594,25 +595,28 @@ client.on("alert", (msg) => {
   vibrateByLevel(event_type);
 });
 
-// Feedback: POST /feedback (event_id, vote, session_id)
-async function sendFeedback(vote) {
-  if (lastAlertEventId == null) {
+// Feedback: 맞아요=즉시 POST, 아니에요=모달에서 comment 필수 후 POST
+async function sendFeedback(vote, comment) {
+  if (!lastAlertEventInfo) {
     showToast("피드백", "대상 알림이 없습니다. 알림이 온 뒤에 눌러주세요.", true);
     return;
   }
+  const body = {
+    event_id: lastAlertEventInfo.event_id,
+    vote: vote,
+    session_id: SESSION_ID || undefined,
+  };
+  if (comment != null && comment.trim() !== "") body.comment = comment.trim();
   try {
     const res = await fetch(API_BASE + "/feedback", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        event_id: lastAlertEventId,
-        vote: vote,
-        session_id: SESSION_ID || undefined,
-      }),
+      body: JSON.stringify(body),
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.ok) {
       showToast("피드백", "저장되었습니다.", false);
+      lastAlertEventInfo = null;  // 제출 후 초기화
     } else {
       showToast("피드백 실패", data.detail || res.statusText || "다시 시도해 주세요.", true);
     }
@@ -620,8 +624,48 @@ async function sendFeedback(vote) {
     showToast("오류", "연결할 수 없습니다. 서버를 확인하세요.", true);
   }
 }
+
+function showFeedbackCommentModal() {
+  if (!lastAlertEventInfo) {
+    showToast("피드백", "대상 알림이 없습니다.", true);
+    return;
+  }
+  const info = lastAlertEventInfo;
+  const kind = info.event_type === "danger" ? "위험/경고" : info.event_type === "caution" ? "주의" : "일상";
+  const timeStr = formatTs(info.ts_ms);
+  const eventInfoEl = document.getElementById("feedbackModalEventInfo");
+  const inputEl = document.getElementById("feedbackCommentInput");
+  if (eventInfoEl) {
+    eventInfoEl.innerHTML = `<strong>${kind}</strong> · ${info.keyword ? "[" + info.keyword + "] " : ""}${info.text || "-"} · ${timeStr}`;
+  }
+  if (inputEl) inputEl.value = "";
+  const modal = new bootstrap.Modal(document.getElementById("feedbackCommentModal"));
+  modal.show();
+  inputEl?.focus();
+}
+
+function setupFeedbackCommentModal() {
+  const modalEl = document.getElementById("feedbackCommentModal");
+  const inputEl = document.getElementById("feedbackCommentInput");
+  const submitBtn = document.getElementById("feedbackCommentSubmit");
+  if (!modalEl || !inputEl || !submitBtn) return;
+  modalEl.addEventListener("shown.bs.modal", () => modalEl.removeAttribute("inert"));
+  modalEl.addEventListener("hidden.bs.modal", () => modalEl.setAttribute("inert", ""));
+  submitBtn.addEventListener("click", () => {
+    const comment = (inputEl.value || "").trim();
+    if (!comment) {
+      showToast("피드백", "코멘트를 입력해 주세요.", true);
+      inputEl.focus();
+      return;
+    }
+    bootstrap.Modal.getInstance(modalEl)?.hide();
+    sendFeedback("down", comment);
+  });
+}
+
 btnFeedbackYes.addEventListener("click", () => sendFeedback("up"));
-btnFeedbackNo.addEventListener("click", () => sendFeedback("down"));
+btnFeedbackNo.addEventListener("click", () => showFeedbackCommentModal());
+setupFeedbackCommentModal();
 
 function updateSessionLabel() {
   if (sessionLabel) sessionLabel.textContent = SESSION_ID ? "세션: " + SESSION_ID.slice(0, 8) + "…" : "";
@@ -647,11 +691,9 @@ function updateUserSection() {
   if (!userDropdownWrap) return;
   const provider = getProvider();
   if (provider === "google" || provider === "kakao") {
-    if (btnLogin) btnLogin.classList.add("d-none");
     userDropdownWrap.classList.remove("d-none");
     if (SESSION_ID) loadUserInfo();
   } else {
-    if (btnLogin) btnLogin.classList.remove("d-none");
     userDropdownWrap.classList.add("d-none");
   }
   updateLogSectionVisibility();
@@ -731,14 +773,6 @@ function setupUserDropdown() {
   let hideTimer = null;
   userDropdownWrap.addEventListener("mouseenter", () => {
     if (hideTimer) clearTimeout(hideTimer);
-    try {
-      if (window.bootstrap && btnUserIcon) {
-        const dropdown = bootstrap.Dropdown.getOrCreateInstance(btnUserIcon);
-        if (dropdown) dropdown.show();
-      }
-    } catch (e) {
-      console.warn("[Lumen] dropdown show", e);
-    }
   });
   userDropdownWrap.addEventListener("mouseleave", () => {
     hideTimer = setTimeout(() => {
@@ -752,6 +786,43 @@ function setupUserDropdown() {
   });
 }
 
+// 푸터: 소리등록/설정 링크 - 게스트 클릭 시 로그인 유도
+function setupFooterAuthLinks() {
+  const footerSoundReg = document.getElementById("footerSoundReg");
+  const footerSettings = document.getElementById("footerSettings");
+  const intercept = (e, link) => {
+    if (!link) return;
+    if (isGuest()) {
+      e.preventDefault();
+      alert("로그인이 필요한 서비스입니다.");
+      window.location.href = "/login";
+    }
+  };
+  if (footerSoundReg) footerSoundReg.addEventListener("click", (e) => intercept(e, footerSoundReg));
+  if (footerSettings) footerSettings.addEventListener("click", (e) => intercept(e, footerSettings));
+}
+
+// 이벤트 기록 저장 토글: 변경 시 POST /settings로 event_save_enabled 저장
+function setupSaveToggle() {
+  if (!saveToggle || !SESSION_ID) return;
+  saveToggle.addEventListener("change", async () => {
+    const enabled = saveToggle.checked;
+    try {
+      const res = await fetch(API_BASE + "/settings?session_id=" + encodeURIComponent(SESSION_ID), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ event_save_enabled: enabled }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.ok) {
+        saveToggle.checked = !enabled;  // 롤백
+      }
+    } catch (_) {
+      saveToggle.checked = !enabled;  // 롤백
+    }
+  });
+}
+
 // 설정: 자막 글자 크기만 로드 (설정 페이지는 /settings-page 에서 편집)
 function applyFontSizeToCaption(px) {
   if (captionBox && px != null) {
@@ -761,14 +832,18 @@ function applyFontSizeToCaption(px) {
 }
 
 async function loadSettingsForCaption() {
-  if (!SESSION_ID || !captionBox) return;
+  if (!SESSION_ID) return;
   try {
     const res = await fetch(API_BASE + "/settings?session_id=" + encodeURIComponent(SESSION_ID));
     const data = await res.json().catch(() => ({}));
-    const fontSize = data?.data?.font_size ?? data?.font_size;
-    if (res.ok && data?.ok && fontSize != null) {
+    if (!res.ok || !data?.ok) return;
+    const d = data?.data ?? data;
+    const fontSize = d?.font_size;
+    if (fontSize != null && captionBox) {
       applyFontSizeToCaption(fontSize);
     }
+    // 이벤트 기록 저장 토글: event_save_enabled 반영 (없으면 기본 true)
+    if (saveToggle) saveToggle.checked = d?.event_save_enabled !== false;
   } catch (_) {}
 }
 
@@ -781,6 +856,8 @@ async function loadSettingsForCaption() {
     updateUserSection();
     updateLogSectionVisibility();
     setupUserDropdown();
+    setupFooterAuthLinks();
+    setupSaveToggle();
     if (SESSION_ID) loadSettingsForCaption();
   } catch (e) {
     console.warn("[Lumen] init error", e);

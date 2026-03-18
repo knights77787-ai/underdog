@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Lumen · Live (Single User) Main Hompage</title>
+  <title>Lumen | 메인 홈</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 
   <!-- Bootstrap 5 -->
@@ -20,19 +20,20 @@
 
   <!-- Topbar -->
   <nav class="navbar bg-white border-bottom">
-    <div class="header-inner container-fluid d-flex align-items-center gap-2 flex-wrap">
-      <a href="/" class="fw-bold text-dark text-decoration-none">
-        <img src="/static/img/lumen_logo.png" alt="Lumen" width="70" height="50">
-      </a>
-
-      <span id="sessionLabel" class="small text-muted ms-2 d-none d-md-inline"></span>
-
-      <!-- 기록저장 / 설정 / 사용자 (오른쪽 정렬) -->
-      <div class="ms-auto d-flex align-items-center gap-2">
+    <div class="header-inner container-fluid">
+      <div class="header-left d-flex align-items-center">
+        <span id="sessionLabel" class="small text-muted d-none d-md-inline"></span>
+      </div>
+      <span class="header-logo-slot">
+        <a href="/" class="header-logo-wrap fw-bold text-dark text-decoration-none">
+          <img src="/static/img/lumen_logo.png" alt="Lumen" width="70" height="50">
+        </a>
+      </span>
+      <div class="header-right">
         <div class="d-flex align-items-center gap-2" id="saveToggleWrap">
-          <span class="small text-muted">기록저장</span>
+          <span class="small text-muted">이벤트 기록 저장</span>
           <div class="form-check form-switch m-0">
-            <input class="form-check-input" type="checkbox" role="switch" id="saveToggle">
+            <input class="form-check-input" type="checkbox" role="switch" id="saveToggle" checked>
           </div>
         </div>
         <!-- 사용자 아이콘 + 드롭다운 (로그인 후) -->
@@ -129,7 +130,7 @@
             </div>
           </div>
           <div class="card-footer small text-muted">
-            * 서버가 보내는 caption/alert를 이 표에 쌓습니다.
+            * 감지된 이벤트(경고·알림)만 최근 30건 표시.
           </div>
         </div>
       </div>
@@ -157,8 +158,8 @@
       </div>
       <div class="footer-links">
         <a href="/">홈</a>
-        <a href="/new-sound">소리 등록</a>
-        <a href="/settings-page">설정</a>
+        <a href="/new-sound" id="footerSoundReg">소리 등록</a>
+        <a href="/settings-page" id="footerSettings">설정</a>
       </div>
       <div class="footer-copy">© Lumen. 실시간 자막·소리 감지 서비스.</div>
     </div>
@@ -206,6 +207,27 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
           <button type="button" class="btn btn-primary" id="micStopConfirm">확인</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 오탐 피드백 모달: 이벤트 정보 + comment 필수 -->
+  <div class="modal fade" id="feedbackCommentModal" tabindex="-1" aria-labelledby="feedbackCommentModalLabel" aria-hidden="true" inert>
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="feedbackCommentModalLabel">아니에요(오탐) 피드백</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+        </div>
+        <div class="modal-body">
+          <div id="feedbackModalEventInfo" class="mb-3 p-2 rounded bg-light small"></div>
+          <label for="feedbackCommentInput" class="form-label">코멘트 <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="feedbackCommentInput" placeholder="오탐 이유를 한 줄로 적어주세요" maxlength="255" required>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+          <button type="button" class="btn btn-primary" id="feedbackCommentSubmit">제출</button>
         </div>
       </div>
     </div>

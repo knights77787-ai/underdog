@@ -80,6 +80,21 @@ def _is_yamnet_enabled() -> bool:
     return v in ("1", "true", "yes")
 
 
+def _run_event_cleanup():
+    """30일 초과 이벤트 삭제. APScheduler에서 매일 새벽 3시 호출."""
+    import time
+    from App.db.crud import events as crud_events
+    from App.db.database import SessionLocal
+    cutoff_ms = int((time.time() - 30 * 24 * 3600) * 1000)
+    db = SessionLocal()
+    try:
+        n = crud_events.delete_events_older_than(db, cutoff_ms)
+        if n > 0:
+            get_logger("app").info("event_cleanup deleted=%d events", n)
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
@@ -87,6 +102,13 @@ async def lifespan(app: FastAPI):
     get_logger("app").info(
         "app_started level=%s db=%s", log_level, DATABASE_PATH
     )   # 서버가 정상 기동됐는지 확인하는 최초신호
+
+    # APScheduler: 매일 새벽 3시에 30일 초과 이벤트 삭제
+    from apscheduler.schedulers.background import BackgroundScheduler
+    _scheduler = BackgroundScheduler()
+    _scheduler.add_job(_run_event_cleanup, "cron", hour=3, minute=0)
+    _scheduler.start()
+    get_logger("app").info("event_cleanup_scheduler started (daily 03:00)")
 
     # 무거운 기동(Yamnet/STT 워커, rules reload)은 ENABLE_ML_WORKERS=1 일 때만 수행.
     # Render 등에서 OOM 방지: 기본값 비활성화 → /docs, /openapi.json 정상 응답 목표.
@@ -101,6 +123,7 @@ async def lifespan(app: FastAPI):
         app.state.stt_worker_3 = None
         app.state.stt_task_3 = None
         yield
+        _scheduler.shutdown(wait=False)
         return
 
     # 오디오 분류(Yamnet) worker: 비언어 1초 윈도우 → AUDIOCLS_QUEUE → 분류/alert
@@ -115,8 +138,8 @@ async def lifespan(app: FastAPI):
         sid, text, keyword, event_type, ts_ms,
         *, matched_custom_sound_id=None, custom_similarity=None,
     ):
-        """DB 저장 + 쿨다운 기록. event_id 반환 (커스텀 사운드 등 WS 브로드캐스트용)."""
-        event_id = handlers._persist_alert(
+        """DB 저장(event_save_enabled 시) + 쿨다운 기록. event_id 반환 (커스텀 사운드 등 WS 브로드캐스트용)."""
+        event_id = handlers._persist_alert_if_enabled(
             sid, text, keyword, event_type, ts_ms,
             matched_custom_sound_id=matched_custom_sound_id,
             custom_similarity=custom_similarity,
@@ -160,6 +183,8 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    # shutdown: 스케줄러 종료
+    _scheduler.shutdown(wait=False)
     # shutdown: worker tasks 취소
     for name in ("yamnet_task", "yamnet_task_2", "stt_task", "stt_task_2", "stt_task_3"):
         t = getattr(app.state, name, None)

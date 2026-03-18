@@ -12,8 +12,7 @@ from App.Core.security import require_admin_token
 from App.WS.handlers import AUDIOCLS_QUEUE, STT_QUEUE, _persist_alert
 from App.WS.manager import manager
 from App.db.crud import events as crud_events
-from App.db.crud.feedback import list_feedback
-from App.db.crud.feedback_reports import feedback_summary, feedback_suspects
+from App.db.crud.feedback import list_feedback, list_feedback_admin
 from App.db.database import get_db
 from App.Services.audio_rules import get_audio_rules_status, reload_audio_rules
 from App.Services.keyword_detector import get_keyword_counts, reload_keywords
@@ -83,7 +82,7 @@ def admin_health(request: Request, db: Session = Depends(get_db)):
     try:
         rules["keyword_rules"] = get_keyword_counts()
     except Exception:
-        rules["keyword_rules"] = {"warning_count": None, "daily_count": None}
+        rules["keyword_rules"] = {"warning_count": None, "caution_count": None, "daily_count": None}
 
     return {
         "ok": True,
@@ -161,72 +160,54 @@ def get_recent_alerts(
     }
 
 
-@router.get("/feedback-summary")
-def admin_feedback_summary(
-    session_id: Optional[str] = Query(None),
-    since_ts_ms: Optional[int] = Query(None),
-    until_ts_ms: Optional[int] = Query(None),
-    limit: int = Query(50, ge=1, le=500),
-    db: Session = Depends(get_db),
-):
-    """키워드·event_type별 up/down 집계 (down_rate 순)."""
-    data = feedback_summary(
-        db=db,
-        session_id=session_id,
-        since_ts_ms=since_ts_ms,
-        until_ts_ms=until_ts_ms,
-        limit=limit,
-    )
-    return {"ok": True, "count": len(data), "data": data}
-
-
-@router.get("/feedback-suspects")
-def admin_feedback_suspects(
-    session_id: Optional[str] = Query(None),
-    since_ts_ms: Optional[int] = Query(None),
-    until_ts_ms: Optional[int] = Query(None),
-    min_count: int = Query(5, ge=1, le=100),
-    min_down_rate: float = Query(0.6, ge=0.0, le=1.0),
-    limit: int = Query(20, ge=1, le=200),
-    db: Session = Depends(get_db),
-):
-    """오탐 의심(Down 비율 높은) 키워드 후보. min_count·min_down_rate 이상만."""
-    data = feedback_suspects(
-        db=db,
-        session_id=session_id,
-        since_ts_ms=since_ts_ms,
-        until_ts_ms=until_ts_ms,
-        min_count=min_count,
-        min_down_rate=min_down_rate,
-        limit=limit,
-    )
-    return {"ok": True, "count": len(data), "data": data}
-
-
 @router.get("/feedback")
 def get_feedback_list(
     db: Session = Depends(get_db),
     limit: int = Query(50, ge=1, le=500),
     session_id: Optional[str] = Query(None),
     event_id: Optional[int] = Query(None),
+    event_type: Optional[str] = Query(None, description="danger|caution|alert (위험/경고|주의|일상)"),
+    vote: Optional[str] = Query(None, description="up|down"),
+    date_from: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    date_to: Optional[str] = Query(None, description="YYYY-MM-DD"),
 ):
-    """관리자: 피드백 목록 조회."""
-    rows = list_feedback(db, limit=limit, session_id=session_id, event_id=event_id)
-    return {
-        "ok": True,
-        "limit": limit,
-        "count": len(rows),
-        "data": [
-            {
-                "feedback_id": r.feedback_id,
-                "event_id": r.event_id,
-                "session_id": r.client_session_uuid,
-                "vote": r.vote,
-                "comment": r.comment,
-            }
-            for r in rows
-        ],
-    }
+    """관리자: 피드백 목록 조회. 최근 30일까지. 날짜·이벤트분류·up/down 필터."""
+    from datetime import datetime, timedelta
+
+    since_ts_ms = None
+    until_ts_ms = None
+    if date_from:
+        try:
+            d = datetime.strptime(date_from, "%Y-%m-%d")
+            since_ts_ms = int(d.timestamp() * 1000)
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            d = datetime.strptime(date_to, "%Y-%m-%d")
+            until_ts_ms = int(d.timestamp() * 1000) + 86399999  # 해당일 23:59:59.999
+        except ValueError:
+            pass
+
+    # 최근 30일 제한: 그 이전 데이터는 조회 불가
+    cutoff = datetime.now() - timedelta(days=30)
+    cutoff_ts_ms = int(cutoff.timestamp() * 1000)
+    if since_ts_ms is None:
+        since_ts_ms = cutoff_ts_ms
+    elif since_ts_ms < cutoff_ts_ms:
+        since_ts_ms = cutoff_ts_ms
+
+    data = list_feedback_admin(
+        db=db,
+        limit=limit,
+        session_id=session_id,
+        event_id=event_id,
+        event_type=event_type,
+        vote=vote,
+        since_ts_ms=since_ts_ms,
+        until_ts_ms=until_ts_ms,
+    )
+    return {"ok": True, "limit": limit, "count": len(data), "data": data}
 
 
 @router.post("/demo/emit")

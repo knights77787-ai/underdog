@@ -25,7 +25,6 @@ def create_custom_sound(
     db: Session,
     client_session_uuid: str,
     name: str,
-    group_type: str,
     event_type: str,
     emb: np.ndarray,
     audio_path: str | None = None,
@@ -36,7 +35,6 @@ def create_custom_sound(
     row = CustomSound(
         client_session_uuid=client_session_uuid,
         name=name,
-        group_type=group_type,
         event_type=event_type,
         audio_path=audio_path,
         embed_dim=dim,

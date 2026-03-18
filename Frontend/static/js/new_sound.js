@@ -146,10 +146,12 @@ function isAllowedAudioFile(file) {
 }
 
 function categoryToApi(category) {
-  if (category === "danger") {
-    return { group_type: "warning", event_type: "danger" };
-  }
-  return { group_type: "daily", event_type: "alert" };
+  return { event_type: category };
+}
+
+function eventTypeDisplay(eventType) {
+  const map = { danger: "경고", caution: "주의", alert: "생활알림" };
+  return map[eventType] || eventType || "";
 }
 
 function escapeHtml(s) {
@@ -348,13 +350,13 @@ function renderSoundList(list) {
       <div class="sound-row" data-id="${r.custom_sound_id}">
         <div class="sound-left">
           <div class="sound-title-line">
-            <span class="sound-badge ${r.event_type === "danger" ? "danger" : "daily"}">
-              ${r.event_type === "danger" ? "경고" : "생활알림"}
+            <span class="sound-badge ${r.event_type === "danger" ? "danger" : r.event_type === "caution" ? "caution" : "daily"}">
+              ${escapeHtml(eventTypeDisplay(r.event_type))}
             </span>
             <span class="sound-name">${escapeHtml(r.name)}</span>
           </div>
           <div class="sound-date text-muted small">
-            ${escapeHtml(r.group_type)} · ${escapeHtml(r.event_type)}${dateStr}
+            ${escapeHtml(eventTypeDisplay(r.event_type))}${dateStr}
           </div>
         </div>
 
@@ -681,11 +683,10 @@ btnSubmit?.addEventListener("click", async () => {
     return;
   }
 
-  const { group_type, event_type } = categoryToApi(result.category);
+  const { event_type } = categoryToApi(result.category);
 
   const form = new FormData();
   form.append("name", result.name);
-  form.append("group_type", group_type);
   form.append("event_type", event_type);
   form.append("file", result.audioFile, result.audioFile.name);
 

@@ -2,10 +2,10 @@
 WebSocket 메시지 처리: join, caption(저장/브로드캐스트) + alert(판정 시에만 추가).
 
 저장·브로드캐스트 흐름(현실 운영):
-  A) caption(pass) 무조건 저장 + WS 브로드캐스트
+  A) caption(pass) WS 브로드캐스트만 (DB 저장 안 함)
   B) 판정 결과가 있으면(warning/daily) alert 추가 저장 + WS (쿨다운·alert_enabled 반영)
   C) 쿨다운: (client_session_uuid, keyword, event_type) 동일 시 cooldown_sec 내엔 alert 저장/발행 스킵
-  키워드 없으면 caption(pass)만 남고 alert 이벤트는 저장하지 않음.
+  키워드 없으면 caption만 브로드캐스트하고 alert 이벤트는 저장하지 않음.
 """
 import asyncio
 import os
@@ -122,26 +122,25 @@ def _get_settings(client_session_uuid: str) -> dict:
         db.close()
 
 
-def _persist_caption(client_session_uuid: str, text: str, ts_ms: int) -> None:
-    from App.db.crud import events as crud_events
-    from App.db.database import SessionLocal
-
-    db = SessionLocal()
-    try:
-        crud_events.create_caption_event(db, client_session_uuid, text, ts_ms)
-    except Exception:
-        db.rollback()
-        persist_logger.exception(
-            "db_save_caption_failed",
-            extra={
-                "session_id": client_session_uuid,
-                "ts_ms": ts_ms,
-                "text_len": len(text),
-            },
-        )
-        raise
-    finally:
-        db.close()
+def _persist_alert_if_enabled(
+    client_session_uuid: str,
+    text: str,
+    keyword: str | None,
+    event_type: str,
+    ts_ms: int,
+    *,
+    matched_custom_sound_id: int | None = None,
+    custom_similarity: float | None = None,
+) -> int | None:
+    """event_save_enabled이 True일 때만 alert DB 저장. (audio_cls_worker 등에서 사용)"""
+    settings = _get_settings(client_session_uuid)
+    if not settings.get("event_save_enabled", True):
+        return None
+    return _persist_alert(
+        client_session_uuid, text, keyword, event_type, ts_ms,
+        matched_custom_sound_id=matched_custom_sound_id,
+        custom_similarity=custom_similarity,
+    )
 
 
 def _persist_alert(
@@ -205,17 +204,14 @@ async def _handle_caption_generated(
     conn_prefix: str,
 ) -> None:
     """caption 텍스트 공통 처리: 브로드캐스트·DB 저장·키워드 판정·alert(쿨다운·설정 반영). STT 결과도 동일 흐름."""
-    # 1) caption 브로드캐스트 (말한/입력한 클라이언트도 자막 보이도록 exclude 없이 전송)
+    # 1) caption 브로드캐스트 (말한/입력한 클라이언트도 자막 보이도록 exclude 없이 전송, DB 저장 안 함)
     caption_entry = memory_logs.append_caption(sid, text, ts_ms=ts_ms)
     await manager.broadcast_to_session(sid, caption_entry)
-    # 2) DB 저장 + 설정 조회 병렬 (비동기 효율)
-    _, settings = await asyncio.gather(
-        asyncio.to_thread(_persist_caption, sid, text, ts_ms),
-        asyncio.to_thread(_get_settings, sid),
-    )
+    # 2) 설정 조회
+    settings = await asyncio.to_thread(_get_settings, sid)
     # 3) 키워드 판정
     category, event_type, keyword, score = keyword_detector.judge(text)
-    if event_type not in ("danger", "alert") or not keyword:
+    if event_type not in ("danger", "caution", "alert") or not keyword:
         return
     # 4) 설정 기반 쿨다운·alert on/off (위에서 조회한 settings 사용)
     cooldown_sec = int(settings.get("cooldown_sec", 5))
@@ -225,12 +221,14 @@ async def _handle_caption_generated(
             f"{conn_prefix}alert_skipped reason=cooldown session_id={sid} keyword={keyword or ''} event_type={event_type}"
         )
         return
-    # 5) alert 저장 + (가능하면) WS 발행 (event_id 포함해 프론트 피드백용)
+    # 5) alert 저장 + (가능하면) WS 발행 (event_id 포함해 프론트 피드백용). event_save_enabled 시에만 DB 저장
     _last_alert_ts_by_key[(sid, keyword or "", event_type)] = ts_ms
     entry = memory_logs.append_alert(
         sid, text, keyword or "", event_type, category, score, ts_ms=ts_ms, source="text"
     )
-    event_id = await asyncio.to_thread(_persist_alert, sid, text, keyword, event_type, ts_ms)
+    event_id = None
+    if settings.get("event_save_enabled", True):
+        event_id = await asyncio.to_thread(_persist_alert, sid, text, keyword, event_type, ts_ms)
     if event_id is not None:
         entry["event_id"] = event_id
         # 항상 클라이언트에 event_id 전달 (맞아요/아니에요 동작). 알림 끄면 silent로 토스트만 생략
@@ -303,24 +301,27 @@ async def _process_speech_and_enqueue_stt(
                     f"CustomPhraseAudio:{best_phrase.name} (sim={sim:.2f})"
                 )
                 _last_alert_ts_by_key[(sid, kw_phrase, best_phrase.event_type)] = ts_ms
+                _cat = {"danger": "warning", "caution": "caution", "alert": "daily"}.get(best_phrase.event_type, "daily")
                 entry_p = memory_logs.append_alert(
                     sid,
                     text_phrase,
                     kw_phrase,
                     best_phrase.event_type,
-                    "warning",
+                    _cat,
                     float(sim),
                     ts_ms=ts_ms,
                     source="custom_phrase",
                 )
-                event_id = await asyncio.to_thread(
-                    _persist_alert,
-                    sid,
-                    text_phrase,
-                    kw_phrase,
-                    best_phrase.event_type,
-                    ts_ms,
-                )
+                event_id = None
+                if settings.get("event_save_enabled", True):
+                    event_id = await asyncio.to_thread(
+                        _persist_alert,
+                        sid,
+                        text_phrase,
+                        kw_phrase,
+                        best_phrase.event_type,
+                        ts_ms,
+                    )
                 if event_id is not None:
                     entry_p["event_id"] = event_id
                 if alert_enabled:

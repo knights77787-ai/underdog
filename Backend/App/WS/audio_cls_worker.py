@@ -93,12 +93,13 @@ class AudioClsWorker:
                             custom_similarity=float(best_sim),
                         )
                         # Event-builder 통합: memory_logs에 추가 (최근 감지 로그·API 일관성)
+                        _cat = {"danger": "warning", "caution": "caution", "alert": "daily"}.get(best.event_type, "daily")
                         entry_custom = memory_logs.append_alert(
                             sid,
                             text_custom,
                             kw_custom,
                             best.event_type,
-                            "warning",
+                            _cat,
                             float(best_sim),
                             ts_ms=ts_ms,
                             source="custom_sound",
@@ -149,7 +150,7 @@ class AudioClsWorker:
                 )
 
                 # Event-builder 통합: memory_logs에 추가
-                category = "warning" if event_type == "alert" else "danger"
+                category = {"danger": "warning", "caution": "caution", "alert": "daily"}.get(event_type, "daily")
                 entry = memory_logs.append_alert(
                     sid, text, kw_prefixed, event_type, category,
                     float(top_score), ts_ms=ts_ms, source="audio",

@@ -13,7 +13,7 @@ def feedback_summary(
     limit: int = 50,
 ):
     """
-    keyword(텍스트 키워드 or yamnet:xxx) + event_type(danger/alert) 별 up/down 집계
+    keyword(텍스트 키워드 or yamnet:xxx) + event_type(danger/caution/alert) 별 up/down 집계
     """
     q = (
         db.query(
@@ -24,7 +24,7 @@ def feedback_summary(
             func.sum(case((EventFeedback.vote == "down", 1), else_=0)).label("down_cnt"),
         )
         .join(EventFeedback, EventFeedback.event_id == Event.event_id)
-        .filter(Event.event_type.in_(["danger", "alert"]))   # pass 제외
+        .filter(Event.event_type.in_(["danger", "caution", "alert"]))   # pass 제외
     )
 
     if session_id:

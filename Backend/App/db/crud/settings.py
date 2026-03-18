@@ -10,6 +10,7 @@ from App.db.models import SettingsModel
 DEFAULT_SETTINGS = {
     "font_size": 20,
     "alert_enabled": True,
+    "event_save_enabled": True,  # True: caption/alert DB 저장. False: 저장 안 함 (이벤트 히스토리 비표시)
     "cooldown_sec": 5,
     "auto_scroll": True,
     "stt_initial_prompt": "",  # Whisper API prompt: 도메인/어휘 힌트 (예: "일상 대화, 건강")
