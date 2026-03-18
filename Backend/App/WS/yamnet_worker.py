@@ -57,10 +57,12 @@ class YamnetWorker:
 
                 # WS 브로드캐스트
                 if alert_enabled:
+                    category = {"danger": "warning", "caution": "caution", "alert": "daily"}.get(event_type, "daily")
                     entry = {
                         "type": "alert",
                         "source": "audio",
                         "event_type": event_type,
+                        "category": category,
                         "keyword": keyword2,
                         "label_index": top_i,
                         "score": top_score,

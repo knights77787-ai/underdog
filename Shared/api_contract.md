@@ -510,13 +510,13 @@ Google과 거의 동일한 흐름으로 User/Session을 만들고, 프론트 페
 ### POST /custom-sounds (커스텀 환경음 등록)
 
 - **역할:** YAMNet embedding 기반 커스텀 소리(환경음) 등록. 실시간 비말 구간과 코사인 유사도로 매칭 후 alert 발생.
-- **요청:** `session_id`(Query), `name`, `group_type`, `event_type`(Form), `file`(.wav 또는 .mp3, 1초 권장). MP3는 pydub·ffmpeg 필요.
+- **요청:** `session_id`(Query), `name`, `event_type`(Form: danger|caution|alert), `file`(.wav 또는 .mp3, 1초 권장). MP3는 pydub·ffmpeg 필요.
 - **응답:** `{"ok": true, "data": {"custom_sound_id": int, "name": str}}`
 
 ### GET /custom-sounds
 
 - **쿼리:** `session_id` (필수)
-- **응답:** `{"ok": true, "count": N, "data": [{"custom_sound_id", "name", "group_type", "event_type"}, ...]}`
+- **응답:** `{"ok": true, "count": N, "data": [{"custom_sound_id", "name", "event_type"}, ...]}`
 
 ### POST /custom-phrase-audio (커스텀 안내 음성 등록)
 

@@ -45,22 +45,21 @@
 - **쿼리**: `session_id` (필수, 예: `S1`)
 - **Body (multipart/form-data)**:
   - `name`: 소리 이름 (필수)
-  - `group_type`: `"warning"` | `"daily"`
-  - `event_type`: `"danger"` | `"alert"`
-  - `file`: WAV 파일 (필수, **.wav만 지원**)
+  - `event_type`: `"danger"` | `"caution"` | `"alert"`
+  - `file`: WAV/MP3 등 (필수)
 
 ### 3.2 프론트와의 차이
 
 | 현재 프론트 (추정) | 백엔드 스펙 |
 |-------------------|-------------|
 | `POST /api/sounds` | `POST /custom-sounds?session_id=S1` |
-| `sound_name`, `sound_category`, `audio_file` | `name`, `group_type`, `event_type`, `file` |
+| `sound_name`, `sound_category`, `audio_file` | `name`, `event_type`, `file` |
 | 파일: webm/업로드 가능 | **.wav만 지원** |
 
 ### 3.3 연동 방법
 
 1. **요청 URL**: `http://127.0.0.1:8000/custom-sounds?session_id=S1` (같은 호스트면 상대 경로 `/custom-sounds?session_id=S1` 가능)
-2. **Form 필드명**: `name`, `group_type`, `event_type`, `file`
+2. **Form 필드명**: `name`, `event_type`, `file`
 3. **파일**: 서버가 WAV만 받으므로,  
    - 업로드 시 **.wav 파일만 선택**하도록 하거나,  
    - 녹음은 브라우저에서 WAV로 저장하는 라이브러리 사용,  
@@ -114,7 +113,7 @@
 
 - [ ] **라이브**: WS 연결 후 **join** 전송 (`type`, `session_id`)
 - [ ] **라이브**: caption/alert 표시 시 **ts_ms** 사용
-- [ ] **커스텀 소리**: `POST /custom-sounds?session_id=...`, Form 필드 `name`, `group_type`, `event_type`, `file` (.wav)
+- [ ] **커스텀 소리**: `POST /custom-sounds?session_id=...`, Form 필드 `name`, `event_type`, `file` (.wav)
 - [ ] (선택) 피드백: **POST /feedback** with `event_id`, `vote`, `comment`
 - [ ] (선택) 설정: **GET/POST /settings?session_id=...**
 

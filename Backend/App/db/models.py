@@ -57,8 +57,7 @@ class CustomSound(Base):
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.user_id"), nullable=True)
     client_session_uuid: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    group_type: Mapped[str | None] = mapped_column(String(32), nullable=True)  # "warning" | "daily"
-    event_type: Mapped[str | None] = mapped_column(String(32), nullable=True)  # "danger" | "alert"
+    event_type: Mapped[str | None] = mapped_column(String(32), nullable=True)  # "danger" | "caution" | "alert"
     match_target: Mapped[str | None] = mapped_column(String(255), nullable=True)
     audio_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
     embed_dim: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -73,7 +72,7 @@ class CustomPhraseAudio(Base):
     client_session_uuid: Mapped[str] = mapped_column(String(64), index=True)
 
     name: Mapped[str] = mapped_column(String(255))
-    event_type: Mapped[str] = mapped_column(String(16))  # "alert" | "danger"
+    event_type: Mapped[str] = mapped_column(String(16))  # "danger" | "caution" | "alert"
     threshold_pct: Mapped[int] = mapped_column(Integer, default=80)  # 80 => 0.80
 
     audio_path: Mapped[str | None] = mapped_column(String(512), nullable=True)

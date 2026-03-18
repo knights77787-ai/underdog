@@ -64,7 +64,7 @@
 
 - [ ] **내가 등록한 소리 목록**
   - "내가 등록한 소리" 탭 클릭 시 보여줄 페이지 (또는 같은 new_sound.html 내 섹션)
-  - `GET /custom-sounds?session_id=xxx` 호출 → 테이블/카드로 목록 렌더링 (`custom_sound_id`, `name`, `group_type`, `event_type`)
+  - `GET /custom-sounds?session_id=xxx` 호출 → 테이블/카드로 목록 렌더링 (`custom_sound_id`, `name`, `event_type`)
   - session_id는 URL 쿼리 또는 로그인/게스트와 동일한 방식으로 공유 (A와 협의)
 - [ ] **(선택) 커스텀 구문 음성**
   - `POST/GET /custom-phrase-audio` 연동 페이지 하나 (이름·event_type·threshold_pct·파일 업로드). 시간 없으면 생략 가능.

@@ -83,7 +83,7 @@ def admin_health(request: Request, db: Session = Depends(get_db)):
     try:
         rules["keyword_rules"] = get_keyword_counts()
     except Exception:
-        rules["keyword_rules"] = {"warning_count": None, "daily_count": None}
+        rules["keyword_rules"] = {"warning_count": None, "caution_count": None, "daily_count": None}
 
     return {
         "ok": True,

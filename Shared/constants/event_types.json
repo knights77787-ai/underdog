@@ -1,7 +1,8 @@
 {
   "keyword_cooldown_seconds": 5,
   "keywords_by_event_type": {
-    "danger": ["불", "화재", "비상", "살려"],
+    "danger": ["불", "화재", "비상", "살려", "대피"],
+    "caution": ["닫힙니다", "들어옵니다", "접근", "주의", "준비", "발빠짐", "문이 닫힙니다", "열차가 들어옵니다"],
     "alert": ["안내", "방송", "호출", "문 열림", "초인종", "벨", "도와"]
   },
   "audio_rules": {
@@ -9,12 +10,21 @@
     "warning_labels": [
       "Police car (siren)",
       "Ambulance (siren)",
-      "Fire engine, fire truck (siren)"
+      "Fire engine, fire truck (siren)",
+      "Alarm",
+      "Fire alarm"
+    ],
+    "caution_labels": [
+      "Train",
+      "Train horn",
+      "Train whistle",
+      "Vehicle",
+      "Vehicle horn, car horn, honking"
     ],
     "daily_labels": [
       "Doorbell",
-      "Ding-dong",
-      "Knock"
+      "Door Knock",
+      "Alarm clock"
     ]
   }
 }

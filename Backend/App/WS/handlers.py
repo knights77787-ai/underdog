@@ -215,7 +215,7 @@ async def _handle_caption_generated(
     )
     # 3) 키워드 판정
     category, event_type, keyword, score = keyword_detector.judge(text)
-    if event_type not in ("danger", "alert") or not keyword:
+    if event_type not in ("danger", "caution", "alert") or not keyword:
         return
     # 4) 설정 기반 쿨다운·alert on/off (위에서 조회한 settings 사용)
     cooldown_sec = int(settings.get("cooldown_sec", 5))
@@ -303,12 +303,13 @@ async def _process_speech_and_enqueue_stt(
                     f"CustomPhraseAudio:{best_phrase.name} (sim={sim:.2f})"
                 )
                 _last_alert_ts_by_key[(sid, kw_phrase, best_phrase.event_type)] = ts_ms
+                _cat = {"danger": "warning", "caution": "caution", "alert": "daily"}.get(best_phrase.event_type, "daily")
                 entry_p = memory_logs.append_alert(
                     sid,
                     text_phrase,
                     kw_phrase,
                     best_phrase.event_type,
-                    "warning",
+                    _cat,
                     float(sim),
                     ts_ms=ts_ms,
                     source="custom_phrase",

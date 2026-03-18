@@ -111,7 +111,7 @@ def get_logs_from_db(
     if log_type == "caption":
         q = q.filter(Event.event_type == "pass")
     elif log_type == "alert":
-        q = q.filter(Event.event_type.in_(["danger", "alert"]))
+        q = q.filter(Event.event_type.in_(["danger", "caution", "alert"]))
 
     # 정렬: ts_ms 내림차순 + event_id 내림차순(tie-breaker)으로 커서 안정성 확보
     events = q.order_by(desc(Event.segment_start_ms), desc(Event.event_id)).limit(limit + 1).all()
@@ -169,7 +169,7 @@ def get_admin_summary_from_db(
     now_ms = int(time.time() * 1000)
     cutoff = now_ms - (recent_window_sec * 1000)
     captions = [e for e in events if e.event_type == "pass"]
-    alerts = [e for e in events if e.event_type in ("danger", "alert")]
+    alerts = [e for e in events if e.event_type in ("danger", "caution", "alert")]
     recent_alerts = [e for e in alerts if (e.segment_start_ms or 0) >= cutoff]
     session_ids = sorted(
         {e.session.client_session_uuid for e in events if e.session and e.session.client_session_uuid}

@@ -10,20 +10,24 @@ _LOCK = RLock()
 
 _audio_min_score = 0.35
 _warning_labels: set[str] = set()
+_caution_labels: set[str] = set()
 _daily_labels: set[str] = set()
-# 하위 호환: index 기반 설정만 있으면 계속 사용
 _warning_indices: set[int] = set()
+_caution_indices: set[int] = set()
 _daily_indices: set[int] = set()
 
 def reload_audio_rules() -> dict:
-    global _audio_min_score, _warning_labels, _daily_labels, _warning_indices, _daily_indices
+    global _audio_min_score, _warning_labels, _caution_labels, _daily_labels
+    global _warning_indices, _caution_indices, _daily_indices
 
     if not EVENT_TYPES_PATH.exists():
         with _LOCK:
             _audio_min_score = 0.35
             _warning_labels = set()
+            _caution_labels = set()
             _daily_labels = set()
             _warning_indices = set()
+            _caution_indices = set()
             _daily_indices = set()
         return {"ok": False, "reason": "EVENT_TYPES_PATH missing", "path": str(EVENT_TYPES_PATH)}
 
@@ -32,11 +36,11 @@ def reload_audio_rules() -> dict:
 
     min_score = float(audio_rules.get("min_score", 0.35))
 
-    # label 기반 (운영/발표용 권장)
     w_labels = [s.strip() for s in (audio_rules.get("warning_labels") or []) if s and isinstance(s, str)]
+    c_labels = [s.strip() for s in (audio_rules.get("caution_labels") or []) if s and isinstance(s, str)]
     d_labels = [s.strip() for s in (audio_rules.get("daily_labels") or []) if s and isinstance(s, str)]
-    # 하위 호환: index 기반
     w_idx = audio_rules.get("warning_indices", []) or []
+    c_idx = audio_rules.get("caution_indices", []) or []
     d_idx = audio_rules.get("daily_indices", []) or []
 
     def to_int_set(xs):
@@ -51,8 +55,10 @@ def reload_audio_rules() -> dict:
     with _LOCK:
         _audio_min_score = min_score
         _warning_labels = set(w_labels)
+        _caution_labels = set(c_labels)
         _daily_labels = set(d_labels)
         _warning_indices = to_int_set(w_idx)
+        _caution_indices = to_int_set(c_idx)
         _daily_indices = to_int_set(d_idx)
 
     return {
@@ -60,6 +66,7 @@ def reload_audio_rules() -> dict:
         "path": str(EVENT_TYPES_PATH),
         "min_score": _audio_min_score,
         "warning_count": len(_warning_labels) or len(_warning_indices),
+        "caution_count": len(_caution_labels) or len(_caution_indices),
         "daily_count": len(_daily_labels) or len(_daily_indices),
     }
 
@@ -68,29 +75,33 @@ def classify_audio(
 ) -> tuple[str | None, str | None]:
     """
     return: (event_type, keyword)
-    event_type: "danger" | "alert" | None
-    keyword: label 문자열(라벨 기반) 또는 index 문자열(인덱스 기반)
-    label 기반: warning_labels/daily_labels 있으면 top_label로 매칭.
+    event_type: "danger" | "caution" | "alert" | None (Warning|Caution|Daily)
     """
     with _LOCK:
         min_score = _audio_min_score
         w_lab = _warning_labels
+        c_lab = _caution_labels
         d_lab = _daily_labels
         w_idx = _warning_indices
+        c_idx = _caution_indices
         d_idx = _daily_indices
 
     if score < min_score:
         return None, None
 
-    use_labels = bool(w_lab or d_lab)
+    use_labels = bool(w_lab or c_lab or d_lab)
     if use_labels and label:
         if label in w_lab:
             return "danger", label
+        if label in c_lab:
+            return "caution", label
         if label in d_lab:
             return "alert", label
     else:
         if top_index in w_idx:
             return "danger", str(top_index)
+        if top_index in c_idx:
+            return "caution", str(top_index)
         if top_index in d_idx:
             return "alert", str(top_index)
 
@@ -101,6 +112,7 @@ def get_audio_rules_status() -> dict:
         return {
             "min_score": _audio_min_score,
             "warning_count": len(_warning_labels) or len(_warning_indices),
+            "caution_count": len(_caution_labels) or len(_caution_indices),
             "daily_count": len(_daily_labels) or len(_daily_indices),
         }
 

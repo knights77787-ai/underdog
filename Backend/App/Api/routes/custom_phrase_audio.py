@@ -75,7 +75,7 @@ def _decode_audio_to_16k_mono_f32(data: bytes, ext: str) -> np.ndarray:
 async def register_phrase_audio(
     session_id: str = Query(..., description="S1 같은 클라이언트 세션"),
     name: str = Form(..., description="예: 강남역 안내"),
-    event_type: str = Form(..., description="alert|danger"),
+    event_type: str = Form(..., description="danger | caution | alert"),
     threshold_pct: int = Form(80, ge=50, le=99, description="정규화 sim * 100 (예: 80=0.80)"),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),

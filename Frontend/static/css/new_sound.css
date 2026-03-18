@@ -202,6 +202,11 @@ body {
   color: #fff !important;
 }
 
+.sound-badge.caution {
+  background: #f59e0b !important;
+  color: #fff !important;
+}
+
 .icon-btn.play-toggle-btn {
   width: 42px;
   height: 42px;

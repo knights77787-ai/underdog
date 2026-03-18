@@ -7,7 +7,7 @@
 ## ✅ 이미 적용된 것 (방금 반영)
 
 - **POST /custom-sounds**  
-  `new_sound.js`: 제출 시 `FormData`로 `name`, `group_type`, `event_type`, `file` 전송.  
+  `new_sound.js`: 제출 시 `FormData`로 `name`, `event_type`, `file` 전송.  
   세션은 URL `session_id` 또는 기본 `S1`.  
   서버는 **.wav, .mp3**만 허용 → 프론트에서 .webm 선택 시 "등록은 .wav, .mp3만 지원합니다" 안내.
 

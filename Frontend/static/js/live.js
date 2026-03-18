@@ -721,32 +721,22 @@ function setupUserDropdown() {
     window.location.href = "/";
   });
 
-<<<<<<< HEAD
-=======
-  // mouseover 시 드롭다운 표시 (Bootstrap/요소 없으면 무시)
-  let hideTimer = null;
-  userDropdownWrap.addEventListener("mouseenter", () => {
-    if (hideTimer) clearTimeout(hideTimer);
-    try {
-      if (window.bootstrap && btnUserIcon) {
-        const dropdown = bootstrap.Dropdown.getOrCreateInstance(btnUserIcon);
-        if (dropdown) dropdown.show();
-      }
-    } catch (e) {
-      console.warn("[Lumen] dropdown show", e);
+}
+
+// 푸터: 소리등록/설정 링크 - 게스트 클릭 시 로그인 유도
+function setupFooterAuthLinks() {
+  const footerSoundReg = document.getElementById("footerSoundReg");
+  const footerSettings = document.getElementById("footerSettings");
+  const intercept = (e, link) => {
+    if (!link) return;
+    if (isGuest()) {
+      e.preventDefault();
+      alert("로그인이 필요한 서비스입니다.");
+      window.location.href = "/login";
     }
-  });
-  userDropdownWrap.addEventListener("mouseleave", () => {
-    hideTimer = setTimeout(() => {
-      try {
-        if (window.bootstrap && btnUserIcon) {
-          const dropdown = bootstrap.Dropdown.getInstance(btnUserIcon);
-          if (dropdown) dropdown.hide();
-        }
-      } catch (_) {}
-    }, 150);
-  });
->>>>>>> yh_01
+  };
+  if (footerSoundReg) footerSoundReg.addEventListener("click", (e) => intercept(e, footerSoundReg));
+  if (footerSettings) footerSettings.addEventListener("click", (e) => intercept(e, footerSettings));
 }
 
 // 설정: 자막 글자 크기만 로드 (설정 페이지는 /settings-page 에서 편집)
@@ -758,14 +748,18 @@ function applyFontSizeToCaption(px) {
 }
 
 async function loadSettingsForCaption() {
-  if (!SESSION_ID || !captionBox) return;
+  if (!SESSION_ID) return;
   try {
     const res = await fetch(API_BASE + "/settings?session_id=" + encodeURIComponent(SESSION_ID));
     const data = await res.json().catch(() => ({}));
-    const fontSize = data?.data?.font_size ?? data?.font_size;
-    if (res.ok && data?.ok && fontSize != null) {
+    if (!res.ok || !data?.ok) return;
+    const d = data?.data ?? data;
+    const fontSize = d?.font_size;
+    if (fontSize != null && captionBox) {
       applyFontSizeToCaption(fontSize);
     }
+    // 기록저장 토글: 저장된 설정 반영 (없으면 기본 true)
+    if (saveToggle) saveToggle.checked = d?.alert_enabled !== false;
   } catch (_) {}
 }
 
@@ -778,6 +772,7 @@ async function loadSettingsForCaption() {
     updateUserSection();
     updateLogSectionVisibility();
     setupUserDropdown();
+    setupFooterAuthLinks();
     if (SESSION_ID) loadSettingsForCaption();
   } catch (e) {
     console.warn("[Lumen] init error", e);

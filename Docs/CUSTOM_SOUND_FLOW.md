@@ -30,7 +30,7 @@ client_session_uuid = 세션ID    세션별 custom sound와 유사도 비교
 |------|------|
 | 진입 | 라이브 → 사용자 드롭다운 → "소리등록" 클릭 → `/new-sound?session_id=xxx` |
 | 녹음/업로드 | 오디오 파일 선택 후 이름·분류 입력 |
-| 등록 | `POST /custom-sounds?session_id=xxx` (FormData: name, group_type, event_type, file) |
+| 등록 | `POST /custom-sounds?session_id=xxx` (FormData: name, event_type, file) |
 | 서버 처리 | 오디오를 16kHz mono float32로 변환 → YAMNet으로 **embedding 추출** → DB 저장 |
 
 **저장되는 것**
