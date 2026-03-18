@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Lumen · Live (Single User) Main Hompage</title>
+  <title>Lumen | 메인 홈</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 
   <!-- Bootstrap 5 -->
@@ -20,15 +20,16 @@
 
   <!-- Topbar -->
   <nav class="navbar bg-white border-bottom">
-    <div class="header-inner container-fluid d-flex align-items-center gap-2 flex-wrap">
-      <a href="/" class="fw-bold text-dark text-decoration-none">
-        <img src="/static/img/lumen_logo.png" alt="Lumen" width="70" height="50">
-      </a>
-
-      <span id="sessionLabel" class="small text-muted ms-2 d-none d-md-inline"></span>
-
-      <!-- 기록저장 / 설정 / 사용자 (오른쪽 정렬) -->
-      <div class="ms-auto d-flex align-items-center gap-2">
+    <div class="header-inner container-fluid">
+      <div class="header-left d-flex align-items-center">
+        <span id="sessionLabel" class="small text-muted d-none d-md-inline"></span>
+      </div>
+      <span class="header-logo-slot">
+        <a href="/" class="header-logo-wrap fw-bold text-dark text-decoration-none">
+          <img src="/static/img/lumen_logo.png" alt="Lumen" width="70" height="50">
+        </a>
+      </span>
+      <div class="header-right">
         <div class="d-flex align-items-center gap-2" id="saveToggleWrap">
           <span class="small text-muted">이벤트 기록 저장</span>
           <div class="form-check form-switch m-0">
@@ -129,7 +130,7 @@
             </div>
           </div>
           <div class="card-footer small text-muted">
-            * 서버가 보내는 caption/alert를 이 표에 쌓습니다.
+            * 감지된 이벤트(경고·알림)만 최근 30건 표시.
           </div>
         </div>
       </div>

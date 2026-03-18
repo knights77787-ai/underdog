@@ -10,6 +10,52 @@
   padding: 0 0.75rem;
 }
 
+/* 사용자 헤더: 로고 가운데 정렬 (좌/우 영역 균형으로 중앙 유지) */
+.navbar .header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.navbar .header-inner .header-logo-wrap {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+/* 사용자 화면: 로고 slot (헤더 높이와 무관, absolute 배치 후 확대) */
+.navbar .header-inner .header-logo-slot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+}
+.navbar .header-inner .header-logo-slot .header-logo-wrap {
+  position: static;
+  transform: none;
+}
+.navbar .header-inner .header-logo-slot img {
+  width: 98px;
+  height: 70px;
+  object-fit: contain;
+}
+.navbar .header-inner .header-left,
+.navbar .header-inner .header-right {
+  flex: 1;
+  min-width: 0;
+}
+.navbar .header-inner .header-right {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  min-height: 2.5rem;  /* 게스트일 때 빈 상태여도 로그인 사용자와 동일한 헤더 높이 유지 */
+}
+.navbar .header-inner {
+  position: relative;
+}
+
 .app-footer {
   margin-top: auto;
   padding: 1.5rem 0;

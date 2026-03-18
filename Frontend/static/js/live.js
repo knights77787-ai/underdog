@@ -103,7 +103,6 @@ const captionBox = document.getElementById("captionBox");
 
 const toastContainer = document.getElementById("toastContainer");
 const sessionLabel = document.getElementById("sessionLabel");
-const btnLogin = document.getElementById("btnLogin");
 const userDropdownWrap = document.getElementById("userDropdownWrap");
 const btnUserIcon = document.getElementById("btnUserIcon");
 const userDropdownName = document.getElementById("userDropdownName");
@@ -555,14 +554,13 @@ client.on("close", () => {
   btnFeedbackNo.disabled = true;
 });
 
-// 서버가 caption 보내면 (백엔드는 ts_ms 필드 사용). payload 래핑 대비 안전 접근
+// 서버가 caption 보내면 (STT 결과 = 말한 내용). 실시간 자막에만 표시.
 client.on("caption", (msg) => {
   if (!msg || typeof msg !== "object") return;
   const text = (msg.text ?? msg.payload?.text ?? "").toString();
   const danger = isDanger(text);
 
   appendCaption(text, danger);
-  appendLogRow({ ts_ms: msg.ts_ms ?? msg.payload?.ts_ms, ts: msg.ts ?? msg.payload?.ts, type: "caption", text, score: msg.score ?? msg.payload?.score });
 
   if (danger) {
     setHeroDanger(text);
@@ -571,7 +569,7 @@ client.on("caption", (msg) => {
   }
 });
 
-// 서버가 alert 보내면 (백엔드는 ts_ms, event_id 필드 사용). payload 래핑 대비 안전 접근
+// 서버가 alert 보내면 (키워드/YAMNet/커스텀 소리 등). 최근 감지 로그에만 표시. 실시간 자막에는 안 나옴.
 client.on("alert", (msg) => {
   if (!msg || typeof msg !== "object") return;
   const p = (msg && typeof msg.payload === "object" && msg.payload !== null) ? msg.payload : undefined;
@@ -580,7 +578,6 @@ client.on("alert", (msg) => {
   const event_type = msg.event_type ?? p?.event_type ?? "danger";
   if ((msg.event_id ?? p?.event_id) != null) lastAlertEventId = msg.event_id ?? p?.event_id;
 
-  appendCaption(`[ALERT] ${text}`, true);
   appendLogRow({ ts_ms: msg.ts_ms ?? p?.ts_ms, ts: msg.ts ?? p?.ts, type: "alert", text, keyword, event_type, score: msg.score ?? p?.score });
 
   setHeroDanger(`${keyword ? "["+keyword+"] " : ""}${text}`);
@@ -641,11 +638,9 @@ function updateUserSection() {
   if (!userDropdownWrap) return;
   const provider = getProvider();
   if (provider === "google" || provider === "kakao") {
-    if (btnLogin) btnLogin.classList.add("d-none");
     userDropdownWrap.classList.remove("d-none");
     if (SESSION_ID) loadUserInfo();
   } else {
-    if (btnLogin) btnLogin.classList.remove("d-none");
     userDropdownWrap.classList.add("d-none");
   }
   updateLogSectionVisibility();
@@ -739,6 +734,27 @@ function setupFooterAuthLinks() {
   if (footerSettings) footerSettings.addEventListener("click", (e) => intercept(e, footerSettings));
 }
 
+// 이벤트 기록 저장 토글: 변경 시 POST /settings로 event_save_enabled 저장
+function setupSaveToggle() {
+  if (!saveToggle || !SESSION_ID) return;
+  saveToggle.addEventListener("change", async () => {
+    const enabled = saveToggle.checked;
+    try {
+      const res = await fetch(API_BASE + "/settings?session_id=" + encodeURIComponent(SESSION_ID), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ event_save_enabled: enabled }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.ok) {
+        saveToggle.checked = !enabled;  // 롤백
+      }
+    } catch (_) {
+      saveToggle.checked = !enabled;  // 롤백
+    }
+  });
+}
+
 // 설정: 자막 글자 크기만 로드 (설정 페이지는 /settings-page 에서 편집)
 function applyFontSizeToCaption(px) {
   if (captionBox && px != null) {
@@ -758,8 +774,8 @@ async function loadSettingsForCaption() {
     if (fontSize != null && captionBox) {
       applyFontSizeToCaption(fontSize);
     }
-    // 기록저장 토글: 저장된 설정 반영 (없으면 기본 true)
-    if (saveToggle) saveToggle.checked = d?.alert_enabled !== false;
+    // 이벤트 기록 저장 토글: event_save_enabled 반영 (없으면 기본 true)
+    if (saveToggle) saveToggle.checked = d?.event_save_enabled !== false;
   } catch (_) {}
 }
 
@@ -773,6 +789,7 @@ async function loadSettingsForCaption() {
     updateLogSectionVisibility();
     setupUserDropdown();
     setupFooterAuthLinks();
+    setupSaveToggle();
     if (SESSION_ID) loadSettingsForCaption();
   } catch (e) {
     console.warn("[Lumen] init error", e);

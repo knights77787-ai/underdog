@@ -102,27 +102,81 @@ async function saveSettings(e) {
 
 if (settingsForm) settingsForm.addEventListener("submit", saveSettings);
 
-// 라이브로 돌아가기: session_id + provider 포함해 이동 (로그인 유지)
-const btnBackToLive = document.getElementById("btnBackToLive");
-if (btnBackToLive) {
-  (function setBackToLiveHref() {
-    let sid = SESSION_ID;
-    if (!sid && typeof localStorage !== "undefined") {
-      sid = localStorage.getItem(SESSION_STORAGE_KEY);
-    }
-    sid = (sid && String(sid).trim()) || null;
-    let prov = new URLSearchParams(document.location.search).get("provider");
-    if (!prov && typeof localStorage !== "undefined") {
-      prov = localStorage.getItem(PROVIDER_STORAGE_KEY);
-    }
-    prov = (prov && String(prov).trim()) || null;
-    const params = new URLSearchParams();
-    if (sid) params.set("session_id", sid);
-    if (prov) params.set("provider", prov);
-    const qs = params.toString();
-    btnBackToLive.href = qs ? "/live?" + qs : "/live";
-  })();
+// 헬퍼: session_id, provider 포함한 base URL 생성
+function buildUrlWithSession(path) {
+  let sid = SESSION_ID;
+  if (!sid && typeof localStorage !== "undefined") {
+    sid = localStorage.getItem(SESSION_STORAGE_KEY);
+  }
+  sid = (sid && String(sid).trim()) || null;
+  let prov = new URLSearchParams(document.location.search).get("provider");
+  if (!prov && typeof localStorage !== "undefined") {
+    prov = localStorage.getItem(PROVIDER_STORAGE_KEY);
+  }
+  prov = (prov && String(prov).trim()) || null;
+  const params = new URLSearchParams();
+  if (sid) params.set("session_id", sid);
+  if (prov) params.set("provider", prov);
+  const qs = params.toString();
+  return qs ? path + "?" + qs : path;
 }
+
+// 사용자 정보 로드 (드롭다운 상단 표시)
+async function loadUserInfo() {
+  const userDropdownName = document.getElementById("userDropdownName");
+  const userDropdownEmail = document.getElementById("userDropdownEmail");
+  if (!userDropdownName || !userDropdownEmail) return;
+  if (!SESSION_ID) {
+    userDropdownName.textContent = "게스트";
+    userDropdownEmail.textContent = "-";
+    return;
+  }
+  try {
+    const res = await fetch(API_BASE + "/auth/me?session_id=" + encodeURIComponent(SESSION_ID));
+    const data = await res.json().catch(() => ({}));
+    const ok = res.ok && data && (data.ok === true || data.ok === "true");
+    const name = (data && (data.name ?? data.user?.name)) || "사용자";
+    const email = (data && (data.email ?? data.user?.email)) || "-";
+    userDropdownName.textContent = ok ? name : "사용자";
+    userDropdownEmail.textContent = ok ? email : "-";
+  } catch (_) {
+    if (userDropdownName) userDropdownName.textContent = "사용자";
+    if (userDropdownEmail) userDropdownEmail.textContent = "-";
+  }
+}
+
+// 사용자 드롭다운: 소리등록, 설정, 로그아웃
+function setupUserDropdown() {
+  const userDropdownSoundReg = document.getElementById("userDropdownSoundReg");
+  const userDropdownSettings = document.getElementById("userDropdownSettings");
+  const userDropdownLogout = document.getElementById("userDropdownLogout");
+
+  if (userDropdownSoundReg) {
+    userDropdownSoundReg.addEventListener("click", (e) => {
+      e.preventDefault();
+      window.location.href = buildUrlWithSession("/new-sound");
+    });
+  }
+  if (userDropdownSettings) {
+    userDropdownSettings.addEventListener("click", (e) => {
+      e.preventDefault();
+      window.location.href = buildUrlWithSession("/settings-page");
+    });
+  }
+  if (userDropdownLogout) {
+    userDropdownLogout.addEventListener("click", (e) => {
+      e.preventDefault();
+      try {
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+        localStorage.removeItem(PROVIDER_STORAGE_KEY);
+      } catch (_) {}
+      window.location.href = "/";
+    });
+  }
+}
+
+setupUserDropdown();
+loadUserInfo();
 
 if (SESSION_ID) {
   loadSettings();
