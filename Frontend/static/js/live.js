@@ -721,8 +721,6 @@ function setupUserDropdown() {
     window.location.href = "/";
   });
 
-<<<<<<< HEAD
-=======
   // mouseover 시 드롭다운 표시 (Bootstrap/요소 없으면 무시)
   let hideTimer = null;
   userDropdownWrap.addEventListener("mouseenter", () => {
@@ -746,7 +744,6 @@ function setupUserDropdown() {
       } catch (_) {}
     }, 150);
   });
->>>>>>> yh_01
 }
 
 // 설정: 자막 글자 크기만 로드 (설정 페이지는 /settings-page 에서 편집)
