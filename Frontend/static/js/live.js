@@ -1,5 +1,40 @@
 // Frontend/static/js/live.js
 // =======================
+// 0) 공용 unhandledrejection 가드 (초기 로드 초반부터 등록)
+// =======================
+// 소스맵/번들링 때문에 스택에 core.js로 표시되는 경우가 있어,
+// "payload" 관련 TypeError만 조용히 삼키도록 한다.
+(() => {
+  try {
+    if (window.__underdogUnhandledRejectionPayloadGuardInstalled) return;
+    window.__underdogUnhandledRejectionPayloadGuardInstalled = true;
+    window.addEventListener("unhandledrejection", (ev) => {
+      const reason = ev && ev.reason ? ev.reason : null;
+      const msg = reason && (reason.message || String(reason));
+      if (msg && typeof msg === "string") {
+        const msgLower = msg.toLowerCase();
+        const shouldSilence =
+          // 기존: payload 관련 TypeError 무시
+          msgLower.includes("payload") ||
+          msgLower.includes("reading 'payload'") ||
+          // 추가: checkout popup / GF config 관련 미처리 예외 무시
+          msgLower.includes("checkout popup") ||
+          msgLower.includes("checkoutpopup") ||
+          msgLower.includes("no checkout popup config") ||
+          msgLower.includes("gf config") ||
+          msgLower.includes("no gf config") ||
+          msgLower.includes("checkoutpouploggerenabled");
+        if (shouldSilence) {
+        try {
+          ev.preventDefault();
+          ev.stopImmediatePropagation();
+        } catch (_) {}
+        }
+      }
+    });
+  } catch (_) {}
+})();
+// =======================
 // 0) 서버 주소 · 세션 (백엔드 연동: join 시 사용)
 // =======================
 // 배포(HTTPS)에서는 config 미적재 시에도 현재 오리진 사용. 로컬만 127.0.0.1 폴백
