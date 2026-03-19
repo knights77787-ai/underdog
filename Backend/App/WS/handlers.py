@@ -122,27 +122,6 @@ def _get_settings(client_session_uuid: str) -> dict:
         db.close()
 
 
-def _persist_alert_if_enabled(
-    client_session_uuid: str,
-    text: str,
-    keyword: str | None,
-    event_type: str,
-    ts_ms: int,
-    *,
-    matched_custom_sound_id: int | None = None,
-    custom_similarity: float | None = None,
-) -> int | None:
-    """event_save_enabled이 True일 때만 alert DB 저장. (audio_cls_worker 등에서 사용)"""
-    settings = _get_settings(client_session_uuid)
-    if not settings.get("event_save_enabled", True):
-        return None
-    return _persist_alert(
-        client_session_uuid, text, keyword, event_type, ts_ms,
-        matched_custom_sound_id=matched_custom_sound_id,
-        custom_similarity=custom_similarity,
-    )
-
-
 def _persist_alert(
     client_session_uuid: str,
     text: str,
@@ -221,27 +200,20 @@ async def _handle_caption_generated(
             f"{conn_prefix}alert_skipped reason=cooldown session_id={sid} keyword={keyword or ''} event_type={event_type}"
         )
         return
-    # 5) alert 저장 + (가능하면) WS 발행 (event_id 포함해 프론트 피드백용). event_save_enabled 시에만 DB 저장
+    # 5) alert 저장 + WS 발행
     _last_alert_ts_by_key[(sid, keyword or "", event_type)] = ts_ms
     entry = memory_logs.append_alert(
         sid, text, keyword or "", event_type, category, score, ts_ms=ts_ms, source="text"
     )
-    event_id = None
-    if settings.get("event_save_enabled", True):
-        event_id = await asyncio.to_thread(_persist_alert, sid, text, keyword, event_type, ts_ms)
+    event_id = await asyncio.to_thread(_persist_alert, sid, text, keyword, event_type, ts_ms)
     if event_id is not None:
         entry["event_id"] = event_id
-        # 항상 클라이언트에 event_id 전달 (맞아요/아니에요 동작). 알림 끄면 silent로 토스트만 생략
-        if not alert_enabled:
-            entry["silent"] = True
-        await manager.broadcast_to_session(sid, entry)
-        logger.info(
-            f"{conn_prefix}ws_alert_emitted session_id={sid} keyword={keyword or ''} event_type={event_type} event_id={event_id} silent={not alert_enabled}"
-        )
-    else:
-        logger.debug(
-            f"{conn_prefix}alert_not_broadcast event_id=None session_id={sid} keyword={keyword or ''}"
-        )
+    if not alert_enabled:
+        entry["silent"] = True
+    await manager.broadcast_to_session(sid, entry)
+    logger.info(
+        f"{conn_prefix}ws_alert_emitted session_id={sid} keyword={keyword or ''} event_type={event_type} event_id={event_id} silent={not alert_enabled}"
+    )
 
 
 async def _process_speech_and_enqueue_stt(
@@ -312,16 +284,14 @@ async def _process_speech_and_enqueue_stt(
                     ts_ms=ts_ms,
                     source="custom_phrase",
                 )
-                event_id = None
-                if settings.get("event_save_enabled", True):
-                    event_id = await asyncio.to_thread(
-                        _persist_alert,
-                        sid,
-                        text_phrase,
-                        kw_phrase,
-                        best_phrase.event_type,
-                        ts_ms,
-                    )
+                event_id = await asyncio.to_thread(
+                    _persist_alert,
+                    sid,
+                    text_phrase,
+                    kw_phrase,
+                    best_phrase.event_type,
+                    ts_ms,
+                )
                 if event_id is not None:
                     entry_p["event_id"] = event_id
                 if alert_enabled:

@@ -137,8 +137,8 @@ async def lifespan(app: FastAPI):
         sid, text, keyword, event_type, ts_ms,
         *, matched_custom_sound_id=None, custom_similarity=None,
     ):
-        """DB 저장(event_save_enabled 시) + 쿨다운 기록. event_id 반환 (커스텀 사운드 등 WS 브로드캐스트용)."""
-        event_id = handlers._persist_alert_if_enabled(
+        """DB 저장 + 쿨다운 기록. event_id 반환 (커스텀 사운드 등 WS 브로드캐스트용)."""
+        event_id = handlers._persist_alert(
             sid, text, keyword, event_type, ts_ms,
             matched_custom_sound_id=matched_custom_sound_id,
             custom_similarity=custom_similarity,
