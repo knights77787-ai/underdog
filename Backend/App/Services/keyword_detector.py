@@ -29,8 +29,47 @@ def _normalize_text(s: str) -> str:
     - 공백 제거
     - 문장부호/기호 제거 (유니코드 word 문자는 유지: 한글 포함)
     """
-    s = s or ""
+    s = (s or "").lower()
     return _NON_WORD_RE.sub("", s)
+
+
+def _is_phrase_matched(
+    phrase: str,
+    text: str,
+    text_compact: str,
+    text_norm: str,
+) -> bool:
+    """직접/정규화/토큰 순서 기반으로 phrase 매칭."""
+    phrase = phrase or ""
+    if not phrase:
+        return False
+
+    # 1) 원문 부분 문자열
+    if phrase in text:
+        return True
+
+    # 2) 공백 제거 버전
+    phrase_compact = "".join(phrase.split())
+    if phrase_compact and phrase_compact in text_compact:
+        return True
+
+    # 3) 공백+문장부호 제거 버전
+    phrase_norm = _normalize_text(phrase)
+    if phrase_norm and phrase_norm in text_norm:
+        return True
+
+    # 4) 다중 토큰 문구(예: "문이 닫힙니다")는 토큰이 순서대로 등장하면 매칭
+    tokens = [_normalize_text(tok) for tok in phrase.split() if _normalize_text(tok)]
+    if len(tokens) >= 2 and text_norm:
+        pos = 0
+        for tok in tokens:
+            idx = text_norm.find(tok, pos)
+            if idx < 0:
+                return False
+            pos = idx + len(tok)
+        return True
+
+    return False
 
 
 def uniq(seq):
@@ -141,7 +180,7 @@ def judge(
     판정 우선순위: Warning(danger) → Caution → Daily(alert) → info.
     반환: (category, event_type, keyword, score). keyword는 canonical(대표 키).
     """
-    text = text or ""
+    text = (text or "").lower()
     # STT 결과에 "화 재"처럼 공백이 섞여 들어오는 케이스가 있어
     # 공백 제거 버전도 함께 검사한다.
     text_compact = "".join(text.split())
@@ -151,35 +190,21 @@ def judge(
     scores = {"danger": 1.0, "caution": 0.85, "alert": 0.7}
     categories = {"danger": "warning", "caution": "caution", "alert": "daily"}
     for phrase, etype, canonical in rules:
-        phrase = phrase or ""
-        phrase_compact = "".join(phrase.split())
-        phrase_norm = _normalize_text(phrase)
-        if (
-            (phrase and phrase in text)
-            or (phrase_compact and phrase_compact in text_compact)
-            or (phrase_norm and phrase_norm in text_norm)
-        ):
+        if _is_phrase_matched(phrase, text, text_compact, text_norm):
             return (categories[etype], etype, canonical, scores[etype])
     return ("daily", "info", None, 0.2)
 
 
 def check_alerts(text: str):
     """텍스트에서 매칭되는 모든 (keyword, event_type) 쌍 반환. keyword는 canonical."""
-    text = text or ""
+    text = (text or "").lower()
     text_compact = "".join(text.split())
     text_norm = _normalize_text(text)
     with _RULE_LOCK:
         rules = list(_rules_flat)
     seen: set[tuple[str, str]] = set()
     for phrase, etype, canonical in rules:
-        phrase = phrase or ""
-        phrase_compact = "".join(phrase.split())
-        phrase_norm = _normalize_text(phrase)
-        if (
-            (phrase and phrase in text)
-            or (phrase_compact and phrase_compact in text_compact)
-            or (phrase_norm and phrase_norm in text_norm)
-        ):
+        if _is_phrase_matched(phrase, text, text_compact, text_norm):
             key = (canonical, etype)
             if key not in seen:
                 seen.add(key)
