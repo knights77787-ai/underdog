@@ -99,6 +99,7 @@ class WhisperAPISTT:
                         "language": STT_LANGUAGE,
                         **({"prompt": prompt} if prompt else {}),
                         "response_format": "json",
+                        "temperature": 0.2,  # 낮을수록 일관·할루시네이션 감소
                     },
                 )
             resp.raise_for_status()
