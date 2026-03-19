@@ -1,5 +1,40 @@
 // Frontend/static/js/live.js
 // =======================
+// 0) 공용 unhandledrejection 가드 (초기 로드 초반부터 등록)
+// =======================
+// 소스맵/번들링 때문에 스택에 core.js로 표시되는 경우가 있어,
+// "payload" 관련 TypeError만 조용히 삼키도록 한다.
+(() => {
+  try {
+    if (window.__underdogUnhandledRejectionPayloadGuardInstalled) return;
+    window.__underdogUnhandledRejectionPayloadGuardInstalled = true;
+    window.addEventListener("unhandledrejection", (ev) => {
+      const reason = ev && ev.reason ? ev.reason : null;
+      const msg = reason && (reason.message || String(reason));
+      if (msg && typeof msg === "string") {
+        const msgLower = msg.toLowerCase();
+        const shouldSilence =
+          // 기존: payload 관련 TypeError 무시
+          msgLower.includes("payload") ||
+          msgLower.includes("reading 'payload'") ||
+          // 추가: checkout popup / GF config 관련 미처리 예외 무시
+          msgLower.includes("checkout popup") ||
+          msgLower.includes("checkoutpopup") ||
+          msgLower.includes("no checkout popup config") ||
+          msgLower.includes("gf config") ||
+          msgLower.includes("no gf config") ||
+          msgLower.includes("checkoutpouploggerenabled");
+        if (shouldSilence) {
+        try {
+          ev.preventDefault();
+          ev.stopImmediatePropagation();
+        } catch (_) {}
+        }
+      }
+    });
+  } catch (_) {}
+})();
+// =======================
 // 0) 서버 주소 · 세션 (백엔드 연동: join 시 사용)
 // =======================
 // 배포(HTTPS)에서는 config 미적재 시에도 현재 오리진 사용. 로컬만 127.0.0.1 폴백
@@ -91,6 +126,7 @@ const guestCtaSection = document.getElementById("guestCtaSection");
 const micTitle = document.getElementById("micTitle");
 const micDesc  = document.getElementById("micDesc");
 const btnMic   = document.getElementById("btnMic");
+const btnVibrateTest = document.getElementById("btnVibrateTest");
 const micPermissionModal = document.getElementById("micPermissionModal");
 const micPermissionConfirm = document.getElementById("micPermissionConfirm");
 const micStopModal = document.getElementById("micStopModal");
@@ -364,14 +400,72 @@ function setHeroDanger(text) {
   heroDesc.textContent = text;
 }
 
+// =======================
+// Vibration (Android only + user-gesture gated + cooldown)
+// =======================
+let vibrationUnlockedByUser = false;
+let lastVibrateAtMs = 0;
+
+function isAndroidDevice() {
+  const ua = (navigator.userAgent || "").toLowerCase();
+  // iPadOS(데스크톱 UA), iOS 사파리 등 제외하고 Android만 타겟
+  return ua.includes("android");
+}
+
+function unlockVibrationByUserGesture() {
+  // 일부 브라우저는 사용자 제스처 이후에만 진동/오디오 같은 동작을 허용
+  vibrationUnlockedByUser = true;
+}
+
+function canVibrate() {
+  if (!vibrationUnlockedByUser) return false;
+  if (!isAndroidDevice()) return false;
+  return typeof navigator !== "undefined" && typeof navigator.vibrate === "function";
+}
+
+function vibrateWithCooldown(pattern, cooldownMs) {
+  if (!canVibrate()) return;
+  const now = Date.now();
+  if (now - lastVibrateAtMs < cooldownMs) return;
+  lastVibrateAtMs = now;
+  try {
+    navigator.vibrate(pattern);
+  } catch (_) {}
+}
+
 // 진동: 위험 단계별 패턴 (API는 세기 미지원, 지속시간·횟수로 구분)
 function vibrateByLevel(eventType) {
-  if (!navigator.vibrate) return;
   if (eventType === "danger") {
-    navigator.vibrate([300, 100, 300, 100, 300]);  // 위험: 긴 3회 (강한 느낌)
+    // 위험: 긴 3회 (강한 느낌) + 쿨타임 조금 더 짧게
+    vibrateWithCooldown([300, 100, 300, 100, 300], 2500);
   } else {
-    navigator.vibrate([150, 100, 150]);             // 일상알림: 짧은 2회 (부드러운 느낌)
+    // 일상알림: 짧은 2회 (부드러운 느낌) + 쿨타임 길게
+    vibrateWithCooldown([150, 100, 150], 4000);
   }
+}
+
+function setupVibrationTestButton() {
+  if (!btnVibrateTest) return;
+  if (!isAndroidDevice()) return;
+
+  // Android에서만 노출
+  btnVibrateTest.classList.remove("d-none");
+
+  // 아직 사용자 제스처 unlock 전이면 안내용으로 비활성화
+  btnVibrateTest.disabled = !vibrationUnlockedByUser;
+
+  btnVibrateTest.addEventListener("click", () => {
+    unlockVibrationByUserGesture();
+    btnVibrateTest.disabled = false;
+
+    if (!canVibrate()) {
+      showToast("진동 불가", "이 기기/브라우저에서는 진동을 지원하지 않아요.", true);
+      return;
+    }
+
+    showToast("진동 테스트", "진동을 실행합니다.", false);
+    vibrateWithCooldown([200, 80, 200], 0);
+  });
 }
 
 // =======================
@@ -529,6 +623,9 @@ async function startAudioSend() {
 }
 
 btnMic.addEventListener("click", () => {
+  // 사용자 액션(버튼 클릭) 이후에만 진동을 허용하도록 unlock
+  unlockVibrationByUserGesture();
+  if (btnVibrateTest) btnVibrateTest.disabled = false;
   // 이미 마이크 사용 중이면 종료 안내 모달
   if (micStream) {
     if (micStopModal && micStopConfirm && window.bootstrap) {
@@ -913,6 +1010,7 @@ async function loadSettingsForCaption() {
     updateSessionLabel();
     updateUserSection();
     updateLogSectionVisibility();
+    setupVibrationTestButton();
     setupUserDropdown();
     setupFooterAuthLinks();
     setupCaptionTestAllButton();
