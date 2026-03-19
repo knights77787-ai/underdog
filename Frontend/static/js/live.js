@@ -111,8 +111,7 @@ const WORKLET_URL = (window.location.origin || "http://127.0.0.1:8000") + "/stat
 // 1) DOM
 // =======================
 
-const saveToggle = document.getElementById("saveToggle");
-
+const heroCard = document.getElementById("heroCard");
 const heroBadge = document.getElementById("heroBadge");
 const heroTitle = document.getElementById("heroTitle");
 const heroDesc  = document.getElementById("heroDesc");
@@ -386,18 +385,35 @@ function showToast(title, body, danger=true) {
   toastEl.addEventListener("hidden.bs.toast", () => toastEl.remove());
 }
 
+const HERO_LABELS = { danger: "경고", caution: "주의", alert: "생활알림" };
+const HERO_TITLES = { danger: "위험 감지", caution: "주의", alert: "알림" };
+
 function setHeroNormal() {
+  if (heroCard) heroCard.classList.remove("hero-alert-danger", "hero-alert-caution", "hero-alert-alert");
   heroBadge.className = "badge bg-secondary-subtle text-secondary border px-3 py-2";
   heroBadge.textContent = "상태";
   heroTitle.textContent = "대기중";
+  heroTitle.className = "fs-5 fw-bold";
   heroDesc.textContent = "아직 이벤트가 없습니다.";
+  heroDesc.className = "text-muted small";
+}
+
+function setHeroAlert(text, event_type) {
+  const et = event_type === "caution" ? "caution" : event_type === "alert" ? "alert" : "danger";
+  if (heroCard) {
+    heroCard.classList.remove("hero-alert-danger", "hero-alert-caution", "hero-alert-alert");
+    heroCard.classList.add("hero-alert-" + et);
+  }
+  heroBadge.className = "badge px-3 py-2 hero-badge hero-badge-" + et;
+  heroBadge.textContent = HERO_LABELS[et];
+  heroTitle.textContent = HERO_TITLES[et];
+  heroTitle.className = "fs-5 fw-bold hero-title-" + et;
+  heroDesc.textContent = text;
+  heroDesc.className = "small hero-desc-" + et;
 }
 
 function setHeroDanger(text) {
-  heroBadge.className = "badge bg-danger-subtle text-danger border px-3 py-2";
-  heroBadge.textContent = "경고";
-  heroTitle.textContent = "위험 감지";
-  heroDesc.textContent = text;
+  setHeroAlert(text, "danger");
 }
 
 // =======================
@@ -691,7 +707,7 @@ client.on("caption", (msg) => {
   appendCaption(text, danger);
 
   if (danger) {
-    setHeroDanger(text);
+    setHeroAlert(text, "danger");
   }
 });
 
@@ -713,7 +729,7 @@ client.on("alert", (msg) => {
   if (source !== "text") appendCaption(text, event_type === "danger");
   appendLogRow({ ts_ms: msg.ts_ms ?? p?.ts_ms, ts: msg.ts ?? p?.ts, type: "alert", text, keyword, event_type, score: msg.score ?? p?.score });
 
-  setHeroDanger(`${keyword ? "["+keyword+"] " : ""}${text}`);
+  setHeroAlert(`${keyword ? "["+keyword+"] " : ""}${text}`, event_type);
   const toastTitle = event_type === "danger" ? "위험 감지" : "알림";
   showToast(toastTitle, `${keyword ? "["+keyword+"] " : ""}${text}`, true);
   vibrateByLevel(event_type);
