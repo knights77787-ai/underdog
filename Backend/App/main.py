@@ -52,6 +52,7 @@ from App.Api.routes.custom_sounds import router as custom_sounds_router
 from App.Api.routes.settings import router as settings_router
 from App.Api.routes.push import router as push_router
 from App.Core.config import DATABASE_PATH
+from App.Core.env_flags import is_heavy_workers_enabled
 from App.Core.logging import get_logger
 from App.Services.audio_rules import reload_audio_rules
 from App.WS.audio_cls_worker import AudioClsWorker
@@ -60,24 +61,7 @@ from App.WS import handlers
 from App.WS.manager import manager
 from App.WS.stt_worker import SttWorker
 from App.db.database import create_tables
-
-from fastapi import Body
-from App.WS.manager import manager
-from App.WS.handlers import memory_logs, keyword_detector  # 이미 있으면 생략
 import time
-
-
-def _is_heavy_workers_enabled() -> bool:
-    """Render 등 메모리 제한 환경에서는 0 또는 비설정 시 워커 비활성화 → 가벼운 기동."""
-    v = os.environ.get("ENABLE_ML_WORKERS", "").strip().lower()
-    return v in ("1", "true", "yes")
-
-
-def _is_yamnet_enabled() -> bool:
-    """YAMNet(비언어 오디오 분류) 워커 활성 여부. 기본 ON, Render 등에서는 ENABLE_YAMNET=0 으로 비활성화 가능."""
-    v = os.environ.get("ENABLE_YAMNET", "1").strip().lower()
-    return v in ("1", "true", "yes")
-
 
 def _run_event_cleanup():
     """30일 초과 이벤트 삭제. APScheduler에서 매일 새벽 3시 호출."""
@@ -111,7 +95,7 @@ async def lifespan(app: FastAPI):
 
     # 무거운 기동(Yamnet/STT 워커, rules reload)은 ENABLE_ML_WORKERS=1 일 때만 수행.
     # Render 등에서 OOM 방지: 기본값 비활성화 → /docs, /openapi.json 정상 응답 목표.
-    if not _is_heavy_workers_enabled():
+    if not is_heavy_workers_enabled():
         get_logger("app").info("ENABLE_ML_WORKERS not set; skipping yamnet/stt workers and reload_audio_rules (light start)")
         app.state.yamnet_worker = None
         app.state.yamnet_task = None

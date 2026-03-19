@@ -11,6 +11,7 @@ from threading import RLock
 from typing import Literal
 
 from App.Core.config import EVENT_TYPES_PATH
+from App.Services.event_type_utils import event_type_to_category
 
 # event_type 순서: danger(Warning) 우선, caution, alert(Daily)
 _EVENT_TYPE_ORDER: tuple[Literal["danger", "caution", "alert"], ...] = ("danger", "caution", "alert")
@@ -188,10 +189,9 @@ def judge(
     with _RULE_LOCK:
         rules = list(_rules_flat)
     scores = {"danger": 1.0, "caution": 0.85, "alert": 0.7}
-    categories = {"danger": "warning", "caution": "caution", "alert": "daily"}
     for phrase, etype, canonical in rules:
         if _is_phrase_matched(phrase, text, text_compact, text_norm):
-            return (categories[etype], etype, canonical, scores[etype])
+            return (event_type_to_category(etype), etype, canonical, scores[etype])
     return ("daily", "info", None, 0.2)
 
 

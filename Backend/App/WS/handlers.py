@@ -16,6 +16,7 @@ import numpy as np
 from fastapi import WebSocket
 
 from App.Core.config import STT_SILENCE_RMS_THRESHOLD
+from App.Core.env_flags import is_heavy_workers_enabled
 from App.Core.logging import get_logger
 from App.Core.metrics import inc
 from App.Services import keyword_detector
@@ -25,17 +26,14 @@ from App.WS.audio_state import AudioState, AudioStateStore
 from App.WS.manager import manager
 from App.Services.memory_logs import memory_logs
 from App.Services.custom_phrase_matcher import match_phrase
+from App.Services.event_type_utils import event_type_to_category
 
 logger = get_logger("ws.handlers")
 persist_logger = get_logger("ws.persist")
 audio_logger = get_logger("ws.audio")
 
 # STT: ENABLE_ML_WORKERS=1 + OPENAI_API_KEY 있을 때만 Whisper API 사용
-def _is_heavy_workers_enabled() -> bool:
-    v = os.environ.get("ENABLE_ML_WORKERS", "").strip().lower()
-    return v in ("1", "true", "yes")
-
-if _is_heavy_workers_enabled():
+if is_heavy_workers_enabled():
     api_key = os.environ.get("OPENAI_API_KEY", "").strip()
     if api_key:
         from App.Services.stt_whisper_api import WhisperAPISTT
@@ -308,7 +306,7 @@ async def _process_speech_and_enqueue_stt(
                     f"CustomPhraseAudio:{best_phrase.name} (sim={sim:.2f})"
                 )
                 _last_alert_ts_by_key[(sid, kw_phrase, best_phrase.event_type)] = ts_ms
-                _cat = {"danger": "warning", "caution": "caution", "alert": "daily"}.get(best_phrase.event_type, "daily")
+                _cat = event_type_to_category(best_phrase.event_type)
                 entry_p = memory_logs.append_alert(
                     sid,
                     text_phrase,
