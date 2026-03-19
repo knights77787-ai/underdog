@@ -51,6 +51,13 @@ let lastAlertEventInfo = null;
 // 테스트: 전체 자막(caption_all) 상태
 let captionAllEnabled = false;
 
+// 사용자 정보(/auth/me) 조회 중복 호출 방지:
+// 로그인 상태(provider)는 남아있는데 세션이 게스트로 돌아가는 케이스에서
+// 404가 무한 반복될 수 있어서, 단일 in-flight + 최소 간격(쿨다운)을 둡니다.
+let userInfoInFlight = false;
+let userInfoLastFetchTs = 0;
+let userInfoStopUntilTs = 0;
+
 // 마이크 → audio_chunk 전송
 let micStream = null;
 let audioContext = null;
@@ -735,6 +742,13 @@ function updateLogSectionVisibility() {
 
 async function loadUserInfo() {
   if (!SESSION_ID || !userDropdownName || !userDropdownEmail) return;
+  const now = Date.now();
+  if (now < userInfoStopUntilTs) return;
+  if (userInfoInFlight) return;
+  if (userInfoLastFetchTs && now - userInfoLastFetchTs < 10000) return; // 10초 쿨다운
+
+  userInfoInFlight = true;
+  userInfoLastFetchTs = now;
   try {
     const res = await fetch(API_BASE + "/auth/me?session_id=" + encodeURIComponent(SESSION_ID));
     // provider(localStorage)는 남아있는데 실제 세션이 게스트이거나 유저가 없는 경우 404가 날 수 있음.
@@ -743,6 +757,8 @@ async function loadUserInfo() {
       try {
         localStorage.removeItem(PROVIDER_STORAGE_KEY);
       } catch (_) {}
+      // 30초간 /auth/me 재호출 중단 (updateUserSection에서 다시 호출될 수 있어 선적용)
+      userInfoStopUntilTs = Date.now() + 30000;
       // 게스트 UI로 전환(로그 섹션/CTA 포함)
       updateUserSection();
       return;
@@ -751,11 +767,22 @@ async function loadUserInfo() {
     const ok = res.ok && data && (data.ok === true || data.ok === "true");
     const name = (data && (data.name ?? data.user?.name)) || "사용자";
     const email = (data && (data.email ?? data.user?.email)) || "-";
-    userDropdownName.textContent = ok ? name : "사용자";
-    userDropdownEmail.textContent = ok ? email : "-";
+    if (!ok) {
+      // provider는 남아있지만 실제로는 유저가 없는 상태일 수 있음.
+      try {
+        localStorage.removeItem(PROVIDER_STORAGE_KEY);
+      } catch (_) {}
+      userInfoStopUntilTs = Date.now() + 30000;
+      updateUserSection();
+      return;
+    }
+    userDropdownName.textContent = name;
+    userDropdownEmail.textContent = email;
   } catch (_) {
     if (userDropdownName) userDropdownName.textContent = "사용자";
     if (userDropdownEmail) userDropdownEmail.textContent = "-";
+  } finally {
+    userInfoInFlight = false;
   }
 }
 
