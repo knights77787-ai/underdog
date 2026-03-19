@@ -816,8 +816,6 @@ function setupFooterAuthLinks() {
   if (footerSettings) footerSettings.addEventListener("click", (e) => intercept(e, footerSettings));
 }
 
-<<<<<<< Updated upstream
-=======
 // 이벤트 기록 저장 토글: 변경 시 POST /settings로 event_save_enabled 저장
 function setupSaveToggle() {
   if (!saveToggle || !SESSION_ID) return;
@@ -866,8 +864,6 @@ function setupCaptionTestAllButton() {
     }
   });
 }
-
->>>>>>> Stashed changes
 // 설정: 자막 글자 크기만 로드 (설정 페이지는 /settings-page 에서 편집)
 function applyFontSizeToCaption(px) {
   if (captionBox && px != null) {
@@ -887,12 +883,9 @@ async function loadSettingsForCaption() {
     if (fontSize != null && captionBox) {
       applyFontSizeToCaption(fontSize);
     }
-<<<<<<< Updated upstream
-=======
     updateCaptionTestButtonUI(d?.caption_all === true);
     // 이벤트 기록 저장 토글: event_save_enabled 반영 (없으면 기본 true)
     if (saveToggle) saveToggle.checked = d?.event_save_enabled !== false;
->>>>>>> Stashed changes
   } catch (_) {}
 }
 
@@ -906,11 +899,8 @@ async function loadSettingsForCaption() {
     updateLogSectionVisibility();
     setupUserDropdown();
     setupFooterAuthLinks();
-<<<<<<< Updated upstream
-=======
     setupSaveToggle();
     setupCaptionTestAllButton();
->>>>>>> Stashed changes
     if (SESSION_ID) loadSettingsForCaption();
   } catch (e) {
     console.warn("[Lumen] init error", e);

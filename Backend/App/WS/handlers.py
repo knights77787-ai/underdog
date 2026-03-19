@@ -211,17 +211,15 @@ async def _handle_caption_generated(
             f"{conn_prefix}alert_skipped reason=cooldown session_id={sid} keyword={keyword or ''} event_type={event_type}"
         )
         return
-<<<<<<< Updated upstream
     # 5) alert 저장 + WS 발행
-=======
-
-    # 6) alert 저장 + (가능하면) WS 발행 (event_id 포함해 프론트 피드백용). event_save_enabled 시에만 DB 저장
->>>>>>> Stashed changes
+    # - event_save_enabled 시에만 DB 저장하고, 그렇지 않으면 event_id 없이도 WS 브로드캐스트만 수행
     _last_alert_ts_by_key[(sid, keyword or "", event_type)] = ts_ms
     entry = memory_logs.append_alert(
         sid, text, keyword or "", event_type, category, score, ts_ms=ts_ms, source="text"
     )
-    event_id = await asyncio.to_thread(_persist_alert, sid, text, keyword, event_type, ts_ms)
+    event_id = None
+    if settings.get("event_save_enabled", True):
+        event_id = await asyncio.to_thread(_persist_alert, sid, text, keyword, event_type, ts_ms)
     if event_id is not None:
         entry["event_id"] = event_id
     if not alert_enabled:
