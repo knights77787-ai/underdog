@@ -133,27 +133,12 @@ def judge(
     # 공백 제거 버전도 함께 검사한다.
     text_compact = "".join(text.split())
     with _RULE_LOCK:
-<<<<<<< HEAD
-        danger_list = list(_keywords_by_type.get("danger", []))
-        caution_list = list(_keywords_by_type.get("caution", []))
-        alert_list = list(_keywords_by_type.get("alert", []))
-    for kw in danger_list:
-        if kw in text or (text_compact and kw in text_compact):
-            return ("warning", "danger", kw, 1.0)
-    for kw in caution_list:
-        if kw in text or (text_compact and kw in text_compact):
-            return ("caution", "caution", kw, 0.85)
-    for kw in alert_list:
-        if kw in text or (text_compact and kw in text_compact):
-            return ("daily", "alert", kw, 0.7)
-=======
         rules = list(_rules_flat)
     scores = {"danger": 1.0, "caution": 0.85, "alert": 0.7}
     categories = {"danger": "warning", "caution": "caution", "alert": "daily"}
     for phrase, etype, canonical in rules:
-        if phrase in text:
+        if phrase in text or (text_compact and phrase in text_compact):
             return (categories[etype], etype, canonical, scores[etype])
->>>>>>> a6cd6d8187eaab221c6b6679c9faca81e904c641
     return ("daily", "info", None, 0.2)
 
 
