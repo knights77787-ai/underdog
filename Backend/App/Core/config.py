@@ -12,8 +12,12 @@ DEV = os.getenv("DEV", "").lower() in ("1", "true", "yes")
 # config.py: Backend/App/Core/config.py
 # parents[3] -> underdoc
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
-# Linux/Docker 호환: 경로 소문자(shared) 권장. 폴더명이 Shared면 shared로 통일하세요.
-EVENT_TYPES_PATH = _PROJECT_ROOT / "shared" / "constants" / "event_types.json"
+# Linux/Docker 호환: 리눅스는 대소문자 구분이라 shared/Shared 둘 다 지원
+_EVENT_TYPES_CANDIDATES = [
+    _PROJECT_ROOT / "shared" / "constants" / "event_types.json",
+    _PROJECT_ROOT / "Shared" / "constants" / "event_types.json",
+]
+EVENT_TYPES_PATH = next((p for p in _EVENT_TYPES_CANDIDATES if p.exists()), _EVENT_TYPES_CANDIDATES[0])
 
 # SQLite: Backend 폴더 아래 data/underdog.db
 _DB_DIR = Path(__file__).resolve().parents[2] / "data"
