@@ -129,12 +129,15 @@ def judge(
     반환: (category, event_type, keyword, score). keyword는 canonical(대표 키).
     """
     text = text or ""
+    # STT 결과에 "화 재"처럼 공백이 섞여 들어오는 케이스가 있어
+    # 공백 제거 버전도 함께 검사한다.
+    text_compact = "".join(text.split())
     with _RULE_LOCK:
         rules = list(_rules_flat)
     scores = {"danger": 1.0, "caution": 0.85, "alert": 0.7}
     categories = {"danger": "warning", "caution": "caution", "alert": "daily"}
     for phrase, etype, canonical in rules:
-        if phrase in text:
+        if phrase in text or (text_compact and phrase in text_compact):
             return (categories[etype], etype, canonical, scores[etype])
     return ("daily", "info", None, 0.2)
 
