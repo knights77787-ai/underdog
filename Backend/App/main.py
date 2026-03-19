@@ -49,7 +49,6 @@ from App.Api.routes.feedback import router as feedback_router
 from App.Api.routes.health import router as health_router
 from App.Api.routes.custom_phrase_audio import router as custom_phrase_audio_router
 from App.Api.routes.custom_sounds import router as custom_sounds_router
-from App.Api.routes.logs import router as logs_router
 from App.Api.routes.settings import router as settings_router
 from App.Api.routes.push import router as push_router
 from App.Core.config import DATABASE_PATH
@@ -227,7 +226,6 @@ async def log_requests(request, call_next):
 
 # REST 라우트 등록
 app.include_router(health_router)
-app.include_router(logs_router)
 app.include_router(admin_router)
 app.include_router(feedback_router)
 app.include_router(settings_router)

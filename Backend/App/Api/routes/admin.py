@@ -135,31 +135,6 @@ def get_admin_summary(
     return {"ok": True, "summary": summary}
 
 
-@router.get("/alerts")
-def get_recent_alerts(
-    db: Session = Depends(get_db),
-    limit: int = Query(50, ge=1, le=500, description="한 번에 가져올 개수 (추천 50~100)"),
-    session_id: Optional[str] = Query(None, description="특정 세션만 (선택)"),
-    since_ts_ms: Optional[int] = Query(None, description="이 시간(ms) 이후만"),
-    until_ts_ms: Optional[int] = Query(None, description="커서: 이 값보다 과거 알림만 (스크롤 더 불러오기 시 사용)"),
-):
-    result = crud_events.get_logs_from_db(
-        db, log_type="alert", limit=limit,
-        session_id=session_id,
-        since_ts_ms=since_ts_ms,
-        until_ts_ms=until_ts_ms,
-    )
-    items = result["items"]
-    return {
-        "ok": True,
-        "limit": limit,
-        "count": len(items),
-        "data": items,
-        "next_until_ts_ms": result["next_until_ts_ms"],
-        "has_more": result["has_more"],
-    }
-
-
 @router.get("/feedback")
 def get_feedback_list(
     db: Session = Depends(get_db),

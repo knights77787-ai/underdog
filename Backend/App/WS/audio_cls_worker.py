@@ -13,7 +13,8 @@ from App.Services.memory_logs import memory_logs
 
 logger = get_logger("yamnet.worker")
 
-CUSTOM_THRESHOLD = 0.75  # 코사인 유사도 임계값 (0.75~0.9, 환경에 따라 조정)
+# ✔️‼️커스텀 소리 매칭 임계값 ‼️✔️
+CUSTOM_THRESHOLD = 0.70  # 코사인 유사도 임계값 (0.75~0.9, 환경에 따라 조정)
 
 
 def _match_custom_sound(session_id: str, emb_live: np.ndarray):
