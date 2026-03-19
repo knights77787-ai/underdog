@@ -63,12 +63,50 @@ body.bg-light { background-color: #f8fafc !important; }
   50% { box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.15); }
 }
 
-/* Hero 상태 배지 (Lumen 블루 계열) */
+/* Hero 상태 배지: 대기중 (기존 유지) */
 #heroBadge.bg-secondary-subtle {
   background-color: rgba(30, 64, 175, 0.12) !important;
   color: var(--lumen-primary) !important;
   border-color: rgba(30, 64, 175, 0.3) !important;
 }
+
+/* Hero 알림 상태: 카드 배경 틴트 + 배지 색상 (눈 편한 연한 배경) */
+#heroCard.hero-alert-danger .card-body {
+  background: rgba(239, 68, 68, 0.06) !important;
+  border-radius: 0 0 12px 12px;
+}
+#heroCard.hero-alert-caution .card-body {
+  background: rgba(249, 115, 22, 0.08) !important;
+  border-radius: 0 0 12px 12px;
+}
+#heroCard.hero-alert-alert .card-body {
+  background: rgba(30, 64, 175, 0.06) !important;
+  border-radius: 0 0 12px 12px;
+}
+
+.hero-badge {
+  font-weight: 700 !important;
+  border: none !important;
+}
+.hero-badge-danger {
+  background: rgba(220, 38, 38, 0.2) !important;
+  color: #b91c1c !important;
+}
+.hero-badge-caution {
+  background: rgba(234, 88, 12, 0.2) !important;
+  color: #c2410c !important;
+}
+.hero-badge-alert {
+  background: rgba(30, 64, 175, 0.18) !important;
+  color: #1e40af !important;
+}
+
+.hero-title-danger { color: #b91c1c !important; }
+.hero-title-caution { color: #c2410c !important; }
+.hero-title-alert { color: #1e40af !important; }
+.hero-desc-danger { color: #991b1b !important; }
+.hero-desc-caution { color: #9a3412 !important; }
+.hero-desc-alert { color: #1e3a8a !important; }
 
 /* 카드 헤더 포인트 */
 .card-header.fw-semibold {
