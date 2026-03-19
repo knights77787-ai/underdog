@@ -9,3 +9,4 @@ __pycache__/
 .env.example
 lumen-e88ae-firebase-adminsdk-fbsvc-b665d610b4.json
 *firebase-adminsdk*.json
+underdog.db
