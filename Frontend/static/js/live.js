@@ -67,8 +67,6 @@ const WORKLET_URL = (window.location.origin || "http://127.0.0.1:8000") + "/stat
 // 1) DOM
 // =======================
 
-const saveToggle = document.getElementById("saveToggle");
-
 const heroBadge = document.getElementById("heroBadge");
 const heroTitle = document.getElementById("heroTitle");
 const heroDesc  = document.getElementById("heroDesc");
@@ -561,6 +559,7 @@ client.on("close", () => {
 });
 
 // 서버가 caption 보내면 (STT 결과 = 말한 내용). 실시간 자막에만 표시.
+// 토스트/진동은 alert에서 처리 (키워드 시 caption+alert 둘 다 오므로 중복 방지).
 client.on("caption", (msg) => {
   if (!msg || typeof msg !== "object") return;
   const text = (msg.text ?? msg.payload?.text ?? "").toString();
@@ -570,12 +569,10 @@ client.on("caption", (msg) => {
 
   if (danger) {
     setHeroDanger(text);
-    showToast("위험 감지", text, true);
-    vibrateByLevel("danger");
   }
 });
 
-// 서버가 alert 보내면 (키워드/YAMNet/커스텀 소리 등). 최근 감지 로그에만 표시. 실시간 자막에는 안 나옴.
+// 서버가 alert 보내면 (키워드/YAMNet/커스텀 소리 등). 최근 감지 로그 + 실시간 자막에 표시.
 client.on("alert", (msg) => {
   if (!msg || typeof msg !== "object") return;
   const p = (msg && typeof msg.payload === "object" && msg.payload !== null) ? msg.payload : undefined;
@@ -584,14 +581,18 @@ client.on("alert", (msg) => {
   const event_type = msg.event_type ?? p?.event_type ?? "danger";
   const event_id = msg.event_id ?? p?.event_id;
   const ts_ms = msg.ts_ms ?? p?.ts_ms;
+  const source = msg.source ?? p?.source ?? "text";
   if (event_id != null) {
     lastAlertEventInfo = { event_id, text, keyword, event_type, ts_ms };
   }
 
+  // 비언어(source !== "text")만 자막 추가. 키워드면 caption에서 이미 넣음.
+  if (source !== "text") appendCaption(text, event_type === "danger");
   appendLogRow({ ts_ms: msg.ts_ms ?? p?.ts_ms, ts: msg.ts ?? p?.ts, type: "alert", text, keyword, event_type, score: msg.score ?? p?.score });
 
   setHeroDanger(`${keyword ? "["+keyword+"] " : ""}${text}`);
-  showToast("알림", `${keyword ? "["+keyword+"] " : ""}${text}`, true);
+  const toastTitle = event_type === "danger" ? "위험 감지" : "알림";
+  showToast(toastTitle, `${keyword ? "["+keyword+"] " : ""}${text}`, true);
   vibrateByLevel(event_type);
 });
 
@@ -700,7 +701,6 @@ function updateUserSection() {
 }
 
 function updateLogSectionVisibility() {
-  const saveWrap = document.getElementById("saveToggleWrap");
   if (logSection && guestCtaSection) {
     if (isGuest()) {
       logSection.classList.add("d-none");
@@ -711,9 +711,6 @@ function updateLogSectionVisibility() {
       guestCtaSection.classList.add("d-none");
       document.getElementById("mainContentRow")?.classList.remove("guest-layout");
     }
-  }
-  if (saveWrap) {
-    saveWrap.classList.toggle("d-none", isGuest());
   }
 }
 
@@ -802,27 +799,6 @@ function setupFooterAuthLinks() {
   if (footerSettings) footerSettings.addEventListener("click", (e) => intercept(e, footerSettings));
 }
 
-// 이벤트 기록 저장 토글: 변경 시 POST /settings로 event_save_enabled 저장
-function setupSaveToggle() {
-  if (!saveToggle || !SESSION_ID) return;
-  saveToggle.addEventListener("change", async () => {
-    const enabled = saveToggle.checked;
-    try {
-      const res = await fetch(API_BASE + "/settings?session_id=" + encodeURIComponent(SESSION_ID), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ event_save_enabled: enabled }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data?.ok) {
-        saveToggle.checked = !enabled;  // 롤백
-      }
-    } catch (_) {
-      saveToggle.checked = !enabled;  // 롤백
-    }
-  });
-}
-
 // 설정: 자막 글자 크기만 로드 (설정 페이지는 /settings-page 에서 편집)
 function applyFontSizeToCaption(px) {
   if (captionBox && px != null) {
@@ -842,8 +818,6 @@ async function loadSettingsForCaption() {
     if (fontSize != null && captionBox) {
       applyFontSizeToCaption(fontSize);
     }
-    // 이벤트 기록 저장 토글: event_save_enabled 반영 (없으면 기본 true)
-    if (saveToggle) saveToggle.checked = d?.event_save_enabled !== false;
   } catch (_) {}
 }
 
@@ -857,7 +831,6 @@ async function loadSettingsForCaption() {
     updateLogSectionVisibility();
     setupUserDropdown();
     setupFooterAuthLinks();
-    setupSaveToggle();
     if (SESSION_ID) loadSettingsForCaption();
   } catch (e) {
     console.warn("[Lumen] init error", e);

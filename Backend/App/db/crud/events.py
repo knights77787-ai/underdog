@@ -1,14 +1,9 @@
-"""이벤트/자막 CRUD. caption·alert 저장 및 로그 조회."""
-from typing import Literal
-
-from sqlalchemy import desc
+"""이벤트/자막 CRUD. caption·alert 저장."""
 from sqlalchemy.orm import Session, joinedload
 
 from App.db.crud import sessions as crud_sessions
 from App.db.models import Event, EventTranscript, EventFeedback
 from App.db.models import Session as SessionModel
-
-LogType = Literal["all", "caption", "alert"]
 
 
 def delete_events_older_than(db: Session, cutoff_ts_ms: int) -> int:
@@ -85,70 +80,6 @@ def create_alert_event(
         db.rollback()
         raise
     return event.event_id  # flush() 후 이미 채워짐, refresh 불필요
-
-
-def get_logs_from_db(
-    db: Session,
-    log_type: LogType,
-    limit: int,
-    session_id: str | None = None,
-    since_ts_ms: int | None = None,
-    until_ts_ms: int | None = None,
-) -> dict:
-    """스크롤(커서) 조회: 최신순 limit+1건 조회해 has_more 판단 후 limit건만 반환.
-
-    Returns:
-        {"items": [...], "next_until_ts_ms": int | None, "has_more": bool}
-    """
-    q = (
-        db.query(Event)
-        .options(joinedload(Event.session), joinedload(Event.transcripts))
-    )
-    if session_id is not None:
-        q = q.join(Event.session).filter(SessionModel.client_session_uuid == session_id)
-    if since_ts_ms is not None:
-        q = q.filter(Event.segment_start_ms >= since_ts_ms)
-    if until_ts_ms is not None:
-        # 커서 기준: until_ts_ms \"미만\"만 가져와서 이전 페이지와 중복 방지
-        q = q.filter(Event.segment_start_ms < until_ts_ms)
-    if log_type == "caption":
-        q = q.filter(Event.event_type == "pass")
-    elif log_type == "alert":
-        q = q.filter(Event.event_type.in_(["danger", "caution", "alert"]))
-
-    # 정렬: ts_ms 내림차순 + event_id 내림차순(tie-breaker)으로 커서 안정성 확보
-    events = q.order_by(desc(Event.segment_start_ms), desc(Event.event_id)).limit(limit + 1).all()
-    has_more = len(events) > limit
-    if has_more:
-        events = events[:limit]
-
-    out: list[dict] = []
-    for event in events:
-        ts_ms = _ts_ms_from_event(event)
-        client_uuid = event.session.client_session_uuid if event.session else None
-        text = event.transcripts[0].text if event.transcripts else ""
-        if event.event_type == "pass":
-            out.append({
-                "type": "caption",
-                "event_id": event.event_id,
-                "session_id": client_uuid,
-                "text": text,
-                "ts_ms": ts_ms,
-            })
-        else:
-            out.append({
-                "type": "alert",
-                "event_id": event.event_id,
-                "source": _source_from_keyword(event.keyword),
-                "event_type": event.event_type,
-                "keyword": event.keyword or "",
-                "session_id": client_uuid,
-                "text": text,
-                "ts_ms": ts_ms,
-            })
-
-    next_until_ts_ms = out[-1]["ts_ms"] if out else None
-    return {"items": out, "next_until_ts_ms": next_until_ts_ms, "has_more": has_more}
 
 
 def get_admin_summary_from_db(

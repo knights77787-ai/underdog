@@ -15,7 +15,6 @@ class SettingsPatch(BaseModel):
     """저장 시 보낼 수 있는 필드. None이면 해당 키는 갱신하지 않음."""
     font_size: Optional[int] = Field(None, ge=10, le=60)
     alert_enabled: Optional[bool] = None
-    event_save_enabled: Optional[bool] = None
     cooldown_sec: Optional[int] = Field(None, ge=0, le=60)
     auto_scroll: Optional[bool] = None
 

@@ -49,7 +49,6 @@ from App.Api.routes.feedback import router as feedback_router
 from App.Api.routes.health import router as health_router
 from App.Api.routes.custom_phrase_audio import router as custom_phrase_audio_router
 from App.Api.routes.custom_sounds import router as custom_sounds_router
-from App.Api.routes.logs import router as logs_router
 from App.Api.routes.settings import router as settings_router
 from App.Api.routes.push import router as push_router
 from App.Core.config import DATABASE_PATH
@@ -138,8 +137,8 @@ async def lifespan(app: FastAPI):
         sid, text, keyword, event_type, ts_ms,
         *, matched_custom_sound_id=None, custom_similarity=None,
     ):
-        """DB 저장(event_save_enabled 시) + 쿨다운 기록. event_id 반환 (커스텀 사운드 등 WS 브로드캐스트용)."""
-        event_id = handlers._persist_alert_if_enabled(
+        """DB 저장 + 쿨다운 기록. event_id 반환 (커스텀 사운드 등 WS 브로드캐스트용)."""
+        event_id = handlers._persist_alert(
             sid, text, keyword, event_type, ts_ms,
             matched_custom_sound_id=matched_custom_sound_id,
             custom_similarity=custom_similarity,
@@ -227,7 +226,6 @@ async def log_requests(request, call_next):
 
 # REST 라우트 등록
 app.include_router(health_router)
-app.include_router(logs_router)
 app.include_router(admin_router)
 app.include_router(feedback_router)
 app.include_router(settings_router)
