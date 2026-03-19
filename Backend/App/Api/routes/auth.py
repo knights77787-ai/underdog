@@ -350,7 +350,11 @@ def get_me(
     session_id: str = Query(..., description="client_session_uuid (URL의 session_id)"),
     db: Session = Depends(get_db),
 ):
-    """로그인한 사용자(Google/Kakao)의 name, email 반환. 게스트/미존재 시 404."""
+    """현재 로그인 사용자 정보 반환.
+
+    게스트/미존재인 경우에도 프론트에서 재시도/요청 반복으로 404 스팸이 생길 수 있어
+    HTTP 404 대신 `ok: false`를 200으로 내려준다.
+    """
     from App.db.models import Session as SessionModel, User
 
     sess = (
@@ -359,10 +363,10 @@ def get_me(
         .first()
     )
     if not sess or sess.user_id is None:
-        raise HTTPException(status_code=404, detail="User not found or guest session")
+        return {"ok": False, "guest": True, "name": "", "email": ""}
     user = db.query(User).filter(User.user_id == sess.user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        return {"ok": False, "guest": False, "name": "", "email": ""}
     return {
         "ok": True,
         "name": user.name or "",
