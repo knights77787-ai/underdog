@@ -394,7 +394,7 @@ function setHeroNormal() {
   heroBadge.textContent = "상태";
   heroTitle.textContent = "대기중";
   heroTitle.className = "fs-5 fw-bold";
-  heroDesc.textContent = "아직 이벤트가 없습니다.";
+  heroDesc.textContent = "";
   heroDesc.className = "text-muted small";
 }
 
