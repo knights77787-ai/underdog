@@ -816,27 +816,6 @@ function setupFooterAuthLinks() {
   if (footerSettings) footerSettings.addEventListener("click", (e) => intercept(e, footerSettings));
 }
 
-// 이벤트 기록 저장 토글: 변경 시 POST /settings로 event_save_enabled 저장
-function setupSaveToggle() {
-  if (!saveToggle || !SESSION_ID) return;
-  saveToggle.addEventListener("change", async () => {
-    const enabled = saveToggle.checked;
-    try {
-      const res = await fetch(API_BASE + "/settings?session_id=" + encodeURIComponent(SESSION_ID), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ event_save_enabled: enabled }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data?.ok) {
-        saveToggle.checked = !enabled;  // 롤백
-      }
-    } catch (_) {
-      saveToggle.checked = !enabled;  // 롤백
-    }
-  });
-}
-
 function setupCaptionTestAllButton() {
   if (!btnCaptionTestAll) return;
   updateCaptionTestButtonUI(false);
@@ -884,8 +863,6 @@ async function loadSettingsForCaption() {
       applyFontSizeToCaption(fontSize);
     }
     updateCaptionTestButtonUI(d?.caption_all === true);
-    // 이벤트 기록 저장 토글: event_save_enabled 반영 (없으면 기본 true)
-    if (saveToggle) saveToggle.checked = d?.event_save_enabled !== false;
   } catch (_) {}
 }
 
@@ -899,7 +876,6 @@ async function loadSettingsForCaption() {
     updateLogSectionVisibility();
     setupUserDropdown();
     setupFooterAuthLinks();
-    setupSaveToggle();
     setupCaptionTestAllButton();
     if (SESSION_ID) loadSettingsForCaption();
   } catch (e) {
