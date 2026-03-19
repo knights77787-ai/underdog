@@ -253,6 +253,16 @@ body {
   border-color: #dc3545;
 }
 
+@media (max-width: 400px) {
+  .sound-tabs .nav-link {
+    font-size: 0.8rem;
+    padding: 0.5rem 0.6rem;
+  }
+  .main-card .card-body {
+    padding: 1rem !important;
+  }
+}
+
 @media (max-width: 768px) {
   .sound-row {
     grid-template-columns: 1fr;
