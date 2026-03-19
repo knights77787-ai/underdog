@@ -191,3 +191,29 @@
     margin-bottom: 3rem;
   }
 }
+
+@media (max-width: 400px) {
+  .login-main {
+    padding: 1.5rem 0.5rem 2rem;
+  }
+  .login-card-wrap {
+    max-width: 100%;
+  }
+  .login-card-header,
+  .login-card-body {
+    padding-left: 1.25rem !important;
+    padding-right: 1.25rem !important;
+  }
+  .login-features {
+    flex-wrap: nowrap;
+    gap: 0.5rem 0.75rem;
+    padding: 0 0.5rem;
+    margin-top: 1.5rem;
+  }
+  .login-feature {
+    font-size: 0.75rem;
+  }
+  .login-feature i {
+    font-size: 0.85rem;
+  }
+}

@@ -124,14 +124,74 @@ body.bg-light { background-color: #f8fafc !important; }
   background: var(--lumen-bg-subtle) !important;
   color: var(--lumen-primary-dark);
   font-weight: 600;
+  white-space: nowrap;
 }
 #logTable th:first-child,
 #logTable td:first-child { padding-left: 1rem; }
-#logTable .col-time { width: 12%; }
+#logTable .col-time { width: 12%; min-width: 2.5em; }
 #logTable .col-type { width: 12%; }
 #logTable .col-content { width: 64%; }
 #logTable .col-prob { width: 12%; }
 #logTable td:nth-child(4) { text-align: left; }
+
+/* 모바일: 최근 감지 로그 카드형 레이아웃 */
+@media (max-width: 576px) {
+  #logSection .table-responsive {
+    padding: 0 0.75rem;
+  }
+  #logSection .card-body {
+    padding: 0.75rem 0 !important;
+  }
+  #logTable thead { display: none; }
+  #logTable,
+  #logTable tbody { display: block; }
+  #logTable tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0 0.75rem;
+    padding: 0.65rem 0;
+    border-bottom: 1px solid rgba(6, 182, 212, 0.12);
+    background: transparent;
+  }
+  #logTable tbody tr:nth-of-type(odd) {
+    background: rgba(6, 182, 212, 0.03);
+    margin: 0 -0.75rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+  #logTable tr:last-child { border-bottom: 0; }
+  #logTable td {
+    display: block;
+    padding: 0;
+    border: none;
+    font-size: 0.85rem;
+  }
+  #logTable td::before {
+    font-weight: 600;
+    font-size: 0.7rem;
+    color: var(--lumen-primary-dark);
+    margin-right: 0.25rem;
+  }
+  #logTable td:nth-child(1) { order: 1; }
+  #logTable td:nth-child(1)::before { content: "시간 "; }
+  #logTable td:nth-child(2) { order: 2; }
+  #logTable td:nth-child(2)::before { content: "종류 "; }
+  #logTable td:nth-child(4) { order: 3; }
+  #logTable td:nth-child(4)::before { content: "확률 "; }
+  #logTable td:nth-child(3) {
+    order: 4;
+    flex: 1 1 100%;
+    margin-top: 0.3rem;
+    padding-top: 0.25rem;
+    border-top: 1px solid rgba(6, 182, 212, 0.08);
+  }
+  #logTable td:nth-child(3)::before {
+    content: "내용";
+    display: block;
+    margin-bottom: 0.15rem;
+  }
+}
 
 /* 게스트 전용 CTA 카드 */
 .guest-cta-card {
@@ -159,4 +219,41 @@ body.bg-light { background-color: #f8fafc !important; }
 
 .card.shadow-sm .card-body {
   border-radius: 0 0 12px 12px;
+}
+
+/* 모바일 400px: 줄바꿈 방지 */
+@media (max-width: 400px) {
+  #heroCard .card-body {
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+  }
+  #heroCard .card-body > div:first-child {
+    min-width: 0;
+    flex: 1;
+  }
+  #heroCard .card-body .d-flex.gap-2 {
+    flex-shrink: 0;
+    gap: 0.35rem;
+  }
+  #heroCard .card-body .btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+  }
+  #heroCard #heroBadge {
+    padding: 0.25rem 0.5rem !important;
+    font-size: 0.7rem;
+  }
+  #heroCard #heroTitle {
+    font-size: 1rem !important;
+  }
+  #heroCard #heroDesc {
+    font-size: 0.75rem !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #btnCaptionTestAll {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.4rem;
+  }
 }
