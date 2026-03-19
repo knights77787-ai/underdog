@@ -6,6 +6,7 @@
 """
 import json
 import logging
+import re
 from threading import RLock
 from typing import Literal
 
@@ -18,6 +19,18 @@ _RULE_LOCK = RLock()
 _phrase_to_result: dict[str, tuple[Literal["danger", "caution", "alert"], str]] = {}
 # judge용: event_type 순서대로 (phrase, canonical) 리스트
 _rules_flat: list[tuple[str, Literal["danger", "caution", "alert"], str]] = []
+
+_NON_WORD_RE = re.compile(r"[\s\W_]+", flags=re.UNICODE)
+
+
+def _normalize_text(s: str) -> str:
+    """
+    STT 텍스트는 공백/문장부호가 섞여 들어오는 경우가 있어 키워드 매칭 안정화를 위해 정규화한다.
+    - 공백 제거
+    - 문장부호/기호 제거 (유니코드 word 문자는 유지: 한글 포함)
+    """
+    s = s or ""
+    return _NON_WORD_RE.sub("", s)
 
 
 def uniq(seq):
@@ -132,12 +145,20 @@ def judge(
     # STT 결과에 "화 재"처럼 공백이 섞여 들어오는 케이스가 있어
     # 공백 제거 버전도 함께 검사한다.
     text_compact = "".join(text.split())
+    text_norm = _normalize_text(text)
     with _RULE_LOCK:
         rules = list(_rules_flat)
     scores = {"danger": 1.0, "caution": 0.85, "alert": 0.7}
     categories = {"danger": "warning", "caution": "caution", "alert": "daily"}
     for phrase, etype, canonical in rules:
-        if phrase in text or (text_compact and phrase in text_compact):
+        phrase = phrase or ""
+        phrase_compact = "".join(phrase.split())
+        phrase_norm = _normalize_text(phrase)
+        if (
+            (phrase and phrase in text)
+            or (phrase_compact and phrase_compact in text_compact)
+            or (phrase_norm and phrase_norm in text_norm)
+        ):
             return (categories[etype], etype, canonical, scores[etype])
     return ("daily", "info", None, 0.2)
 
@@ -145,11 +166,20 @@ def judge(
 def check_alerts(text: str):
     """텍스트에서 매칭되는 모든 (keyword, event_type) 쌍 반환. keyword는 canonical."""
     text = text or ""
+    text_compact = "".join(text.split())
+    text_norm = _normalize_text(text)
     with _RULE_LOCK:
         rules = list(_rules_flat)
     seen: set[tuple[str, str]] = set()
     for phrase, etype, canonical in rules:
-        if phrase in text:
+        phrase = phrase or ""
+        phrase_compact = "".join(phrase.split())
+        phrase_norm = _normalize_text(phrase)
+        if (
+            (phrase and phrase in text)
+            or (phrase_compact and phrase_compact in text_compact)
+            or (phrase_norm and phrase_norm in text_norm)
+        ):
             key = (canonical, etype)
             if key not in seen:
                 seen.add(key)
