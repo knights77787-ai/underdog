@@ -1,11 +1,6 @@
 /**
  * Lumen 서비스 공통 푸터
  */
-/* 모바일: 노치/카메라 영역 회피 (safe-area) */
-.navbar {
-  padding-top: env(safe-area-inset-top, 0);
-}
-
 /* 공통 콘텐츠 영역: 헤더·메인·푸터 모두 max-width + padding으로 안쪽 정렬 */
 .header-inner,
 .footer-inner,

@@ -3,11 +3,6 @@ body {
   background-color: #f8fafc !important;
 }
 
-/* 모바일: 노치/카메라 영역 회피 */
-.navbar {
-  padding-top: env(safe-area-inset-top, 0);
-}
-
 /* 관리자 로그인: 로고 위에 얹기 */
 .admin-login-logo-img {
   width: 120px;
