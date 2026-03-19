@@ -725,8 +725,10 @@ client.on("alert", (msg) => {
     lastAlertEventInfo = { event_id, text, keyword, event_type, ts_ms };
   }
 
-  // 비언어(source !== "text")만 자막 추가. 키워드면 caption에서 이미 넣음.
-  if (source !== "text") appendCaption(text, event_type === "danger");
+  // alert는 UI에서 반드시 보이게 한다.
+  // 원래는 "키워드면 caption에서 이미 넣음"이었지만, caption_all=OFF에서 caption이 누락되는 케이스가 있어
+  // alert(text)를 자막에도 폴백으로 추가해준다(중복은 감수, UX 우선).
+  appendCaption(text, event_type === "danger");
   appendLogRow({ ts_ms: msg.ts_ms ?? p?.ts_ms, ts: msg.ts ?? p?.ts, type: "alert", text, keyword, event_type, score: msg.score ?? p?.score });
 
   setHeroAlert(`${keyword ? "["+keyword+"] " : ""}${text}`, event_type);

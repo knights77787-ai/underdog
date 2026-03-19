@@ -191,6 +191,17 @@ async def _handle_caption_generated(
     category, event_type, keyword, score = keyword_detector.judge(text)
     keyword_matched = bool(keyword) and event_type in ("danger", "caution", "alert")
     caption_all_enabled = bool(settings.get("caption_all", False))
+    logger.info(
+        "%sKW_JUDGE sid=%s caption_all=%s matched=%s event_type=%s keyword=%s score=%.2f text=%r",
+        conn_prefix,
+        sid,
+        caption_all_enabled,
+        keyword_matched,
+        event_type,
+        (keyword or ""),
+        float(score or 0.0),
+        (text[:120] if isinstance(text, str) else str(text)) if text is not None else "",
+    )
 
     # 3) caption 브로드캐스트
     # - 기본: 키워드가 검출된 경우에만 자막 표시
@@ -198,6 +209,19 @@ async def _handle_caption_generated(
     if caption_all_enabled or keyword_matched:
         caption_entry = memory_logs.append_caption(sid, text, ts_ms=ts_ms)
         await manager.broadcast_to_session(sid, caption_entry)
+        logger.info(
+            "%sWS_CAPTION_EMITTED sid=%s ts_ms=%s",
+            conn_prefix,
+            sid,
+            ts_ms,
+        )
+    else:
+        logger.info(
+            "%sWS_CAPTION_SKIPPED sid=%s reason=no_keyword caption_all=%s",
+            conn_prefix,
+            sid,
+            caption_all_enabled,
+        )
 
     # 4) 키워드가 없으면 alert 처리도 스킵
     if not keyword_matched:
@@ -362,6 +386,8 @@ async def handle_message(
         b64 = msg.get("data_b64")
         if not sid or not b64:
             return session_id
+        # 일부 환경에서 join이 누락되어도 caption/alert 브로드캐스트를 받도록 보강
+        await manager.connect(websocket, sid)
         if sr != 16000 or fmt != "pcm_s16le":
             audio_logger.warning(
                 "bad_audio_format session_id=%s sr=%s format=%s",

@@ -9,7 +9,9 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket, session_id: str) -> None:
         if session_id not in self.sessions:
             self.sessions[session_id] = []
-        self.sessions[session_id].append(websocket)
+        # 같은 소켓이 중복 등록되면 브로드캐스트가 중복될 수 있어 1회만 유지
+        if websocket not in self.sessions[session_id]:
+            self.sessions[session_id].append(websocket)
 
     def disconnect(self, websocket: WebSocket, session_id: str) -> None:
         if session_id in self.sessions:
