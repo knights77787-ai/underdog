@@ -97,7 +97,17 @@
 
         <!-- Caption stream -->
         <div class="card shadow-sm">
-          <div class="card-header fw-semibold">실시간 자막</div>
+          <div class="card-header fw-semibold d-flex align-items-center justify-content-between gap-2">
+            <span>실시간 자막</span>
+            <button
+              id="btnCaptionTestAll"
+              class="btn btn-sm btn-outline-secondary"
+              type="button"
+              disabled
+            >
+              테스트: 전체 자막 OFF
+            </button>
+          </div>
           <div class="card-body">
             <div id="captionBox" class="caption-box"></div>
           </div>

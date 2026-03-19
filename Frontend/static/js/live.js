@@ -48,6 +48,8 @@ if (SESSION_ID) {
 }
 // 피드백 대상: 가장 최근 수신한 alert 정보
 let lastAlertEventInfo = null;
+// 테스트: 전체 자막(caption_all) 상태
+let captionAllEnabled = false;
 
 // 마이크 → audio_chunk 전송
 let micStream = null;
@@ -101,6 +103,7 @@ setupModalA11y(micPermissionModal);
 setupModalA11y(micStopModal);
 
 const captionBox = document.getElementById("captionBox");
+const btnCaptionTestAll = document.getElementById("btnCaptionTestAll");
 
 const toastContainer = document.getElementById("toastContainer");
 const sessionLabel = document.getElementById("sessionLabel");
@@ -168,6 +171,20 @@ function appendCaption(text, danger=false) {
   while (captionBox.children.length > 60) {
     captionBox.removeChild(captionBox.firstChild);
   }
+}
+
+function updateCaptionTestButtonUI(enabled) {
+  captionAllEnabled = !!enabled;
+  if (!btnCaptionTestAll) return;
+  if (!SESSION_ID) {
+    btnCaptionTestAll.disabled = true;
+    btnCaptionTestAll.textContent = "테스트: 전체 자막 OFF";
+    btnCaptionTestAll.className = "btn btn-sm btn-outline-secondary";
+    return;
+  }
+  btnCaptionTestAll.disabled = false;
+  btnCaptionTestAll.textContent = captionAllEnabled ? "테스트: 전체 자막 ON" : "테스트: 전체 자막 OFF";
+  btnCaptionTestAll.className = "btn btn-sm " + (captionAllEnabled ? "btn-outline-success" : "btn-outline-secondary");
 }
 
 const LOCAL_LOG_KEY = "underdog_event_log";
@@ -799,6 +816,58 @@ function setupFooterAuthLinks() {
   if (footerSettings) footerSettings.addEventListener("click", (e) => intercept(e, footerSettings));
 }
 
+<<<<<<< Updated upstream
+=======
+// 이벤트 기록 저장 토글: 변경 시 POST /settings로 event_save_enabled 저장
+function setupSaveToggle() {
+  if (!saveToggle || !SESSION_ID) return;
+  saveToggle.addEventListener("change", async () => {
+    const enabled = saveToggle.checked;
+    try {
+      const res = await fetch(API_BASE + "/settings?session_id=" + encodeURIComponent(SESSION_ID), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ event_save_enabled: enabled }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.ok) {
+        saveToggle.checked = !enabled;  // 롤백
+      }
+    } catch (_) {
+      saveToggle.checked = !enabled;  // 롤백
+    }
+  });
+}
+
+function setupCaptionTestAllButton() {
+  if (!btnCaptionTestAll) return;
+  updateCaptionTestButtonUI(false);
+  btnCaptionTestAll.addEventListener("click", async () => {
+    if (!SESSION_ID) {
+      showToast("세션 없음", "마이크를 눌러 세션을 만든 뒤 다시 시도해 주세요.", true);
+      return;
+    }
+    const next = !captionAllEnabled;
+    btnCaptionTestAll.disabled = true;
+    try {
+      const res = await fetch(API_BASE + "/settings?session_id=" + encodeURIComponent(SESSION_ID), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ caption_all: next }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.ok) {
+        updateCaptionTestButtonUI(captionAllEnabled); // 롤백
+        return;
+      }
+      updateCaptionTestButtonUI(next);
+    } catch (_) {
+      updateCaptionTestButtonUI(captionAllEnabled); // 롤백
+    }
+  });
+}
+
+>>>>>>> Stashed changes
 // 설정: 자막 글자 크기만 로드 (설정 페이지는 /settings-page 에서 편집)
 function applyFontSizeToCaption(px) {
   if (captionBox && px != null) {
@@ -818,6 +887,12 @@ async function loadSettingsForCaption() {
     if (fontSize != null && captionBox) {
       applyFontSizeToCaption(fontSize);
     }
+<<<<<<< Updated upstream
+=======
+    updateCaptionTestButtonUI(d?.caption_all === true);
+    // 이벤트 기록 저장 토글: event_save_enabled 반영 (없으면 기본 true)
+    if (saveToggle) saveToggle.checked = d?.event_save_enabled !== false;
+>>>>>>> Stashed changes
   } catch (_) {}
 }
 
@@ -831,6 +906,11 @@ async function loadSettingsForCaption() {
     updateLogSectionVisibility();
     setupUserDropdown();
     setupFooterAuthLinks();
+<<<<<<< Updated upstream
+=======
+    setupSaveToggle();
+    setupCaptionTestAllButton();
+>>>>>>> Stashed changes
     if (SESSION_ID) loadSettingsForCaption();
   } catch (e) {
     console.warn("[Lumen] init error", e);

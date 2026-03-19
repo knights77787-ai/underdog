@@ -2,10 +2,11 @@
 WebSocket 메시지 처리: join, caption(저장/브로드캐스트) + alert(판정 시에만 추가).
 
 저장·브로드캐스트 흐름(현실 운영):
-  A) caption(pass) WS 브로드캐스트만 (DB 저장 안 함)
+  A) caption은 기본적으로 "키워드 검출된 경우"에만 WS 브로드캐스트 (DB 저장 안 함)
+     - 테스트/디버그: `settings.caption_all=true`면 키워드 여부와 무관하게 caption 전부 브로드캐스트
   B) 판정 결과가 있으면(warning/daily) alert 추가 저장 + WS (쿨다운·alert_enabled 반영)
   C) 쿨다운: (client_session_uuid, keyword, event_type) 동일 시 cooldown_sec 내엔 alert 저장/발행 스킵
-  키워드 없으면 caption만 브로드캐스트하고 alert 이벤트는 저장하지 않음.
+     - (caption_all이거나) 키워드는 그대로 caption만 표시될 수 있음
 """
 import asyncio
 import os
@@ -98,7 +99,7 @@ async def _enqueue_audiocls(
 
 
 # 세션별 설정 캐시 (TTL 10초). caption/alert 판정 시 DB 조회 완화
-_settings_cache_ttl_sec = 10
+_settings_cache_ttl_sec = 2  # 테스트 버튼 등 설정 변경 반영을 빠르게 하기 위함
 _settings_cache: dict[str, tuple[dict, float]] = {}  # client_session_uuid -> (settings, cached_at)
 
 
@@ -183,16 +184,26 @@ async def _handle_caption_generated(
     conn_prefix: str,
 ) -> None:
     """caption 텍스트 공통 처리: 브로드캐스트·DB 저장·키워드 판정·alert(쿨다운·설정 반영). STT 결과도 동일 흐름."""
-    # 1) caption 브로드캐스트 (말한/입력한 클라이언트도 자막 보이도록 exclude 없이 전송, DB 저장 안 함)
-    caption_entry = memory_logs.append_caption(sid, text, ts_ms=ts_ms)
-    await manager.broadcast_to_session(sid, caption_entry)
-    # 2) 설정 조회
+    # 1) 설정 조회
     settings = await asyncio.to_thread(_get_settings, sid)
-    # 3) 키워드 판정
+
+    # 2) 키워드 판정
     category, event_type, keyword, score = keyword_detector.judge(text)
-    if event_type not in ("danger", "caution", "alert") or not keyword:
+    keyword_matched = bool(keyword) and event_type in ("danger", "caution", "alert")
+    caption_all_enabled = bool(settings.get("caption_all", False))
+
+    # 3) caption 브로드캐스트
+    # - 기본: 키워드가 검출된 경우에만 자막 표시
+    # - 테스트: caption_all_enabled면 키워드 여부와 무관하게 자막 표시
+    if caption_all_enabled or keyword_matched:
+        caption_entry = memory_logs.append_caption(sid, text, ts_ms=ts_ms)
+        await manager.broadcast_to_session(sid, caption_entry)
+
+    # 4) 키워드가 없으면 alert 처리도 스킵
+    if not keyword_matched:
         return
-    # 4) 설정 기반 쿨다운·alert on/off (위에서 조회한 settings 사용)
+
+    # 5) 설정 기반 쿨다운·alert on/off (위에서 조회한 settings 사용)
     cooldown_sec = int(settings.get("cooldown_sec", 5))
     alert_enabled = bool(settings.get("alert_enabled", True))
     if _is_in_cooldown(sid, keyword or "", event_type, cooldown_sec, ts_ms):
@@ -200,7 +211,12 @@ async def _handle_caption_generated(
             f"{conn_prefix}alert_skipped reason=cooldown session_id={sid} keyword={keyword or ''} event_type={event_type}"
         )
         return
+<<<<<<< Updated upstream
     # 5) alert 저장 + WS 발행
+=======
+
+    # 6) alert 저장 + (가능하면) WS 발행 (event_id 포함해 프론트 피드백용). event_save_enabled 시에만 DB 저장
+>>>>>>> Stashed changes
     _last_alert_ts_by_key[(sid, keyword or "", event_type)] = ts_ms
     entry = memory_logs.append_alert(
         sid, text, keyword or "", event_type, category, score, ts_ms=ts_ms, source="text"

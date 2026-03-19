@@ -10,6 +10,13 @@ from App.db.models import SettingsModel
 DEFAULT_SETTINGS = {
     "font_size": 20,
     "alert_enabled": True,
+<<<<<<< Updated upstream
+=======
+    "event_save_enabled": True,  # True: caption/alert DB 저장. False: 저장 안 함 (이벤트 히스토리 비표시)
+    # STT 결과에서 키워드가 검출될 때만 실시간 자막(caption)을 표시할지 여부.
+    # 테스트 버튼으로 전체 표시로 토글할 수 있음.
+    "caption_all": False,
+>>>>>>> Stashed changes
     "cooldown_sec": 5,
     "auto_scroll": True,
     "stt_initial_prompt": "",  # Whisper API prompt: 도메인/어휘 힌트 (예: "일상 대화, 건강")

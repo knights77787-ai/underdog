@@ -14,6 +14,8 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 class SettingsPatch(BaseModel):
     """저장 시 보낼 수 있는 필드. None이면 해당 키는 갱신하지 않음."""
     font_size: Optional[int] = Field(None, ge=10, le=60)
+    # True: STT 캡션을 전부 표시(키워드 필터 해제). False: 키워드 매칭될 때만 표시.
+    caption_all: Optional[bool] = None
     alert_enabled: Optional[bool] = None
     cooldown_sec: Optional[int] = Field(None, ge=0, le=60)
     auto_scroll: Optional[bool] = None
