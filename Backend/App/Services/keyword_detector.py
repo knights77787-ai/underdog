@@ -101,17 +101,20 @@ def judge(
     반환: (category, event_type, keyword, score). category는 warning|caution|daily.
     """
     text = text or ""
+    # STT 결과에 "화 재"처럼 공백이 섞여 들어오는 케이스가 있어
+    # 공백 제거 버전도 함께 검사한다.
+    text_compact = "".join(text.split())
     with _RULE_LOCK:
         danger_list = list(_keywords_by_type.get("danger", []))
         caution_list = list(_keywords_by_type.get("caution", []))
         alert_list = list(_keywords_by_type.get("alert", []))
     for kw in danger_list:
-        if kw in text:
+        if kw in text or (text_compact and kw in text_compact):
             return ("warning", "danger", kw, 1.0)
     for kw in caution_list:
-        if kw in text:
+        if kw in text or (text_compact and kw in text_compact):
             return ("caution", "caution", kw, 0.85)
     for kw in alert_list:
-        if kw in text:
+        if kw in text or (text_compact and kw in text_compact):
             return ("daily", "alert", kw, 0.7)
     return ("daily", "info", None, 0.2)
