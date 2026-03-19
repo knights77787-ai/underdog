@@ -69,6 +69,8 @@ const WORKLET_URL = (window.location.origin || "http://127.0.0.1:8000") + "/stat
 // 1) DOM
 // =======================
 
+const saveToggle = document.getElementById("saveToggle");
+
 const heroBadge = document.getElementById("heroBadge");
 const heroTitle = document.getElementById("heroTitle");
 const heroDesc  = document.getElementById("heroDesc");
@@ -735,6 +737,16 @@ async function loadUserInfo() {
   if (!SESSION_ID || !userDropdownName || !userDropdownEmail) return;
   try {
     const res = await fetch(API_BASE + "/auth/me?session_id=" + encodeURIComponent(SESSION_ID));
+    // provider(localStorage)는 남아있는데 실제 세션이 게스트이거나 유저가 없는 경우 404가 날 수 있음.
+    // 이 경우 provider 상태를 정리해서 이후 반복 호출/콘솔 노이즈를 줄인다.
+    if (res.status === 404) {
+      try {
+        localStorage.removeItem(PROVIDER_STORAGE_KEY);
+      } catch (_) {}
+      // 게스트 UI로 전환(로그 섹션/CTA 포함)
+      updateUserSection();
+      return;
+    }
     const data = await res.json().catch(() => ({}));
     const ok = res.ok && data && (data.ok === true || data.ok === "true");
     const name = (data && (data.name ?? data.user?.name)) || "사용자";

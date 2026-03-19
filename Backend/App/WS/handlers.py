@@ -99,7 +99,7 @@ async def _enqueue_audiocls(
 
 
 # 세션별 설정 캐시 (TTL 10초). caption/alert 판정 시 DB 조회 완화
-_settings_cache_ttl_sec = 2  # 테스트 버튼 등 설정 변경 반영을 빠르게 하기 위함
+_settings_cache_ttl_sec = 1  # 테스트 버튼 등 설정 변경 반영을 빠르게 하기 위함
 _settings_cache: dict[str, tuple[dict, float]] = {}  # client_session_uuid -> (settings, cached_at)
 
 
