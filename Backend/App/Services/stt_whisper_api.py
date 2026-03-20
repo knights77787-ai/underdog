@@ -21,12 +21,12 @@ OPENAI_TRANSCRIPTIONS_URL = "https://api.openai.com/v1/audio/transcriptions"
 
 # 학습 데이터에 흔한 불필요 문장 필터 (할루시네이션 감소)
 BANNED_TOKENS = frozenset({
-    "네",
     "네 그렇습니다",
     "감사합니다",
     "고맙습니다",
-    "시청해주셔서 감사합니다",
-    "구독과 좋아요",
+    "시청해주셔서 감사합니다", "시청 해주셔서 감사합니다다"
+    "구독과 좋아요", 
+    "한국어"
 })
 
 

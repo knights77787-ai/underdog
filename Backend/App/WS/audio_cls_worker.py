@@ -134,7 +134,7 @@ class AudioClsWorker:
                 if not event_type:
                     continue
 
-                # prefix는 worker에서 한 번만 (쿨डाउन/record_alert_ts 키 일치)
+                # prefix는 worker에서 한 번만 (쿨다운/record_alert_ts 키 일치)
                 kw_prefixed = f"yamnet:{keyword}"
 
                 if self.cooldown_check_fn(
