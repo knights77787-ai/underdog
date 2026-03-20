@@ -415,26 +415,49 @@ function setHeroDanger(text) {
 }
 
 // =======================
-// Vibration (Android only + user-gesture gated + cooldown)
+// Vibration (Web Vibration API + user-gesture gated + cooldown)
+// - iOS Safari: 진동 API 없음 → 알림만 뜨고 진동 없음이 정상
+// - PC 크롬·iPad 에뮬레이터: 대부분 진동 없음
+// - 실제 안드로이드 폰 + 크롬(HTTPS): 여기서만 확실히 동작
 // =======================
 let vibrationUnlockedByUser = false;
 let lastVibrateAtMs = 0;
+let vibrateUnsupportedHintShown = false;
 
 function isAndroidDevice() {
   const ua = (navigator.userAgent || "").toLowerCase();
-  // iPadOS(데스크톱 UA), iOS 사파리 등 제외하고 Android만 타겟
   return ua.includes("android");
 }
 
+/** 브라우저가 진동 API를 노출하는지 (기기가 실제로 울리는지는 별개) */
+function supportsVibrateAPI() {
+  if (typeof navigator === "undefined" || typeof navigator.vibrate !== "function") return false;
+  try {
+    if (typeof window !== "undefined" && window.isSecureContext === false) return false;
+  } catch (_) {}
+  return true;
+}
+
 function unlockVibrationByUserGesture() {
-  // 일부 브라우저는 사용자 제스처 이후에만 진동/오디오 같은 동작을 허용
   vibrationUnlockedByUser = true;
 }
 
 function canVibrate() {
   if (!vibrationUnlockedByUser) return false;
-  if (!isAndroidDevice()) return false;
-  return typeof navigator !== "undefined" && typeof navigator.vibrate === "function";
+  return supportsVibrateAPI();
+}
+
+/** 알림은 떴는데 진동만 안 될 때 1회만 안내 (iOS/PC 등) */
+function maybeWarnVibrateUnsupported() {
+  if (vibrateUnsupportedHintShown) return;
+  if (!vibrationUnlockedByUser) return;
+  if (supportsVibrateAPI()) return;
+  vibrateUnsupportedHintShown = true;
+  showToast(
+    "진동 안내",
+    "이 환경(iOS·일부 태블릿·PC)에서는 웹 진동이 지원되지 않아요. 실제 안드로이드 폰 크롬에서 확인해 주세요.",
+    false
+  );
 }
 
 function vibrateWithCooldown(pattern, cooldownMs) {
@@ -443,29 +466,33 @@ function vibrateWithCooldown(pattern, cooldownMs) {
   if (now - lastVibrateAtMs < cooldownMs) return;
   lastVibrateAtMs = now;
   try {
+    navigator.vibrate(0);
     navigator.vibrate(pattern);
   } catch (_) {}
 }
 
-// 진동: 위험 단계별 패턴 (API는 세기 미지원, 지속시간·횟수로 구분)
+// 진동: 위험 단계별 패턴 (웹 API는 강도 불가 → 길이·간격·반복을 최대한 길게)
+// 브라우저/OS가 한 번에 허용하는 길이에 잘릴 수 있음.
 function vibrateByLevel(eventType) {
+  maybeWarnVibrateUnsupported();
+  if (!canVibrate()) return;
   if (eventType === "danger") {
-    // 위험: 긴 3회 (강한 느낌) + 쿨타임 조금 더 짧게
-    vibrateWithCooldown([300, 100, 300, 100, 300], 2500);
+    // 위험: 약 4.6초 분량 (긴 펄스 4회 + 마지막 길게)
+    vibrateWithCooldown(
+      [700, 150, 700, 150, 700, 150, 700, 150, 1200],
+      5200
+    );
   } else {
-    // 일상알림: 짧은 2회 (부드러운 느낌) + 쿨타임 길게
-    vibrateWithCooldown([150, 100, 150], 4000);
+    // 주의·일상 알림: 약 2.2초 분량
+    vibrateWithCooldown([400, 140, 400, 140, 400, 140, 600], 3200);
   }
 }
 
 function setupVibrationTestButton() {
   if (!btnVibrateTest) return;
-  if (!isAndroidDevice()) return;
+  if (!isAndroidDevice() && !supportsVibrateAPI()) return;
 
-  // Android에서만 노출
   btnVibrateTest.classList.remove("d-none");
-
-  // 아직 사용자 제스처 unlock 전이면 안내용으로 비활성화
   btnVibrateTest.disabled = !vibrationUnlockedByUser;
 
   btnVibrateTest.addEventListener("click", () => {
@@ -473,12 +500,12 @@ function setupVibrationTestButton() {
     btnVibrateTest.disabled = false;
 
     if (!canVibrate()) {
-      showToast("진동 불가", "이 기기/브라우저에서는 진동을 지원하지 않아요.", true);
+      showToast("진동 불가", "이 기기/브라우저에서는 웹 진동을 지원하지 않아요.", true);
       return;
     }
 
-    showToast("진동 테스트", "진동을 실행합니다.", false);
-    vibrateWithCooldown([200, 80, 200], 0);
+    showToast("진동 테스트", "긴 패턴으로 진동합니다.", false);
+    vibrateWithCooldown([500, 150, 500, 150, 500, 200, 800], 0);
   });
 }
 
