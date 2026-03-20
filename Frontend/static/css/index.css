@@ -257,3 +257,15 @@ body.bg-light { background-color: #f8fafc !important; }
     padding: 0.2rem 0.4rem;
   }
 }
+
+/* 최근 감지 로그: 피드백 선택 가능한 행 */
+#logTable tbody tr.log-row-clickable {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+#logTable tbody tr.log-row-clickable:hover {
+  background-color: rgba(6, 182, 212, 0.12) !important;
+}
+#logTable tbody tr.log-row-clickable.table-active {
+  box-shadow: inset 3px 0 0 0 var(--lumen-teal, #0891b2);
+}

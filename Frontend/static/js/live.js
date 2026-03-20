@@ -251,6 +251,8 @@ function updateCaptionTestButtonUI(enabled) {
 
 const LOCAL_LOG_KEY = "underdog_event_log";
 const MAX_LOCAL_LOGS = 30;
+/** 알림 로그 행(tr) → 피드백용 메타 (event_id 등) */
+const logRowAlertMeta = new WeakMap();
 
 function saveToLocalLog(entry) {
   try {
@@ -267,7 +269,48 @@ function saveToLocalLog(entry) {
   } catch (_) {}
 }
 
-function appendLogRow({ ts, ts_ms, type, text, score, event_type, keyword }) {
+function clearLogRowSelection() {
+  if (!logTbody) return;
+  logTbody.querySelectorAll("tr.table-active").forEach((r) => r.classList.remove("table-active"));
+}
+
+function selectLogRowForFeedback(tr) {
+  const meta = logRowAlertMeta.get(tr);
+  if (!meta || meta.event_id == null) {
+    showToast("피드백", "이 기록은 서버 이벤트와 연결되지 않아 피드백을 보낼 수 없어요.", true);
+    return;
+  }
+  clearLogRowSelection();
+  tr.classList.add("table-active");
+  lastAlertEventInfo = {
+    event_id: meta.event_id,
+    text: meta.text,
+    keyword: meta.keyword,
+    event_type: meta.event_type,
+    ts_ms: meta.ts_ms,
+  };
+  showToast("피드백", "선택한 알림에 대해 위쪽 맞아요 / 아니에요를 눌러주세요.", false);
+}
+
+function setupLogTableFeedbackClicks() {
+  if (!logTbody) return;
+  logTbody.addEventListener("click", (e) => {
+    const tr = e.target && e.target.closest ? e.target.closest("tr.log-row-clickable") : null;
+    if (!tr || !logTbody.contains(tr)) return;
+    selectLogRowForFeedback(tr);
+  });
+  logTbody.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const tr = e.target && e.target.tagName === "TR" && e.target.classList.contains("log-row-clickable")
+      ? e.target
+      : null;
+    if (!tr || !logTbody.contains(tr)) return;
+    e.preventDefault();
+    selectLogRowForFeedback(tr);
+  });
+}
+
+function appendLogRow({ ts, ts_ms, type, text, score, event_type, keyword, event_id }) {
   const tr = document.createElement("tr");
   const kind = (type === "alert")
     ? (event_type === "danger" ? "경고" : "생활알림")
@@ -275,13 +318,34 @@ function appendLogRow({ ts, ts_ms, type, text, score, event_type, keyword }) {
   const prob = (typeof score === "number") ? `${Math.round(score * 100)}%` : "-";
   const extra = keyword ? ` [${keyword}]` : "";
   const timeStr = formatTs(ts_ms ?? ts);
+  const contentLine = `${text || ""}${extra}${event_type ? ` (${event_type})` : ""}`;
 
-  tr.innerHTML = `
-    <td>${timeStr}</td>
-    <td>${kind}</td>
-    <td>${text}${extra}${event_type ? ` (${event_type})` : ""}</td>
-    <td>${prob}</td>
-  `;
+  const tdTime = document.createElement("td");
+  tdTime.textContent = timeStr;
+  const tdKind = document.createElement("td");
+  tdKind.textContent = kind;
+  const tdContent = document.createElement("td");
+  tdContent.textContent = contentLine;
+  const tdProb = document.createElement("td");
+  tdProb.textContent = prob;
+  tr.append(tdTime, tdKind, tdContent, tdProb);
+
+  if (type === "alert" && event_id != null) {
+    tr.classList.add("log-row-clickable");
+    tr.setAttribute("role", "button");
+    tr.tabIndex = 0;
+    tr.title = "클릭하면 이 알림에 피드백할 수 있어요";
+    logRowAlertMeta.set(tr, {
+      event_id,
+      text: text || "",
+      keyword: keyword || "",
+      event_type: event_type || "danger",
+      ts_ms: ts_ms ?? ts ?? Date.now(),
+    });
+  } else if (type === "alert") {
+    tr.title = "이 기록은 서버 이벤트 ID가 없어 피드백을 보낼 수 없습니다";
+  }
+
   logTbody.prepend(tr);
 
   while (logTbody.children.length > 30) {
@@ -295,6 +359,7 @@ function appendLogRow({ ts, ts_ms, type, text, score, event_type, keyword }) {
     category: event_type || (type === "alert" ? "alert" : "caption"),
     keyword: keyword || null,
     score: typeof score === "number" ? score : null,
+    event_id: event_id != null ? event_id : undefined,
   });
 }
 
@@ -773,7 +838,17 @@ client.on("alert", (msg) => {
   // 원래는 "키워드면 caption에서 이미 넣음"이었지만, caption_all=OFF에서 caption이 누락되는 케이스가 있어
   // alert(text)를 자막에도 폴백으로 추가해준다(중복은 감수, UX 우선).
   appendCaption(text, event_type === "danger");
-  appendLogRow({ ts_ms: msg.ts_ms ?? p?.ts_ms, ts: msg.ts ?? p?.ts, type: "alert", text, keyword, event_type, score: msg.score ?? p?.score });
+  clearLogRowSelection();
+  appendLogRow({
+    ts_ms: msg.ts_ms ?? p?.ts_ms,
+    ts: msg.ts ?? p?.ts,
+    type: "alert",
+    text,
+    keyword,
+    event_type,
+    score: msg.score ?? p?.score,
+    event_id: event_id != null ? event_id : undefined,
+  });
 
   setHeroAlert(`${keyword ? "["+keyword+"] " : ""}${text}`, event_type);
   const toastTitle = event_type === "danger" ? "위험 감지" : "알림";
@@ -803,6 +878,7 @@ async function sendFeedback(vote, comment) {
     if (res.ok && data.ok) {
       showToast("피드백", "저장되었습니다.", false);
       lastAlertEventInfo = null;  // 제출 후 초기화
+      clearLogRowSelection();
     } else {
       showToast("피드백 실패", data.detail || res.statusText || "다시 시도해 주세요.", true);
     }
@@ -1067,6 +1143,7 @@ async function loadSettingsForCaption() {
     setHeroNormal();
     updateUserSection();
     updateLogSectionVisibility();
+    setupLogTableFeedbackClicks();
     setupVibrationTestButton();
     setupUserDropdown();
     setupFooterAuthLinks();
