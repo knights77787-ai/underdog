@@ -150,7 +150,6 @@ const captionBox = document.getElementById("captionBox");
 const btnCaptionTestAll = document.getElementById("btnCaptionTestAll");
 
 const toastContainer = document.getElementById("toastContainer");
-const sessionLabel = document.getElementById("sessionLabel");
 const userDropdownWrap = document.getElementById("userDropdownWrap");
 const btnUserIcon = document.getElementById("btnUserIcon");
 const userDropdownName = document.getElementById("userDropdownName");
@@ -302,7 +301,6 @@ async function ensureSessionAndConnect() {
       try {
         window.UnderdogApp?.setSessionId(SESSION_ID);
       } catch (_) {}
-      updateSessionLabel();
       updateUserSection();
       loadSettingsForCaption();
     } catch (e) {
@@ -836,10 +834,6 @@ btnFeedbackYes.addEventListener("click", () => sendFeedback("up"));
 btnFeedbackNo.addEventListener("click", () => showFeedbackCommentModal());
 setupFeedbackCommentModal();
 
-function updateSessionLabel() {
-  if (sessionLabel) sessionLabel.textContent = SESSION_ID ? "세션: " + SESSION_ID.slice(0, 8) + "…" : "";
-}
-
 // 로그인 상태: provider 있으면 사용자 아이콘+드롭다운, 없으면 '다른 계정' 버튼
 function getProvider() {
   const fromUrl = new URLSearchParams(document.location.search).get("provider");
@@ -1052,7 +1046,6 @@ async function loadSettingsForCaption() {
   try {
     updateMicStatusUI();
     setHeroNormal();
-    updateSessionLabel();
     updateUserSection();
     updateLogSectionVisibility();
     setupVibrationTestButton();

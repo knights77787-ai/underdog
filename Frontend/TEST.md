@@ -89,13 +89,13 @@ console.log("mediaDevices:", navigator.mediaDevices);
 1. 브라우저에서 **http://127.0.0.1:8000/login** 접속
 2. **「게스트로 시작」** 클릭
 3. `/?session_id=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` 형태로 **라이브 메인(/)으로 이동**하는지 확인
-4. 상단에 **「세션: xxxxxxxx…」** 같은 표시가 나오는지 확인
+4. 주소창에 `session_id` 쿼리가 붙었는지 확인
 
 ### 3.2 세션 없이 라이브 접속 후 Connect
 
 1. **http://127.0.0.1:8000/** 로 직접 접속 (쿼리 없이)
 2. **「Connect」** 클릭
-3. 서버에서 게스트 세션을 발급해 URL이 **`/?session_id=...`** 로 바뀌고, **「세션: …」** 이 보이는지 확인
+3. 서버에서 게스트 세션을 발급해 URL이 **`/?session_id=...`** 로 바뀌는지 확인
 4. 배지가 **「Connected」** 로 바뀌는지 확인
 
 ### 3.3 피드백 (맞아요/아니에요)
