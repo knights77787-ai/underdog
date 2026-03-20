@@ -2,36 +2,55 @@
 // =======================
 // 0) 공용 unhandledrejection 가드 (초기 로드 초반부터 등록)
 // =======================
-// 소스맵/번들링 때문에 스택에 core.js로 표시되는 경우가 있어,
-// "payload" 관련 TypeError만 조용히 삼키도록 한다.
+// 브라우저 확장(core.js 등) · 결제/기부 위젯이 던지는 payload 관련 Promise rejection을 삼킨다.
+// capture: true 로 다른 스크립트보다 먼저 처리해 콘솔 Uncaught 노이즈를 줄인다.
 (() => {
   try {
     if (window.__underdogUnhandledRejectionPayloadGuardInstalled) return;
     window.__underdogUnhandledRejectionPayloadGuardInstalled = true;
-    window.addEventListener("unhandledrejection", (ev) => {
-      const reason = ev && ev.reason ? ev.reason : null;
-      const msg = reason && (reason.message || String(reason));
-      if (msg && typeof msg === "string") {
-        const msgLower = msg.toLowerCase();
-        const shouldSilence =
-          // 기존: payload 관련 TypeError 무시
-          msgLower.includes("payload") ||
-          msgLower.includes("reading 'payload'") ||
-          // 추가: checkout popup / GF config 관련 미처리 예외 무시
-          msgLower.includes("checkout popup") ||
-          msgLower.includes("checkoutpopup") ||
-          msgLower.includes("no checkout popup config") ||
-          msgLower.includes("gf config") ||
-          msgLower.includes("no gf config") ||
-          msgLower.includes("checkoutpouploggerenabled");
-        if (shouldSilence) {
+
+    function rejectionToMessage(reason) {
+      if (reason == null) return "";
+      if (typeof reason === "string") return reason;
+      if (reason instanceof Error) return reason.message || String(reason);
+      try {
+        const m = reason && reason.message;
+        if (typeof m === "string") return m;
+        return String(reason);
+      } catch (_) {
+        return "";
+      }
+    }
+
+    function shouldSilenceExternalRejection(msg) {
+      if (!msg || typeof msg !== "string") return false;
+      const s = msg.toLowerCase();
+      return (
+        s.includes("payload") ||
+        s.includes("reading 'payload'") ||
+        s.includes('reading "payload"') ||
+        (s.includes("cannot read properties") && s.includes("payload")) ||
+        s.includes("checkout popup") ||
+        s.includes("checkoutpopup") ||
+        s.includes("no checkout popup config") ||
+        s.includes("gf config") ||
+        s.includes("no gf config") ||
+        s.includes("checkoutpouploggerenabled")
+      );
+    }
+
+    window.addEventListener(
+      "unhandledrejection",
+      (ev) => {
+        const msg = rejectionToMessage(ev && ev.reason);
+        if (!shouldSilenceExternalRejection(msg)) return;
         try {
           ev.preventDefault();
           ev.stopImmediatePropagation();
         } catch (_) {}
-        }
-      }
-    });
+      },
+      { capture: true }
+    );
   } catch (_) {}
 })();
 // =======================
@@ -1058,13 +1077,4 @@ async function loadSettingsForCaption() {
   }
 })();
 
-// 확장 프로그램 등 외부 스크립트(core.js 등) 또는 OAuth 에러 페이지에서 나는 unhandledrejection 처리
-// (예: Cannot read properties of undefined (reading 'payload')) — 앱 중단·콘솔 노이즈 방지
-window.addEventListener("unhandledrejection", function (ev) {
-  const msg = ev.reason && (ev.reason.message || String(ev.reason));
-  if (msg && typeof msg === "string" && (msg.includes("payload") || msg.includes("reading 'payload'"))) {
-    console.warn("[Lumen] 외부/OAuth 관련 예외로 보이는 rejection (무시):", msg);
-    ev.preventDefault();
-    ev.stopImmediatePropagation();
-  }
-});
+// 상단 IIFE에서 capture:true 로 이미 처리 — 중복 리스너 제거 (이중 preventDefault 방지)

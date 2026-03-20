@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import io
 import os
+import re
 import wave
 
 import numpy as np
@@ -27,7 +28,51 @@ BANNED_TOKENS = frozenset({
     "고맙습니다",
     "시청해주셔서 감사합니다",
     "구독과 좋아요",
+    "한국어",
+    "한국어로 말합니다",
+    "한국어로 말합니다.",
 })
+
+
+def sanitize_whisper_transcript(text: str) -> str:
+    """
+    Whisper가 잡음에서 프롬프트/메타 단어를 반복 출력하는 경우 제거.
+    특히 prompt에 '한국어'가 있으면 '방송, 한국어, 한국어, ...' 식 출력이 자주 난다.
+    """
+    if not text or not str(text).strip():
+        return ""
+    t = str(text).strip()
+    n_ko = len(re.findall(r"\b한국어\b", t))
+    if n_ko == 0:
+        return t
+
+    parts = [p for p in re.split(r"[\s,，、]+", t) if p]
+    if not parts:
+        return ""
+
+    if len(parts) == 1 and parts[0] == "한국어":
+        return ""
+
+    if n_ko >= 3 and (n_ko / len(parts)) >= 0.35:
+        logger.info(
+            "WHISPER_SANITIZE drop reason=korean_meta_spam n_ko=%s parts=%s sample=%r",
+            n_ko,
+            len(parts),
+            t[:80],
+        )
+        return ""
+
+    if all(p == "한국어" for p in parts):
+        return ""
+
+    if len(t) > 50 and n_ko >= 4:
+        logger.info("WHISPER_SANITIZE drop reason=korean_repeat_long text_len=%s n_ko=%s", len(t), n_ko)
+        return ""
+
+    low = t.lower()
+    if low in ("korean", "korean language"):
+        return ""
+    return t
 
 
 def _float32_16k_to_wav_bytes(audio: np.ndarray) -> bytes:
@@ -85,9 +130,16 @@ class WhisperAPISTT:
             audio.dtype,
         )
         wav_bytes = _float32_16k_to_wav_bytes(audio)
-        prompt = (initial_prompt or "").strip()
+        raw_prompt = (initial_prompt or "").strip()
+        # 사용자/기본값 모두: 프롬프트에 '한국어' 넣으면 Whisper가 잡음에서 해당 단어를 반복 출력하기 쉬움
+        if raw_prompt:
+            prompt = re.sub(r"\b한국어\b", " ", raw_prompt)
+            prompt = re.sub(r"\s*,\s*,", ",", prompt)
+            prompt = re.sub(r"\s+", " ", prompt).strip(" ,")
+        else:
+            prompt = ""
         if not prompt:
-            prompt = "일상 대화, 안전, 안내 방송, 한국어"  # 기본 힌트
+            prompt = "안전 안내, 화재 대피, 일상 대화, 열차 문 닫힘"
         try:
             with httpx.Client(timeout=30.0) as client:
                 resp = client.post(
@@ -111,6 +163,9 @@ class WhisperAPISTT:
         except Exception:
             logger.exception("WHISPER_API request failed")
             return ""
+        if not text:
+            return ""
+        text = sanitize_whisper_transcript(text)
         if not text:
             return ""
         # 끝 마침표/공백 제거 후 금지 문구 매칭 (예: "시청해주셔서 감사합니다." → 필터)
