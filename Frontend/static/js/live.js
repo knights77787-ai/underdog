@@ -289,7 +289,8 @@ function selectLogRowForFeedback(tr) {
     event_type: meta.event_type,
     ts_ms: meta.ts_ms,
   };
-  showToast("피드백", "선택한 알림에 대해 위쪽 맞아요 / 아니에요를 눌러주세요.", false);
+  const kw = meta.keyword ? `[${meta.keyword}] ` : "";
+  setHeroAlert(`${kw}${meta.text || ""}`, meta.event_type);
 }
 
 function setupLogTableFeedbackClicks() {
@@ -879,6 +880,7 @@ async function sendFeedback(vote, comment) {
       showToast("피드백", "저장되었습니다.", false);
       lastAlertEventInfo = null;  // 제출 후 초기화
       clearLogRowSelection();
+      setHeroNormal();
     } else {
       showToast("피드백 실패", data.detail || res.statusText || "다시 시도해 주세요.", true);
     }
