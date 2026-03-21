@@ -3,6 +3,58 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
+  <!-- 확장 프로그램 등 외부 스크립트의 payload 관련 Promise rejection을 최대한 일찍 삼켜 콘솔 노이즈 감소 -->
+  <script>
+  (function () {
+    if (window.__lumenEarlyRejectionGuard) return;
+    window.__lumenEarlyRejectionGuard = true;
+    function rejectionToMessage(reason) {
+      if (reason == null) return "";
+      if (typeof reason === "string") return reason;
+      if (reason instanceof Error) return reason.message || String(reason);
+      try {
+        const m = reason && reason.message;
+        if (typeof m === "string") return m;
+        return String(reason);
+      } catch (_) {
+        return "";
+      }
+    }
+    function stackOf(reason) {
+      return reason instanceof Error && reason.stack ? String(reason.stack) : "";
+    }
+    function shouldSilence(msg, reason) {
+      if (!msg || typeof msg !== "string") return false;
+      const s = msg.toLowerCase();
+      const st = stackOf(reason).toLowerCase();
+      const extStack =
+        st.includes("chrome-extension://") ||
+        st.includes("moz-extension://") ||
+        /\bcore\.js\b/.test(st);
+      const payloadish =
+        s.includes("payload") ||
+        (s.includes("undefined") && (s.includes("read") || s.includes("읽을")));
+      if (extStack && payloadish) return true;
+      return (
+        s.includes("payload") ||
+        (s.includes("cannot read properties") && s.includes("payload")) ||
+        (s.includes("cannot read") && s.includes("payload"))
+      );
+    }
+    window.addEventListener(
+      "unhandledrejection",
+      function (ev) {
+        const msg = rejectionToMessage(ev && ev.reason);
+        if (!shouldSilence(msg, ev && ev.reason)) return;
+        try {
+          ev.preventDefault();
+          ev.stopImmediatePropagation();
+        } catch (_) {}
+      },
+      { capture: true }
+    );
+  })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Lumen | 메인 홈</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
@@ -251,6 +303,6 @@
 
   <script src="/static/js/config.js"></script>
   <script src="/static/js/wsClient.js"></script>
-  <script src="/static/js/live.js?v=3"></script>
+  <script src="/static/js/live.js?v=4"></script>
 </body>
 </html>

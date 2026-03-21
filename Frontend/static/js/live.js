@@ -22,14 +22,28 @@
       }
     }
 
-    function shouldSilenceExternalRejection(msg) {
+    function stackOf(reason) {
+      return reason instanceof Error && reason.stack ? String(reason.stack) : "";
+    }
+
+    function shouldSilenceExternalRejection(msg, reason) {
       if (!msg || typeof msg !== "string") return false;
       const s = msg.toLowerCase();
+      const st = stackOf(reason).toLowerCase();
+      const extStack =
+        st.includes("chrome-extension://") ||
+        st.includes("moz-extension://") ||
+        /\bcore\.js\b/.test(st);
+      const payloadish =
+        s.includes("payload") ||
+        (s.includes("undefined") && (s.includes("read") || s.includes("읽을")));
+      if (extStack && payloadish) return true;
       return (
         s.includes("payload") ||
         s.includes("reading 'payload'") ||
         s.includes('reading "payload"') ||
         (s.includes("cannot read properties") && s.includes("payload")) ||
+        (s.includes("cannot read") && s.includes("payload")) ||
         s.includes("checkout popup") ||
         s.includes("checkoutpopup") ||
         s.includes("no checkout popup config") ||
@@ -43,7 +57,7 @@
       "unhandledrejection",
       (ev) => {
         const msg = rejectionToMessage(ev && ev.reason);
-        if (!shouldSilenceExternalRejection(msg)) return;
+        if (!shouldSilenceExternalRejection(msg, ev && ev.reason)) return;
         try {
           ev.preventDefault();
           ev.stopImmediatePropagation();
@@ -158,6 +172,12 @@ function setupModalA11y(modalEl) {
     modalEl.setAttribute("aria-hidden", "false");
   });
   modalEl.addEventListener("hidden.bs.modal", () => {
+    const ae = document.activeElement;
+    if (ae && typeof ae.blur === "function" && modalEl.contains(ae)) {
+      try {
+        ae.blur();
+      } catch (_) {}
+    }
     modalEl.setAttribute("inert", "");
     modalEl.setAttribute("aria-hidden", "true");
   });
