@@ -4,9 +4,10 @@ WebSocket 메시지 처리: join, caption(저장/브로드캐스트) + alert(판
 저장·브로드캐스트 흐름(현실 운영):
   A) caption은 기본적으로 "키워드 검출된 경우"에만 WS 브로드캐스트 (DB 저장 안 함)
      - 테스트/디버그: `settings.caption_all=true`면 키워드 여부와 무관하게 caption 전부 브로드캐스트
+     - 동일 세션에서 정규화 텍스트가 cooldown 윈도우 내 반복되면 caption WS 생략(자막 폭주 완화). alert 쿨다운과 별개.
   B) 판정 결과가 있으면(warning/daily) alert 추가 저장 + WS (쿨다운·alert_enabled 반영)
   C) 쿨다운: (client_session_uuid, keyword, event_type) 동일 시 cooldown_sec 내엔 alert 저장/발행 스킵
-     - (caption_all이거나) 키워드는 그대로 caption만 표시될 수 있음
+     - caption은 위 A의 dedupe 외 별도 쿨다운 없음(키워드 매칭 시 매 STT마다 자막이 갈 수 있음 → dedupe로 완화)
 """
 import asyncio
 import os
@@ -60,6 +61,8 @@ STT_QUEUE: asyncio.Queue = asyncio.Queue(maxsize=32)
 # 쿨다운: (session_id, keyword, event_type) -> 마지막 발행 ts_ms (스펙과 동일)
 # disconnect 시 해당 세션 키 제거해 메모리 누적 완화
 _last_alert_ts_by_key: dict[tuple[str, str, str], int] = {}
+# caption 중복 억제: session_id -> (정규화 텍스트, 마지막 송신 ts_ms)
+_last_caption_dedupe: dict[str, tuple[str, int]] = {}
 
 
 def clear_cooldown_for_session(session_id: str) -> None:
@@ -67,6 +70,7 @@ def clear_cooldown_for_session(session_id: str) -> None:
     to_del = [k for k in _last_alert_ts_by_key if k[0] == session_id]
     for k in to_del:
         del _last_alert_ts_by_key[k]
+    _last_caption_dedupe.pop(session_id, None)
     _settings_cache.pop(session_id, None)
 
 
@@ -173,6 +177,22 @@ def _is_in_cooldown(
     return last_ts + cooldown_sec * 1000 > ts_ms
 
 
+def _should_skip_duplicate_caption(sid: str, text: str, ts_ms: int, window_ms: int) -> bool:
+    """동일(정규화) 자막이 짧은 간격으로 연속이면 True — STT 구간 분할·할루시네이션 대비."""
+    norm = keyword_detector._normalize_text(text)
+    if len(norm) < 6:
+        return False
+    prev = _last_caption_dedupe.get(sid)
+    if prev is None:
+        _last_caption_dedupe[sid] = (norm, ts_ms)
+        return False
+    prev_norm, prev_ts = prev
+    if norm == prev_norm and (ts_ms - prev_ts) < window_ms:
+        return True
+    _last_caption_dedupe[sid] = (norm, ts_ms)
+    return False
+
+
 async def _handle_caption_generated(
     *,
     websocket: WebSocket,
@@ -204,15 +224,26 @@ async def _handle_caption_generated(
     # 3) caption 브로드캐스트
     # - 기본: 키워드가 검출된 경우에만 자막 표시
     # - 테스트: caption_all_enabled면 키워드 여부와 무관하게 자막 표시
+    cooldown_sec = int(settings.get("cooldown_sec", 5))
+    caption_dedupe_ms = min(max(cooldown_sec * 1000, 2500), 12000)
     if caption_all_enabled or keyword_matched:
-        caption_entry = memory_logs.append_caption(sid, text, ts_ms=ts_ms)
-        await manager.broadcast_to_session(sid, caption_entry)
-        logger.info(
-            "%sWS_CAPTION_EMITTED sid=%s ts_ms=%s",
-            conn_prefix,
-            sid,
-            ts_ms,
-        )
+        if _should_skip_duplicate_caption(sid, text, ts_ms, caption_dedupe_ms):
+            logger.info(
+                "%sWS_CAPTION_DEDUPED sid=%s ts_ms=%s window_ms=%s",
+                conn_prefix,
+                sid,
+                ts_ms,
+                caption_dedupe_ms,
+            )
+        else:
+            caption_entry = memory_logs.append_caption(sid, text, ts_ms=ts_ms)
+            await manager.broadcast_to_session(sid, caption_entry)
+            logger.info(
+                "%sWS_CAPTION_EMITTED sid=%s ts_ms=%s",
+                conn_prefix,
+                sid,
+                ts_ms,
+            )
     else:
         logger.info(
             "%sWS_CAPTION_SKIPPED sid=%s reason=no_keyword caption_all=%s",
@@ -226,11 +257,15 @@ async def _handle_caption_generated(
         return
 
     # 5) 설정 기반 쿨다운·alert on/off (위에서 조회한 settings 사용)
-    cooldown_sec = int(settings.get("cooldown_sec", 5))
     alert_enabled = bool(settings.get("alert_enabled", True))
     if _is_in_cooldown(sid, keyword or "", event_type, cooldown_sec, ts_ms):
-        logger.debug(
-            f"{conn_prefix}alert_skipped reason=cooldown session_id={sid} keyword={keyword or ''} event_type={event_type}"
+        logger.info(
+            "%salert_skipped reason=cooldown session_id=%s keyword=%s event_type=%s cooldown_sec=%s",
+            conn_prefix,
+            sid,
+            keyword or "",
+            event_type,
+            cooldown_sec,
         )
         return
     # 6) alert 저장 + WS 발행

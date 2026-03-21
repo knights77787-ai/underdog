@@ -8,6 +8,7 @@ import io
 import os
 import re
 import wave
+from collections import Counter
 
 import numpy as np
 import httpx
@@ -43,6 +44,7 @@ def sanitize_whisper_transcript(text: str) -> str:
     if not text or not str(text).strip():
         return ""
     t = str(text).strip()
+    t = _compress_repetitive_comma_phrases(t)
     n_ko = len(re.findall(r"\b한국어\b", t))
     if n_ko == 0:
         return t
@@ -74,6 +76,26 @@ def sanitize_whisper_transcript(text: str) -> str:
     if low in ("korean", "korean language"):
         return ""
     return t
+
+
+def _compress_repetitive_comma_phrases(text: str) -> str:
+    """쉼표로 이어진 동일 구절이 과도하게 반복되면(옛 기본 prompt 유사 할루시네이션) 한 번씩만 남김."""
+    if "," not in text or len(text) < 50:
+        return text
+    parts = [p.strip() for p in text.split(",") if p.strip()]
+    if len(parts) < 10:
+        return text
+    top = max(Counter(parts).values(), default=0)
+    if top < 4:
+        return text
+    seen: set[str] = set()
+    out: list[str] = []
+    for p in parts:
+        if p in seen:
+            continue
+        seen.add(p)
+        out.append(p)
+    return ", ".join(out)
 
 
 def _float32_16k_to_wav_bytes(audio: np.ndarray) -> bytes:
@@ -139,8 +161,8 @@ class WhisperAPISTT:
             prompt = re.sub(r"\s+", " ", prompt).strip(" ,")
         else:
             prompt = ""
-        if not prompt:
-            prompt = "안전 안내, 화재 대피, 일상 대화, 열차 문 닫힘"
+        # 빈 프롬프트면 API에 prompt 필드를 보내지 않음. 이전 기본값(안내·열차 문 닫힘 등)은
+        # 잡음/배경에서 해당 문구가 STT 결과로 반복(할루시네이션)되기 쉬워 제거함.
         try:
             with httpx.Client(timeout=30.0) as client:
                 resp = client.post(

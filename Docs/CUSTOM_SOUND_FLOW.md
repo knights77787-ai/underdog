@@ -65,11 +65,16 @@ _match_custom_sound(session_id, emb_live):
   - 메인 화면: 실시간 자막 + 경고 배너 + 토스트 표시
 ```
 
-### 2-4. 유사도 임계값
+### 2-4. YAMNet(비언어)이 “아예 반응 없을 때”
 
-- `CUSTOM_THRESHOLD = 0.75` (audio_cls_worker.py)
-- 0.75 이상이면 같은 소리로 판단
-- 환경/녹음 품질에 따라 0.75~0.9 사이로 조정 가능
+- YAMNet은 클래스를 맞혀도, `Shared/constants/event_types.json` 의 **`audio_rules`** 안 `*_labels`에 **CSV와 동일한 `display_name`** 이 없으면 alert로 이어지지 않는다.
+- 개 짖는 소리 등은 맵에 `Bark`, `Dog` 등이 있으므로, 필요한 라벨을 `warning_labels` / `caution_labels` / `daily_labels` 중 하나에 넣어야 한다. (라벨 문자열은 `Backend/App/resources/yamnet_class_map.csv` 와 **완전 일치**)
+- 룰 수정 후: 서버 재시작 또는 `POST /admin/reload-audio-rules` (관리 토큰).
+
+### 2-5. 유사도 임계값 (커스텀 소리)
+
+- `CUSTOM_THRESHOLD` 는 코드의 `audio_cls_worker.py` 값을 따름 (현재 대략 0.70 전후).
+- 환경에 따라 0.75~0.9 사이로 조정 가능.
 
 ---
 

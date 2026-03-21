@@ -39,7 +39,12 @@
     "daily_labels": [
       "Doorbell",
       "Door Knock",
-      "Alarm clock"
+      "Alarm clock",
+      "Bark",
+      "Dog",
+      "Bow-wow",
+      "Yip",
+      "Whimper (dog)"
     ]
   }
 }
