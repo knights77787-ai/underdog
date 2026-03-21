@@ -69,14 +69,18 @@ class YamnetService:
         top_i, top_score, _ = self.predict(waveform_16k_f32)
         return top_i, top_score
 
+    def mean_scores(self, waveform_16k_f32: np.ndarray) -> np.ndarray:
+        """프레임별 클래스 점수를 시간 평균한 (521,) 배열. predict·보조 판별에서 1회만 호출."""
+        x = tf.convert_to_tensor(waveform_16k_f32, dtype=tf.float32)
+        scores, _, _ = self.model(x)
+        return tf.reduce_mean(scores, axis=0).numpy()
+
     def predict(self, waveform_16k_f32: np.ndarray) -> tuple[int, float, str]:
         """
         waveform_16k_f32: float32 mono 16kHz (N,)
         returns: (top_index, top_score, label)
         """
-        x = tf.convert_to_tensor(waveform_16k_f32, dtype=tf.float32)
-        scores, _, _ = self.model(x)
-        mean_scores = tf.reduce_mean(scores, axis=0).numpy()
+        mean_scores = self.mean_scores(waveform_16k_f32)
         top_i = int(np.argmax(mean_scores))
         top_score = float(mean_scores[top_i])
         label = self.index_to_label.get(top_i, str(top_i))

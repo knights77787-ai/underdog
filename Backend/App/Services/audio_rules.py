@@ -137,6 +137,12 @@ def classify_audio(
     return None, None
 
 
+def get_audio_min_score() -> float:
+    """YAMNet classify_audio 에 쓰는 min_score (설정 동기화용)."""
+    with _LOCK:
+        return float(_audio_min_score)
+
+
 def yamnet_subgroup_for_label(label: str) -> str | None:
     """YAMNet display label → keywords_by_event_type 하위그룹 키(열차 등). 없으면 None."""
     if not label or not isinstance(label, str):

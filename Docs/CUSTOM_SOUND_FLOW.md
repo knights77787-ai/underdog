@@ -73,6 +73,7 @@ _match_custom_sound(session_id, emb_live):
 - 전체 목록(인덱스·mid·이름)은 `Shared/constants/yamnet_class_catalog.json` 에 JSON으로도 있다(검색·문서용).
 - **주의**: 클래스에 `Speech`, `Conversation` 등 **말소리**도 포함된다. 주변 대화가 크면 비언어 알림이 잦아질 수 있어, 필요하면 `min_score` 를 올리거나 `daily_labels` 에서 일부만 남기도록 다시 줄인다.
 - **`yamnet_skip_alert_labels`**: 말소리·웃음·울음·숨·기침·군중 말잡음(`Chatter`/`Crowd`/`Hubbub…`)·`Silence` 등 **비언어 알림에서 제외**할 YAMNet `display_name` 목록. `classify_audio` 단계에서 매칭 전에 건너뛴다(저장·WS·캐시 없음). 라벨은 CSV와 완전 일치.
+- **개 짖음 보조**: 1위가 위 스킵에 걸려도, `Animal`~`Whimper (dog)` 인덱스 중 최고 점수가 `max(0.28, min_score×0.75)` 이상이면 그 클래스로 다시 `classify_audio` (스피커·잡음에 1위만 `Speech`인 경우 완화).
 - 룰 수정 후: 서버 재시작 또는 `POST /admin/reload-audio-rules` (관리 토큰).
 
 ### 2-5. 유사도 임계값 (커스텀 소리)

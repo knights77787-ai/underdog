@@ -908,10 +908,11 @@ client.on("alert", (msg) => {
     };
   }
 
-  // alert는 UI에서 반드시 보이게 한다.
-  // 원래는 "키워드면 caption에서 이미 넣음"이었지만, caption_all=OFF에서 caption이 누락되는 케이스가 있어
-  // alert(text)를 자막에도 폴백으로 추가해준다(중복은 감수, UX 우선).
-  appendCaption(text, event_type === "danger");
+  // STT 키워드 알림(source=text)은 서버가 이미 caption WS로 같은 문장을 보냄 → 자막 중복 1줄 방지.
+  // YAMNet·커스텀 소리·구문 매칭은 caption이 없을 수 있어 자막에도 표시.
+  if (source !== "text") {
+    appendCaption(text, event_type === "danger");
+  }
   clearLogRowSelection();
   appendLogRow({
     ts_ms: msg.ts_ms ?? p?.ts_ms,

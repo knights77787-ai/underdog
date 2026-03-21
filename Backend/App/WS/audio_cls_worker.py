@@ -7,7 +7,11 @@ import numpy as np
 
 from App.Core.logging import get_logger
 from App.Core.metrics import add_time, inc
-from App.Services.audio_rules import classify_audio, yamnet_subgroup_for_label
+from App.Services.audio_rules import (
+    classify_audio,
+    get_audio_min_score,
+    yamnet_subgroup_for_label,
+)
 from App.Services.yamnet_service import YamnetService
 from App.Services.memory_logs import memory_logs
 
@@ -15,6 +19,18 @@ logger = get_logger("yamnet.worker")
 
 # ✔️‼️커스텀 소리 매칭 임계값 ‼️✔️
 CUSTOM_THRESHOLD = 0.70  # 코사인 유사도 임계값 (0.75~0.9, 환경에 따라 조정)
+
+# YAMNet CSV index: 개·동물 계열. 1위가 Speech 등 말소리로 스킵돼도 보조 후보로 사용.
+_PET_SOUND_INDICES: tuple[int, ...] = (
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    75,
+)  # Animal, Domestic pets, Dog, Bark, Yip, Howl, Bow-wow, Whimper (dog)
 
 
 def _match_custom_sound(session_id: str, emb_live: np.ndarray):
@@ -117,13 +133,26 @@ class AudioClsWorker:
                             await self.broadcast_fn(sid, entry_custom)
 
                 # 2) 기본 YAMNet 룰 분류(danger/alert)
-                # TF는 블로킹이 커서 to_thread 권장 (predict는 index, score, label 반환)
+                # TF는 블로킹이 커서 to_thread 권장. mean_scores 한 번으로 1위 + 개짖음 보조 판별.
                 t0 = time.perf_counter()
-                top_i, top_score, label = await asyncio.to_thread(self.yamnet.predict, audio)
+                mean_sc = await asyncio.to_thread(self.yamnet.mean_scores, audio)
                 dt_ms = int((time.perf_counter() - t0) * 1000)
                 add_time("yamnet", dt_ms)
 
+                top_i = int(np.argmax(mean_sc))
+                top_score = float(mean_sc[top_i])
+                label = self.yamnet.index_to_label.get(top_i, str(top_i))
                 event_type, keyword = classify_audio(top_i, top_score, label)
+                if not event_type:
+                    pi = max(_PET_SOUND_INDICES, key=lambda ix: float(mean_sc[ix]))
+                    ps = float(mean_sc[pi])
+                    min_sc = get_audio_min_score()
+                    floor = max(0.28, min_sc * 0.75)
+                    if ps >= floor:
+                        plabel = self.yamnet.index_to_label.get(pi, str(pi))
+                        event_type, keyword = classify_audio(pi, ps, plabel)
+                        if event_type:
+                            top_i, top_score, label = pi, ps, plabel
                 logger.debug(
                     "%s YAMNET top=%s score=%.3f label=%s mapped=%s",
                     conn_prefix,
