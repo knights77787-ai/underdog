@@ -16,11 +16,14 @@ _warning_indices: set[int] = set()
 _caution_indices: set[int] = set()
 _daily_indices: set[int] = set()
 _yamnet_label_to_subgroup: dict[str, str] = {}
+# 비언어 알림에서 제외(말소리·숨·군중 말잡음·침묵 등). CSV display_name과 일치해야 함.
+_yamnet_skip_alert_labels: set[str] = set()
 
 def reload_audio_rules() -> dict:
     global _audio_min_score, _warning_labels, _caution_labels, _daily_labels
     global _warning_indices, _caution_indices, _daily_indices
     global _yamnet_label_to_subgroup
+    global _yamnet_skip_alert_labels
 
     if not EVENT_TYPES_PATH.exists():
         with _LOCK:
@@ -32,6 +35,7 @@ def reload_audio_rules() -> dict:
             _caution_indices = set()
             _daily_indices = set()
             _yamnet_label_to_subgroup = {}
+            _yamnet_skip_alert_labels = set()
         return {"ok": False, "reason": "EVENT_TYPES_PATH missing", "path": str(EVENT_TYPES_PATH)}
 
     data = json.loads(EVENT_TYPES_PATH.read_text(encoding="utf-8"))
@@ -52,6 +56,13 @@ def reload_audio_rules() -> dict:
             if isinstance(k, str) and isinstance(v, str) and k.strip() and v.strip():
                 label_to_sub[k.strip()] = v.strip()
 
+    skip_raw = audio_rules.get("yamnet_skip_alert_labels") or []
+    skip_labels: set[str] = set()
+    if isinstance(skip_raw, list):
+        for s in skip_raw:
+            if isinstance(s, str) and s.strip():
+                skip_labels.add(s.strip())
+
     def to_int_set(xs):
         out = set()
         for x in xs:
@@ -70,6 +81,7 @@ def reload_audio_rules() -> dict:
         _caution_indices = to_int_set(c_idx)
         _daily_indices = to_int_set(d_idx)
         _yamnet_label_to_subgroup = label_to_sub
+        _yamnet_skip_alert_labels = skip_labels
 
     return {
         "ok": True,
@@ -78,6 +90,7 @@ def reload_audio_rules() -> dict:
         "warning_count": len(_warning_labels) or len(_warning_indices),
         "caution_count": len(_caution_labels) or len(_caution_indices),
         "daily_count": len(_daily_labels) or len(_daily_indices),
+        "yamnet_skip_alert_count": len(skip_labels),
     }
 
 def classify_audio(
@@ -99,14 +112,20 @@ def classify_audio(
     if score < min_score:
         return None, None
 
+    lab = (label or "").strip()
+    with _LOCK:
+        skip_lab = _yamnet_skip_alert_labels
+    if lab and lab in skip_lab:
+        return None, None
+
     use_labels = bool(w_lab or c_lab or d_lab)
-    if use_labels and label:
-        if label in w_lab:
-            return "danger", label
-        if label in c_lab:
-            return "caution", label
-        if label in d_lab:
-            return "alert", label
+    if use_labels and lab:
+        if lab in w_lab:
+            return "danger", lab
+        if lab in c_lab:
+            return "caution", lab
+        if lab in d_lab:
+            return "alert", lab
     else:
         if top_index in w_idx:
             return "danger", str(top_index)
@@ -133,6 +152,7 @@ def get_audio_rules_status() -> dict:
             "warning_count": len(_warning_labels) or len(_warning_indices),
             "caution_count": len(_caution_labels) or len(_caution_indices),
             "daily_count": len(_daily_labels) or len(_daily_indices),
+            "yamnet_skip_alert_count": len(_yamnet_skip_alert_labels),
         }
 
 
