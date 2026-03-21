@@ -236,7 +236,15 @@ async def _handle_caption_generated(
     # 6) alert 저장 + WS 발행
     _last_alert_ts_by_key[(sid, keyword or "", event_type)] = ts_ms
     entry = memory_logs.append_alert(
-        sid, text, keyword or "", event_type, category, score, ts_ms=ts_ms, source="text"
+        sid,
+        text,
+        keyword or "",
+        event_type,
+        category,
+        score,
+        ts_ms=ts_ms,
+        source="text",
+        subgroup=keyword or None,
     )
     event_id = await asyncio.to_thread(_persist_alert, sid, text, keyword, event_type, ts_ms)
     if event_id is not None:
@@ -316,6 +324,7 @@ async def _process_speech_and_enqueue_stt(
                     float(sim),
                     ts_ms=ts_ms,
                     source="custom_phrase",
+                    subgroup=best_phrase.name or None,
                 )
                 event_id = await asyncio.to_thread(
                     _persist_alert,

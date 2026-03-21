@@ -36,8 +36,11 @@ def append_alert(
     score: float,
     ts_ms: int | None = None,
     source: str = "text",
+    *,
+    subgroup: str | None = None,
 ) -> dict:
-    """source: 'text'(키워드) | 'audio'(YAMNet) | 'demo'(데모 트리거)."""
+    """source: 'text'(키워드) | 'audio'(YAMNet) | 'demo'(데모 트리거).
+    subgroup: UI용 하위그룹(열차, 화재 …). keyword는 쿨다운/DB용( yamnet:… 등 )일 수 있음."""
     entry = {
         "type": "alert",
         "source": source,
@@ -49,6 +52,8 @@ def append_alert(
         "ts_ms": ts_ms if ts_ms is not None else _now_ms(),
         "score": score,
     }
+    if subgroup:
+        entry["subgroup"] = subgroup
     alerts_log.append(entry)
     return entry
 

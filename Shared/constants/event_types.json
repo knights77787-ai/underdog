@@ -40,6 +40,21 @@
       "Doorbell",
       "Door Knock",
       "Alarm clock"
-    ]
+    ],
+    "yamnet_label_to_subgroup": {
+      "Police car (siren)": "비상",
+      "Ambulance (siren)": "비상",
+      "Fire engine, fire truck (siren)": "화재",
+      "Alarm": "비상",
+      "Fire alarm": "화재",
+      "Train": "열차",
+      "Train horn": "열차",
+      "Train whistle": "열차",
+      "Vehicle": "차량",
+      "Vehicle horn, car horn, honking": "차량",
+      "Doorbell": "초인종",
+      "Door Knock": "초인종",
+      "Alarm clock": "시간"
+    }
   }
 }
