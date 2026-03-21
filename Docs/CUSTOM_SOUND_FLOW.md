@@ -65,10 +65,13 @@ _match_custom_sound(session_id, emb_live):
   - 메인 화면: 실시간 자막 + 경고 배너 + 토스트 표시
 ```
 
-### 2-4. YAMNet(비언어)이 “아예 반응 없을 때”
+### 2-4. YAMNet 클래스(521종) 등록 방식
 
-- YAMNet은 클래스를 맞혀도, `Shared/constants/event_types.json` 의 **`audio_rules`** 안 `*_labels`에 **CSV와 동일한 `display_name`** 이 없으면 alert로 이어지지 않는다.
-- 개 짖는 소리 등은 맵에 `Bark`, `Dog` 등이 있으므로, 필요한 라벨을 `warning_labels` / `caution_labels` / `daily_labels` 중 하나에 넣어야 한다. (라벨 문자열은 `Backend/App/resources/yamnet_class_map.csv` 와 **완전 일치**)
+- YAMNet(TF Hub)은 **521개** 환경음 클래스를 내며, 표시 이름은 `Backend/App/resources/yamnet_class_map.csv` 와 동일해야 한다.
+- `event_types.json` 의 **`daily_labels`** 에 위 CSV의 **전체 `display_name` 521개**를 넣어 두었다. 이제 1위 클래스가 `min_score` 이상이면 기본적으로 **생활 알림(`alert` 티어)** 로 나갈 수 있다.
+- **`warning_labels` → `caution_labels` → `daily_labels`** 순으로 매칭하므로, 사이렌·기차·차량 경적·개(`Dog`/`Animal`) 등은 기존처럼 **위험/주의가 우선**이다.
+- 전체 목록(인덱스·mid·이름)은 `Shared/constants/yamnet_class_catalog.json` 에 JSON으로도 있다(검색·문서용).
+- **주의**: 클래스에 `Speech`, `Conversation` 등 **말소리**도 포함된다. 주변 대화가 크면 비언어 알림이 잦아질 수 있어, 필요하면 `min_score` 를 올리거나 `daily_labels` 에서 일부만 남기도록 다시 줄인다.
 - 룰 수정 후: 서버 재시작 또는 `POST /admin/reload-audio-rules` (관리 토큰).
 
 ### 2-5. 유사도 임계값 (커스텀 소리)
@@ -108,6 +111,8 @@ _match_custom_sound(session_id, emb_live):
 | `Backend/App/WS/handlers.py` | `audio_chunk` 수신 → VAD(음성→STT) / 커스텀소리(VAD 무관) → AUDIOCLS_QUEUE 적재 |
 | `Backend/App/WS/audio_cls_worker.py` | embedding 계산, `_match_custom_sound`, alert 브로드캐스트 |
 | `Backend/App/Api/routes/custom_sounds.py` | 등록 시 YAMNet embedding 계산 후 DB 저장 |
+| `Shared/constants/yamnet_class_catalog.json` | YAMNet 521 클래스 인덱스·mid·`display_name` 참고용 |
+| `Shared/constants/event_types.json` | `audio_rules.daily_labels` 에 521 라벨 + `warning`/`caution` 우선 |
 
 ---
 
