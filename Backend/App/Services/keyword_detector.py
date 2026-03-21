@@ -176,10 +176,11 @@ def get_keyword_to_type() -> dict[str, Literal["danger", "caution", "alert"]]:
 
 def judge(
     text: str,
-) -> tuple[str, str, str | None, float]:
+) -> tuple[str, str, str | None, float, str | None]:
     """
     판정 우선순위: Warning(danger) → Caution → Daily(alert) → info.
-    반환: (category, event_type, keyword, score). keyword는 canonical(대표 키).
+    반환: (category, event_type, keyword, score, matched_phrase).
+    keyword는 canonical(대표 키). matched_phrase는 실제로 걸린 규칙 문구(예: '벨').
     """
     text = (text or "").lower()
     # STT 결과에 "화 재"처럼 공백이 섞여 들어오는 케이스가 있어
@@ -191,8 +192,14 @@ def judge(
     scores = {"danger": 1.0, "caution": 0.85, "alert": 0.7}
     for phrase, etype, canonical in rules:
         if _is_phrase_matched(phrase, text, text_compact, text_norm):
-            return (event_type_to_category(etype), etype, canonical, scores[etype])
-    return ("daily", "info", None, 0.2)
+            return (
+                event_type_to_category(etype),
+                etype,
+                canonical,
+                scores[etype],
+                phrase,
+            )
+    return ("daily", "info", None, 0.2, None)
 
 
 def check_alerts(text: str):

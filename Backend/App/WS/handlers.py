@@ -186,7 +186,7 @@ async def _handle_caption_generated(
     settings = await asyncio.to_thread(_get_settings, sid)
 
     # 2) 키워드 판정
-    category, event_type, keyword, score = keyword_detector.judge(text)
+    category, event_type, keyword, score, matched_phrase = keyword_detector.judge(text)
     keyword_matched = bool(keyword) and event_type in ("danger", "caution", "alert")
     caption_all_enabled = bool(settings.get("caption_all", False))
     logger.info(
@@ -235,6 +235,7 @@ async def _handle_caption_generated(
         return
     # 6) alert 저장 + WS 발행
     _last_alert_ts_by_key[(sid, keyword or "", event_type)] = ts_ms
+    _mp = (matched_phrase or "").strip() or None
     entry = memory_logs.append_alert(
         sid,
         text,
@@ -245,6 +246,7 @@ async def _handle_caption_generated(
         ts_ms=ts_ms,
         source="text",
         subgroup=keyword or None,
+        matched_phrase=_mp,
     )
     event_id = await asyncio.to_thread(_persist_alert, sid, text, keyword, event_type, ts_ms)
     if event_id is not None:

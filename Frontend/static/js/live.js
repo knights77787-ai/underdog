@@ -146,6 +146,7 @@ const WORKLET_URL = (window.location.origin || "http://127.0.0.1:8000") + "/stat
 
 const heroCard = document.getElementById("heroCard");
 const heroBadge = document.getElementById("heroBadge");
+const heroMatchedPhrase = document.getElementById("heroMatchedPhrase");
 const heroTitle = document.getElementById("heroTitle");
 const heroDesc  = document.getElementById("heroDesc");
 const btnFeedbackYes = document.getElementById("btnFeedbackYes");
@@ -309,12 +310,14 @@ function selectLogRowForFeedback(tr) {
     event_type: meta.event_type,
     ts_ms: meta.ts_ms,
     subgroup: meta.subgroup || "",
+    matched_phrase: meta.matched_phrase || "",
   };
   const titleSub = heroTitleSubgroupFromParts(meta.subgroup, meta.keyword);
   setHeroAlert(
     buildHeroAlertDesc(meta.keyword, meta.text || "", titleSub),
     meta.event_type,
-    titleSub
+    titleSub,
+    meta.matched_phrase || ""
   );
 }
 
@@ -336,7 +339,7 @@ function setupLogTableFeedbackClicks() {
   });
 }
 
-function appendLogRow({ ts, ts_ms, type, text, score, event_type, keyword, event_id, subgroup }) {
+function appendLogRow({ ts, ts_ms, type, text, score, event_type, keyword, event_id, subgroup, matched_phrase }) {
   const tr = document.createElement("tr");
   const kind = (type === "alert")
     ? (event_type === "danger" ? "위험/경고" : event_type === "caution" ? "주의" : "생활알림")
@@ -344,7 +347,9 @@ function appendLogRow({ ts, ts_ms, type, text, score, event_type, keyword, event
   const prob = (typeof score === "number") ? `${Math.round(score * 100)}%` : "-";
   const extra = keyword ? ` [${keyword}]` : "";
   const timeStr = formatTs(ts_ms ?? ts);
-  const contentLine = `${text || ""}${extra}${event_type ? ` (${event_type})` : ""}`;
+  const mp = (matched_phrase || "").toString().trim();
+  const matchHint = mp ? ` · 매칭:「${mp}」` : "";
+  const contentLine = `${text || ""}${extra}${matchHint}${event_type ? ` (${event_type})` : ""}`;
 
   const tdTime = document.createElement("td");
   tdTime.textContent = timeStr;
@@ -366,6 +371,7 @@ function appendLogRow({ ts, ts_ms, type, text, score, event_type, keyword, event
       text: text || "",
       keyword: keyword || "",
       subgroup: (subgroup || "").toString(),
+      matched_phrase: (matched_phrase || "").toString(),
       event_type: event_type || "danger",
       ts_ms: ts_ms ?? ts ?? Date.now(),
     });
@@ -386,6 +392,7 @@ function appendLogRow({ ts, ts_ms, type, text, score, event_type, keyword, event
     category: event_type || (type === "alert" ? "alert" : "caption"),
     keyword: keyword || null,
     subgroup: subgroup || null,
+    matched_phrase: matched_phrase || null,
     score: typeof score === "number" ? score : null,
     event_id: event_id != null ? event_id : undefined,
   });
@@ -533,13 +540,31 @@ function setHeroNormal() {
   if (heroCard) heroCard.classList.remove("hero-alert-danger", "hero-alert-caution", "hero-alert-alert");
   heroBadge.className = "badge bg-secondary-subtle text-secondary border px-3 py-2";
   heroBadge.textContent = "상태";
+  if (heroMatchedPhrase) {
+    heroMatchedPhrase.textContent = "";
+    heroMatchedPhrase.classList.add("d-none");
+  }
   heroTitle.textContent = "대기중";
   heroTitle.className = "fs-5 fw-bold";
   heroDesc.textContent = "";
   heroDesc.className = "text-muted small";
 }
 
-function setHeroAlert(descText, event_type, titleSubgroup) {
+/** STT 등: 실제 매칭된 규칙 문구를 배지 옆에 표시(하위그룹과 다를 때만). */
+function applyHeroMatchedPhrase(matchedPhrase, titleSubgroup) {
+  if (!heroMatchedPhrase) return;
+  const p = (matchedPhrase && String(matchedPhrase).trim()) || "";
+  const sub = (titleSubgroup && String(titleSubgroup).trim()) || "";
+  if (p && p !== sub) {
+    heroMatchedPhrase.textContent = `매칭:「${p}」`;
+    heroMatchedPhrase.classList.remove("d-none");
+  } else {
+    heroMatchedPhrase.textContent = "";
+    heroMatchedPhrase.classList.add("d-none");
+  }
+}
+
+function setHeroAlert(descText, event_type, titleSubgroup, matchedPhrase) {
   const et = event_type === "caution" ? "caution" : event_type === "alert" ? "alert" : "danger";
   if (heroCard) {
     heroCard.classList.remove("hero-alert-danger", "hero-alert-caution", "hero-alert-alert");
@@ -552,10 +577,11 @@ function setHeroAlert(descText, event_type, titleSubgroup) {
   heroTitle.className = "fs-5 fw-bold hero-title-" + et;
   heroDesc.textContent = descText || "";
   heroDesc.className = "small hero-desc-" + et;
+  applyHeroMatchedPhrase(matchedPhrase, sub);
 }
 
 function setHeroDanger(text) {
-  setHeroAlert(text, "danger", "");
+  setHeroAlert(text, "danger", "", "");
 }
 
 // =======================
@@ -881,7 +907,7 @@ client.on("caption", (msg) => {
   appendCaption(text, danger);
 
   if (danger) {
-    setHeroAlert(text, "danger", "");
+    setHeroAlert(text, "danger", "", "");
   }
 });
 
@@ -896,6 +922,7 @@ client.on("alert", (msg) => {
   const event_id = msg.event_id ?? p?.event_id;
   const ts_ms = msg.ts_ms ?? p?.ts_ms;
   const source = msg.source ?? p?.source ?? "text";
+  const matchedPhraseRaw = (msg.matched_phrase ?? p?.matched_phrase ?? "").toString().trim();
   const titleSubgroup = heroTitleSubgroupFromParts(subgroupRaw, keyword);
   if (event_id != null) {
     lastAlertEventInfo = {
@@ -903,6 +930,7 @@ client.on("alert", (msg) => {
       text,
       keyword,
       subgroup: titleSubgroup,
+      matched_phrase: matchedPhraseRaw,
       event_type,
       ts_ms,
     };
@@ -920,18 +948,27 @@ client.on("alert", (msg) => {
     text,
     keyword,
     subgroup: titleSubgroup,
+    matched_phrase: matchedPhraseRaw,
     event_type,
     score: msg.score ?? p?.score,
     event_id: event_id != null ? event_id : undefined,
   });
 
-  setHeroAlert(buildHeroAlertDesc(keyword, text, titleSubgroup), event_type, titleSubgroup);
+  setHeroAlert(
+    buildHeroAlertDesc(keyword, text, titleSubgroup),
+    event_type,
+    titleSubgroup,
+    source === "text" ? matchedPhraseRaw : ""
+  );
   const toastTitle =
     event_type === "danger" ? "위험/경고" : event_type === "caution" ? "주의" : "생활알림";
-  const toastBody =
+  let toastBody =
     titleSubgroup && keyword.includes(":")
       ? text
       : `${keyword && !keyword.includes(":") ? "[" + keyword + "] " : ""}${text}`;
+  if (source === "text" && matchedPhraseRaw) {
+    toastBody += ` · 매칭:「${matchedPhraseRaw}」`;
+  }
   showToast(toastTitle, toastBody, true);
   vibrateByLevel(event_type);
 });

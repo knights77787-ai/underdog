@@ -38,9 +38,11 @@ def append_alert(
     source: str = "text",
     *,
     subgroup: str | None = None,
+    matched_phrase: str | None = None,
 ) -> dict:
     """source: 'text'(키워드) | 'audio'(YAMNet) | 'demo'(데모 트리거).
-    subgroup: UI용 하위그룹(열차, 화재 …). keyword는 쿨다운/DB용( yamnet:… 등 )일 수 있음."""
+    subgroup: UI용 하위그룹(열차, 화재 …). keyword는 쿨다운/DB용( yamnet:… 등 )일 수 있음.
+    matched_phrase: STT 등에서 실제 매칭된 규칙 문구(예: 벨)."""
     entry = {
         "type": "alert",
         "source": source,
@@ -54,6 +56,8 @@ def append_alert(
     }
     if subgroup:
         entry["subgroup"] = subgroup
+    if matched_phrase:
+        entry["matched_phrase"] = matched_phrase
     alerts_log.append(entry)
     return entry
 

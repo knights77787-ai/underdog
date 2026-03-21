@@ -84,6 +84,14 @@ body.bg-light { background-color: #f8fafc !important; }
   border-radius: 0 0 12px 12px;
 }
 
+.hero-matched-phrase {
+  color: var(--lumen-primary-dark, #1e3a8a);
+  font-weight: 600;
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .hero-badge {
   font-weight: 700 !important;
   border: none !important;
