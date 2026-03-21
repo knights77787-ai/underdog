@@ -15,6 +15,7 @@ from App.db.crud import events as crud_events
 from App.db.crud.feedback import list_feedback, list_feedback_admin
 from App.db.database import get_db
 from App.Services.audio_rules import get_audio_rules_status, reload_audio_rules
+from App.Services.event_type_utils import event_type_to_category
 from App.Services.keyword_detector import get_keyword_counts, reload_keywords
 
 
@@ -236,8 +237,20 @@ async def admin_test_caption(
     # 키워드 룰까지 태워서 alert도 같이 보내기(원하면)
     alerts = []
     try:
+        ts_ms = int(time.time() * 1000)
         for kw, etype in keyword_detector.check_alerts(text):
-            entry = memory_logs.append_alert(session_id, text, kw, etype)
+            cat = event_type_to_category(etype)
+            entry = memory_logs.append_alert(
+                session_id,
+                text,
+                kw,
+                etype,
+                cat,
+                1.0,
+                ts_ms=ts_ms,
+                source="text",
+                subgroup=kw,
+            )
             await manager.broadcast_to_session(session_id, entry)
             alerts.append(entry)
     except Exception:

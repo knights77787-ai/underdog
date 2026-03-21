@@ -15,10 +15,12 @@ _daily_labels: set[str] = set()
 _warning_indices: set[int] = set()
 _caution_indices: set[int] = set()
 _daily_indices: set[int] = set()
+_yamnet_label_to_subgroup: dict[str, str] = {}
 
 def reload_audio_rules() -> dict:
     global _audio_min_score, _warning_labels, _caution_labels, _daily_labels
     global _warning_indices, _caution_indices, _daily_indices
+    global _yamnet_label_to_subgroup
 
     if not EVENT_TYPES_PATH.exists():
         with _LOCK:
@@ -29,6 +31,7 @@ def reload_audio_rules() -> dict:
             _warning_indices = set()
             _caution_indices = set()
             _daily_indices = set()
+            _yamnet_label_to_subgroup = {}
         return {"ok": False, "reason": "EVENT_TYPES_PATH missing", "path": str(EVENT_TYPES_PATH)}
 
     data = json.loads(EVENT_TYPES_PATH.read_text(encoding="utf-8"))
@@ -42,6 +45,12 @@ def reload_audio_rules() -> dict:
     w_idx = audio_rules.get("warning_indices", []) or []
     c_idx = audio_rules.get("caution_indices", []) or []
     d_idx = audio_rules.get("daily_indices", []) or []
+    raw_sub_map = audio_rules.get("yamnet_label_to_subgroup") or {}
+    label_to_sub: dict[str, str] = {}
+    if isinstance(raw_sub_map, dict):
+        for k, v in raw_sub_map.items():
+            if isinstance(k, str) and isinstance(v, str) and k.strip() and v.strip():
+                label_to_sub[k.strip()] = v.strip()
 
     def to_int_set(xs):
         out = set()
@@ -60,6 +69,7 @@ def reload_audio_rules() -> dict:
         _warning_indices = to_int_set(w_idx)
         _caution_indices = to_int_set(c_idx)
         _daily_indices = to_int_set(d_idx)
+        _yamnet_label_to_subgroup = label_to_sub
 
     return {
         "ok": True,
@@ -107,6 +117,15 @@ def classify_audio(
 
     return None, None
 
+
+def yamnet_subgroup_for_label(label: str) -> str | None:
+    """YAMNet display label → keywords_by_event_type 하위그룹 키(열차 등). 없으면 None."""
+    if not label or not isinstance(label, str):
+        return None
+    with _LOCK:
+        return _yamnet_label_to_subgroup.get(label.strip())
+
+
 def get_audio_rules_status() -> dict:
     with _LOCK:
         return {
@@ -143,3 +162,6 @@ def get_yamnet_display_name(index: int) -> str:
     if not _yamnet_display_names and YAMNET_CLASS_MAP_PATH.exists():
         _load_yamnet_class_map()
     return _yamnet_display_names.get(index, str(index))
+
+
+reload_audio_rules()

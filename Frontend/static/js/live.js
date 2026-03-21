@@ -308,9 +308,14 @@ function selectLogRowForFeedback(tr) {
     keyword: meta.keyword,
     event_type: meta.event_type,
     ts_ms: meta.ts_ms,
+    subgroup: meta.subgroup || "",
   };
-  const kw = meta.keyword ? `[${meta.keyword}] ` : "";
-  setHeroAlert(`${kw}${meta.text || ""}`, meta.event_type);
+  const titleSub = heroTitleSubgroupFromParts(meta.subgroup, meta.keyword);
+  setHeroAlert(
+    buildHeroAlertDesc(meta.keyword, meta.text || "", titleSub),
+    meta.event_type,
+    titleSub
+  );
 }
 
 function setupLogTableFeedbackClicks() {
@@ -331,10 +336,10 @@ function setupLogTableFeedbackClicks() {
   });
 }
 
-function appendLogRow({ ts, ts_ms, type, text, score, event_type, keyword, event_id }) {
+function appendLogRow({ ts, ts_ms, type, text, score, event_type, keyword, event_id, subgroup }) {
   const tr = document.createElement("tr");
   const kind = (type === "alert")
-    ? (event_type === "danger" ? "경고" : "생활알림")
+    ? (event_type === "danger" ? "위험/경고" : event_type === "caution" ? "주의" : "생활알림")
     : "자막";
   const prob = (typeof score === "number") ? `${Math.round(score * 100)}%` : "-";
   const extra = keyword ? ` [${keyword}]` : "";
@@ -360,6 +365,7 @@ function appendLogRow({ ts, ts_ms, type, text, score, event_type, keyword, event
       event_id,
       text: text || "",
       keyword: keyword || "",
+      subgroup: (subgroup || "").toString(),
       event_type: event_type || "danger",
       ts_ms: ts_ms ?? ts ?? Date.now(),
     });
@@ -379,6 +385,7 @@ function appendLogRow({ ts, ts_ms, type, text, score, event_type, keyword, event
     text,
     category: event_type || (type === "alert" ? "alert" : "caption"),
     keyword: keyword || null,
+    subgroup: subgroup || null,
     score: typeof score === "number" ? score : null,
     event_id: event_id != null ? event_id : undefined,
   });
@@ -488,8 +495,39 @@ function showToast(title, body, danger=true) {
   toastEl.addEventListener("hidden.bs.toast", () => toastEl.remove());
 }
 
-const HERO_LABELS = { danger: "경고", caution: "주의", alert: "생활알림" };
-const HERO_TITLES = { danger: "위험 감지", caution: "주의", alert: "알림" };
+/** 배지: 소리 등록 폼「소리 알림 분류」와 동일 (danger / caution / alert) */
+const HERO_LABELS = { danger: "위험/경고", caution: "주의", alert: "생활알림" };
+/** 하위그룹 없을 때 #heroTitle 폴백 */
+const HERO_TITLE_FALLBACK = { danger: "위험 감지", caution: "주의", alert: "생활알림" };
+
+function stripLeadingBracketTag(descText, tag) {
+  if (!tag || descText == null) return descText;
+  const t = String(descText);
+  const re = new RegExp("^\\s*\\[" + String(tag).replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\]\\s*");
+  const s = t.replace(re, "").trim();
+  return s || t;
+}
+
+/** 서버 keyword(쿨다운용) + subgroup(표시용)에 맞춰 본문 한 줄 구성 */
+function buildHeroAlertDesc(keyword, text, titleSubgroup) {
+  const kw = (keyword || "").toString().trim();
+  const body = (text || "").toString();
+  const sub = (titleSubgroup || "").toString().trim();
+  if (sub && kw.includes(":")) return body;
+  if (kw && !kw.includes(":")) {
+    const line = `[${kw}] ${body}`.trim();
+    return sub ? stripLeadingBracketTag(line, sub) : line;
+  }
+  return body;
+}
+
+function heroTitleSubgroupFromParts(subgroup, keyword) {
+  const s = (subgroup || "").toString().trim();
+  if (s) return s;
+  const kw = (keyword || "").toString().trim();
+  if (kw && !kw.includes(":")) return kw;
+  return "";
+}
 
 function setHeroNormal() {
   if (heroCard) heroCard.classList.remove("hero-alert-danger", "hero-alert-caution", "hero-alert-alert");
@@ -501,7 +539,7 @@ function setHeroNormal() {
   heroDesc.className = "text-muted small";
 }
 
-function setHeroAlert(text, event_type) {
+function setHeroAlert(descText, event_type, titleSubgroup) {
   const et = event_type === "caution" ? "caution" : event_type === "alert" ? "alert" : "danger";
   if (heroCard) {
     heroCard.classList.remove("hero-alert-danger", "hero-alert-caution", "hero-alert-alert");
@@ -509,14 +547,15 @@ function setHeroAlert(text, event_type) {
   }
   heroBadge.className = "badge px-3 py-2 hero-badge hero-badge-" + et;
   heroBadge.textContent = HERO_LABELS[et];
-  heroTitle.textContent = HERO_TITLES[et];
+  const sub = (titleSubgroup && String(titleSubgroup).trim()) || "";
+  heroTitle.textContent = sub || HERO_TITLE_FALLBACK[et];
   heroTitle.className = "fs-5 fw-bold hero-title-" + et;
-  heroDesc.textContent = text;
+  heroDesc.textContent = descText || "";
   heroDesc.className = "small hero-desc-" + et;
 }
 
 function setHeroDanger(text) {
-  setHeroAlert(text, "danger");
+  setHeroAlert(text, "danger", "");
 }
 
 // =======================
@@ -818,8 +857,13 @@ client.on("open", () => {
 client.on("close", () => {
   stopAudioSend();
   if (micStream) {
-    micTitle.textContent = "마이크 승인 완료";
-    micDesc.textContent = "마이크를 다시 눌러 재연결하세요.";
+    if (client.autoReconnect) {
+      micTitle.textContent = "연결 중…";
+      micDesc.textContent = "서버에 다시 연결하는 중이에요.";
+    } else {
+      micTitle.textContent = "연결 끊김";
+      micDesc.textContent = "마이크를 다시 눌러 재연결하세요.";
+    }
   }
   updateMicStatusUI();
 
@@ -837,7 +881,7 @@ client.on("caption", (msg) => {
   appendCaption(text, danger);
 
   if (danger) {
-    setHeroAlert(text, "danger");
+    setHeroAlert(text, "danger", "");
   }
 });
 
@@ -847,12 +891,21 @@ client.on("alert", (msg) => {
   const p = (msg && typeof msg.payload === "object" && msg.payload !== null) ? msg.payload : undefined;
   const text = (msg.text ?? p?.text ?? "").toString();
   const keyword = (msg.keyword ?? p?.keyword ?? "").toString();
+  const subgroupRaw = (msg.subgroup ?? p?.subgroup ?? "").toString().trim();
   const event_type = msg.event_type ?? p?.event_type ?? "danger";
   const event_id = msg.event_id ?? p?.event_id;
   const ts_ms = msg.ts_ms ?? p?.ts_ms;
   const source = msg.source ?? p?.source ?? "text";
+  const titleSubgroup = heroTitleSubgroupFromParts(subgroupRaw, keyword);
   if (event_id != null) {
-    lastAlertEventInfo = { event_id, text, keyword, event_type, ts_ms };
+    lastAlertEventInfo = {
+      event_id,
+      text,
+      keyword,
+      subgroup: titleSubgroup,
+      event_type,
+      ts_ms,
+    };
   }
 
   // alert는 UI에서 반드시 보이게 한다.
@@ -866,14 +919,20 @@ client.on("alert", (msg) => {
     type: "alert",
     text,
     keyword,
+    subgroup: titleSubgroup,
     event_type,
     score: msg.score ?? p?.score,
     event_id: event_id != null ? event_id : undefined,
   });
 
-  setHeroAlert(`${keyword ? "["+keyword+"] " : ""}${text}`, event_type);
-  const toastTitle = event_type === "danger" ? "위험 감지" : "알림";
-  showToast(toastTitle, `${keyword ? "["+keyword+"] " : ""}${text}`, true);
+  setHeroAlert(buildHeroAlertDesc(keyword, text, titleSubgroup), event_type, titleSubgroup);
+  const toastTitle =
+    event_type === "danger" ? "위험/경고" : event_type === "caution" ? "주의" : "생활알림";
+  const toastBody =
+    titleSubgroup && keyword.includes(":")
+      ? text
+      : `${keyword && !keyword.includes(":") ? "[" + keyword + "] " : ""}${text}`;
+  showToast(toastTitle, toastBody, true);
   vibrateByLevel(event_type);
 });
 
@@ -915,7 +974,7 @@ function showFeedbackCommentModal() {
     return;
   }
   const info = lastAlertEventInfo;
-  const kind = info.event_type === "danger" ? "위험/경고" : info.event_type === "caution" ? "주의" : "일상";
+  const kind = info.event_type === "danger" ? "위험/경고" : info.event_type === "caution" ? "주의" : "생활알림";
   const timeStr = formatTs(info.ts_ms);
   const eventInfoEl = document.getElementById("feedbackModalEventInfo");
   const inputEl = document.getElementById("feedbackCommentInput");

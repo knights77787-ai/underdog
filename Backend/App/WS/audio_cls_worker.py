@@ -7,7 +7,7 @@ import numpy as np
 
 from App.Core.logging import get_logger
 from App.Core.metrics import add_time, inc
-from App.Services.audio_rules import classify_audio
+from App.Services.audio_rules import classify_audio, yamnet_subgroup_for_label
 from App.Services.yamnet_service import YamnetService
 from App.Services.memory_logs import memory_logs
 
@@ -95,6 +95,7 @@ class AudioClsWorker:
                         )
                         # Event-builder 통합: memory_logs에 추가 (최근 감지 로그·API 일관성)
                         _cat = {"danger": "warning", "caution": "caution", "alert": "daily"}.get(best.event_type, "daily")
+                        _sub = (best.name or "").strip() or None
                         entry_custom = memory_logs.append_alert(
                             sid,
                             text_custom,
@@ -104,6 +105,7 @@ class AudioClsWorker:
                             float(best_sim),
                             ts_ms=ts_ms,
                             source="custom_sound",
+                            subgroup=_sub,
                         )
                         if event_id is not None:
                             entry_custom["event_id"] = event_id
@@ -152,9 +154,11 @@ class AudioClsWorker:
 
                 # Event-builder 통합: memory_logs에 추가
                 category = {"danger": "warning", "caution": "caution", "alert": "daily"}.get(event_type, "daily")
+                subgroup_ui = yamnet_subgroup_for_label(label or "") or None
                 entry = memory_logs.append_alert(
                     sid, text, kw_prefixed, event_type, category,
                     float(top_score), ts_ms=ts_ms, source="audio",
+                    subgroup=subgroup_ui,
                 )
                 if event_id is not None:
                     entry["event_id"] = event_id

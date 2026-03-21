@@ -11,7 +11,7 @@
     "caution": {
       "열차": ["열차", "열차가 들어옵니다", "열차 들어옵니다", "출발합니다", "문이 닫힙니다", "문 닫힙니다", "닫힙니다", "들어옵니다", "발빠짐", "발 빠짐"],
       "차량": ["차", "차량", "비켜", "비켜주세요", "차 와요", "차가 와", "경적"],
-      "안전": ["주의", "위험", "접근", "조심", "준비", "조심하세요", "가까이 오지마"]
+      "안전": ["주의", "조심", "조심하세요", "안전"]
     },
     "alert": {
       "초인종": ["초인종", "초인종 소리", "벨", "초인종 울렸어", "누가 왔어", "택배", "택배 왔어"],
@@ -34,17 +34,39 @@
       "Train horn",
       "Train whistle",
       "Vehicle",
-      "Vehicle horn, car horn, honking"
+      "Vehicle horn, car horn, honking",
+      "Animal",
+      "Dog"
     ],
     "daily_labels": [
       "Doorbell",
       "Door Knock",
       "Alarm clock",
       "Bark",
-      "Dog",
       "Bow-wow",
       "Yip",
       "Whimper (dog)"
-    ]
+    ],
+    "yamnet_label_to_subgroup": {
+      "Police car (siren)": "비상",
+      "Ambulance (siren)": "비상",
+      "Fire engine, fire truck (siren)": "화재",
+      "Alarm": "비상",
+      "Fire alarm": "화재",
+      "Train": "열차",
+      "Train horn": "열차",
+      "Train whistle": "열차",
+      "Vehicle": "차량",
+      "Vehicle horn, car horn, honking": "차량",
+      "Animal": "안전",
+      "Dog": "안전",
+      "Doorbell": "초인종",
+      "Door Knock": "초인종",
+      "Alarm clock": "시간",
+      "Bark": "안전",
+      "Bow-wow": "안전",
+      "Yip": "안전",
+      "Whimper (dog)": "안전"
+    }
   }
 }
