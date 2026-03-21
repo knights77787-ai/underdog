@@ -319,7 +319,7 @@ function setupLogTableFeedbackClicks() {
 function appendLogRow({ ts, ts_ms, type, text, score, event_type, keyword, event_id, subgroup }) {
   const tr = document.createElement("tr");
   const kind = (type === "alert")
-    ? (event_type === "danger" ? "위험" : event_type === "caution" ? "경고" : "알림")
+    ? (event_type === "danger" ? "위험/경고" : event_type === "caution" ? "주의" : "생활알림")
     : "자막";
   const prob = (typeof score === "number") ? `${Math.round(score * 100)}%` : "-";
   const extra = keyword ? ` [${keyword}]` : "";
@@ -475,10 +475,10 @@ function showToast(title, body, danger=true) {
   toastEl.addEventListener("hidden.bs.toast", () => toastEl.remove());
 }
 
-/** 배지: 위험(danger) / 경고(caution) / 알림(alert) */
-const HERO_LABELS = { danger: "위험", caution: "경고", alert: "알림" };
+/** 배지: 소리 등록 폼「소리 알림 분류」와 동일 (danger / caution / alert) */
+const HERO_LABELS = { danger: "위험/경고", caution: "주의", alert: "생활알림" };
 /** 하위그룹 없을 때 #heroTitle 폴백 */
-const HERO_TITLE_FALLBACK = { danger: "위험 감지", caution: "주의", alert: "알림" };
+const HERO_TITLE_FALLBACK = { danger: "위험 감지", caution: "주의", alert: "생활알림" };
 
 function stripLeadingBracketTag(descText, tag) {
   if (!tag || descText == null) return descText;
@@ -907,7 +907,7 @@ client.on("alert", (msg) => {
 
   setHeroAlert(buildHeroAlertDesc(keyword, text, titleSubgroup), event_type, titleSubgroup);
   const toastTitle =
-    event_type === "danger" ? "위험" : event_type === "caution" ? "경고" : "알림";
+    event_type === "danger" ? "위험/경고" : event_type === "caution" ? "주의" : "생활알림";
   const toastBody =
     titleSubgroup && keyword.includes(":")
       ? text
@@ -954,7 +954,7 @@ function showFeedbackCommentModal() {
     return;
   }
   const info = lastAlertEventInfo;
-  const kind = info.event_type === "danger" ? "위험/경고" : info.event_type === "caution" ? "주의" : "일상";
+  const kind = info.event_type === "danger" ? "위험/경고" : info.event_type === "caution" ? "주의" : "생활알림";
   const timeStr = formatTs(info.ts_ms);
   const eventInfoEl = document.getElementById("feedbackModalEventInfo");
   const inputEl = document.getElementById("feedbackCommentInput");

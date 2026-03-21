@@ -95,6 +95,7 @@ class AudioClsWorker:
                         )
                         # Event-builder 통합: memory_logs에 추가 (최근 감지 로그·API 일관성)
                         _cat = {"danger": "warning", "caution": "caution", "alert": "daily"}.get(best.event_type, "daily")
+                        _sub = (best.name or "").strip() or None
                         entry_custom = memory_logs.append_alert(
                             sid,
                             text_custom,
@@ -104,7 +105,7 @@ class AudioClsWorker:
                             float(best_sim),
                             ts_ms=ts_ms,
                             source="custom_sound",
-                            subgroup=best.name or None,
+                            subgroup=_sub,
                         )
                         if event_id is not None:
                             entry_custom["event_id"] = event_id
