@@ -20,17 +20,87 @@ logger = get_logger("yamnet.worker")
 # ✔️‼️커스텀 소리 매칭 임계값 ‼️✔️
 CUSTOM_THRESHOLD = 0.70  # 코사인 유사도 임계값 (0.75~0.9, 환경에 따라 조정)
 
-# YAMNet CSV index: 개·동물 계열. 1위가 Speech 등 말소리로 스킵돼도 보조 후보로 사용.
-_PET_SOUND_INDICES: tuple[int, ...] = (
-    67,
-    68,
-    69,
-    70,
-    71,
-    72,
-    73,
-    75,
-)  # Animal, Domestic pets, Dog, Bark, Yip, Howl, Bow-wow, Whimper (dog)
+# YAMNet CSV index: 개·동물·짖음 계열 (Animal=67 … Whimper (dog)=75, Growling=74)
+_PET_SOUND_INDICES: tuple[int, ...] = (67, 68, 69, 70, 71, 72, 73, 74, 75)
+
+# 보조 판별 시 이 라벨이 충분히 나오면 1위가 잡음·BGM·실내 등으로 밀린 경우에도 채택
+_BARKISH_LABELS: frozenset[str] = frozenset(
+    {
+        "Bark",
+        "Dog",
+        "Bow-wow",
+        "Yip",
+        "Whimper (dog)",
+        "Growling",
+    }
+)
+
+# 1위가 생활알림이지만 개 짖음이 실제일 때 흔히 위로 뜨는 YAMNet 라벨
+_CONFUSER_ALERT_LABELS: frozenset[str] = frozenset(
+    {
+        "Music",
+        "Musical instrument",
+        "Television",
+        "Radio",
+        "Environmental noise",
+        "Noise",
+        "Static",
+        "White noise",
+        "Pink noise",
+        "Inside, small room",
+        "Inside, large room or hall",
+        "Inside, public space",
+        "Silence",
+        "Echo",
+        "Cacophony",
+        "Sound effect",
+        "Pulse",
+        "Hum",
+    }
+)
+
+
+def _resolve_yamnet_classification(
+    mean_sc: np.ndarray,
+    index_to_label: dict[int, str],
+) -> tuple[int, float, str, str | None, str | None]:
+    """
+    (top_i, top_score, label, event_type, keyword)
+    1위가 말소리 스킵·BGM daily 등일 때 Bark 등이 약간 낮아도 채택.
+    """
+    min_sc = get_audio_min_score()
+    floor_bark = max(0.20, min_sc * 0.55)
+
+    top_i = int(np.argmax(mean_sc))
+    top_score = float(mean_sc[top_i])
+    label = index_to_label.get(top_i, str(top_i))
+    event_type, keyword = classify_audio(top_i, top_score, label)
+
+    pi = int(max(_PET_SOUND_INDICES, key=lambda ix: float(mean_sc[ix])))
+    ps = float(mean_sc[pi])
+    plabel = index_to_label.get(pi, str(pi))
+    pet_et, pet_kw = classify_audio(pi, ps, plabel)
+
+    if not pet_et or plabel not in _BARKISH_LABELS or ps < floor_bark:
+        return top_i, top_score, label, event_type, keyword
+
+    take_pet = False
+    if event_type is None:
+        take_pet = True
+    elif event_type == "danger":
+        take_pet = False
+    elif event_type == "caution":
+        if label in ("Animal", "Domestic animals, pets", "Dog") and ps + 0.04 >= top_score:
+            take_pet = True
+    elif event_type == "alert":
+        if label in _CONFUSER_ALERT_LABELS:
+            take_pet = True
+        elif ps + 0.05 >= top_score:
+            take_pet = True
+
+    if take_pet:
+        return pi, ps, plabel, pet_et, pet_kw
+    return top_i, top_score, label, event_type, keyword
 
 
 def _match_custom_sound(session_id: str, emb_live: np.ndarray):
@@ -139,20 +209,9 @@ class AudioClsWorker:
                 dt_ms = int((time.perf_counter() - t0) * 1000)
                 add_time("yamnet", dt_ms)
 
-                top_i = int(np.argmax(mean_sc))
-                top_score = float(mean_sc[top_i])
-                label = self.yamnet.index_to_label.get(top_i, str(top_i))
-                event_type, keyword = classify_audio(top_i, top_score, label)
-                if not event_type:
-                    pi = max(_PET_SOUND_INDICES, key=lambda ix: float(mean_sc[ix]))
-                    ps = float(mean_sc[pi])
-                    min_sc = get_audio_min_score()
-                    floor = max(0.28, min_sc * 0.75)
-                    if ps >= floor:
-                        plabel = self.yamnet.index_to_label.get(pi, str(pi))
-                        event_type, keyword = classify_audio(pi, ps, plabel)
-                        if event_type:
-                            top_i, top_score, label = pi, ps, plabel
+                top_i, top_score, label, event_type, keyword = _resolve_yamnet_classification(
+                    mean_sc, self.yamnet.index_to_label
+                )
                 logger.debug(
                     "%s YAMNET top=%s score=%.3f label=%s mapped=%s",
                     conn_prefix,

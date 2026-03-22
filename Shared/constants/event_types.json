@@ -117,7 +117,8 @@
       "Ambulance (siren)",
       "Fire engine, fire truck (siren)",
       "Alarm",
-      "Fire alarm"
+      "Fire alarm",
+      "Siren"
     ],
     "caution_labels": [
       "Train",
@@ -657,6 +658,7 @@
       "Fire engine, fire truck (siren)": "화재",
       "Alarm": "비상",
       "Fire alarm": "화재",
+      "Siren": "비상",
       "Train": "열차",
       "Train horn": "열차",
       "Train whistle": "열차",
