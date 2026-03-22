@@ -2,12 +2,78 @@ from __future__ import annotations
 
 """커스텀 사운드 CRUD 및 embedding 직렬화."""
 
+from datetime import datetime, timedelta
+from pathlib import Path
+
 import numpy as np
 from sqlalchemy.orm import Session
 
-from pathlib import Path
-
+from App.Core.config import CUSTOM_SOUND_AUDIO_RETENTION_HOURS, DATABASE_PATH
 from App.db.models import CustomSound
+
+
+def resolve_custom_sound_disk_path(audio_path: str | None) -> Path | None:
+    """DB audio_path 문자열 → 실제 파일 Path. 없으면 None."""
+    if not audio_path or not audio_path.strip():
+        return None
+    p = Path(audio_path)
+    if p.is_file():
+        return p
+    rel = audio_path.replace("\\", "/")
+    if rel.startswith("data/"):
+        rel = rel[5:]
+    _data_dir = Path(DATABASE_PATH).resolve().parent
+    full = _data_dir / rel
+    return full if full.is_file() else None
+
+
+def maybe_expire_custom_sound_audio(db: Session, row: CustomSound) -> bool:
+    """
+    보관 기간이 지난 원본이면 디스크에서 삭제하고 audio_path 를 NULL 로 갱신.
+    커밋까지 수행. 임베딩·메타는 유지.
+    Returns: True if row had audio and it was expired (cleared), else False.
+    """
+    if not row.audio_path:
+        return False
+    deadline = row.created_at + timedelta(hours=CUSTOM_SOUND_AUDIO_RETENTION_HOURS)
+    if datetime.utcnow() <= deadline:
+        return False
+    p = resolve_custom_sound_disk_path(row.audio_path)
+    if p and p.is_file():
+        try:
+            p.unlink()
+        except OSError:
+            pass
+    row.audio_path = None
+    db.add(row)
+    db.commit()
+    return True
+
+
+def expire_stale_custom_sounds_audio_for_session(db: Session, client_session_uuid: str) -> None:
+    """해당 세션의 커스텀 소리 중 만료된 원본을 일괄 정리."""
+    rows = (
+        db.query(CustomSound)
+        .filter(CustomSound.client_session_uuid == client_session_uuid)
+        .all()
+    )
+    changed = False
+    now = datetime.utcnow()
+    for r in rows:
+        if not r.audio_path:
+            continue
+        if now <= r.created_at + timedelta(hours=CUSTOM_SOUND_AUDIO_RETENTION_HOURS):
+            continue
+        p = resolve_custom_sound_disk_path(r.audio_path)
+        if p and p.is_file():
+            try:
+                p.unlink()
+            except OSError:
+                pass
+        r.audio_path = None
+        changed = True
+    if changed:
+        db.commit()
 
 
 def _emb_to_blob(emb: np.ndarray) -> tuple[bytes, int]:
@@ -80,19 +146,10 @@ def delete_custom_sound(
     # 오디오 파일이 있으면 함께 삭제 (없거나 실패해도 계속 진행)
     if row.audio_path:
         try:
-            p = Path(row.audio_path)
-            if not p.is_file() and not p.is_absolute():
-                # 상대 경로 "data/custom_sounds/..." → Backend/data/custom_sounds/...
-                from App.Core.config import DATABASE_PATH
-                _data_dir = Path(DATABASE_PATH).resolve().parent
-                rel = row.audio_path.replace("\\", "/")
-                if rel.startswith("data/"):
-                    rel = rel[5:]  # strip "data/"
-                p = _data_dir / rel
-            if p.is_file():
+            p = resolve_custom_sound_disk_path(row.audio_path)
+            if p and p.is_file():
                 p.unlink()
         except Exception:
-            # 파일 삭제 실패는 무시 (DB 정합성을 우선)
             pass
 
     db.delete(row)

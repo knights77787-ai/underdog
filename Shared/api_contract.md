@@ -514,12 +514,21 @@ Google과 거의 동일한 흐름으로 User/Session을 만들고, 프론트 페
 
 - **역할:** YAMNet embedding 기반 커스텀 소리(환경음) 등록. 실시간 비말 구간과 코사인 유사도로 매칭 후 alert 발생.
 - **요청:** `session_id`(Query), `name`, `event_type`(Form: danger|caution|alert), `file`(.wav 또는 .mp3, 1초 권장). MP3는 pydub·ffmpeg 필요.
-- **응답:** `{"ok": true, "data": {"custom_sound_id": int, "name": str}}`
+- **응답:** `{"ok": true, "data": {"custom_sound_id": int, "name": str, "audio_retention_hours": int}}`  
+  - `audio_retention_hours`: 원본 파일 서버 보관 상한(시간). **최대 168(7일)**이며 이를 넘겨 보관하지 않음. 기본 168. 환경변수 `CUSTOM_SOUND_AUDIO_RETENTION_HOURS`로 **24~168** 범위에서만 짧게 조정 가능.
 
 ### GET /custom-sounds
 
 - **쿼리:** `session_id` (필수)
-- **응답:** `{"ok": true, "count": N, "data": [{"custom_sound_id", "name", "event_type"}, ...]}`
+- **동작:** 목록 조회 전, 해당 세션 항목 중 **보관 기간이 지난 원본 파일**은 삭제·`audio_path` 비움(임베딩 유지).
+- **응답:** `{"ok": true, "count": N, "audio_retention_hours": int, "data": [ ... ]}`  
+  - 각 항목: `custom_sound_id`, `name`, `event_type`, `audio_path`(없을 수 있음), `created_at`, **`audio_available`**(bool), **`audio_expires_at`**(ISO8601 UTC `Z` 접미, 만료 기준 시각)
+
+### GET /custom-sounds/{id}/audio
+
+- **쿼리:** `session_id` (필수)
+- **성공:** 원본 파일 스트리밍
+- **만료/없음:** `410` 또는 파일 없음 시 상세 메시지 — 보관 TTL 경과 시 원본 자동 삭제 후 재생 불가(임베딩·실시간 감지는 유지).
 
 ### POST /custom-phrase-audio (커스텀 안내 음성 등록)
 

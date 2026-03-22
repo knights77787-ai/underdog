@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lumen | 등록 음원 수집·보관 안내</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/css/theme.css" rel="stylesheet">
+  <link href="/static/css/footer.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+  <nav class="navbar navbar-expand bg-white border-bottom shadow-sm">
+    <div class="header-inner container-fluid">
+      <a href="/" class="fw-semibold text-dark text-decoration-none">← 홈</a>
+      <span class="ms-3 small text-muted">등록 음원 안내</span>
+    </div>
+  </nav>
+
+  <main class="container py-4 py-md-5" style="max-width: 720px;">
+    <h1 class="h4 fw-bold mb-3">등록 음원(원본 파일) 수집·이용·보관 안내</h1>
+    <p class="text-muted small mb-4">본 안내는 <strong>「소리 등록」</strong> 기능을 통해 사용자가 업로드·녹음한 <strong>원본 음원 파일</strong>에 적용됩니다. 서비스 전체의 개인정보처리방침이 별도로 있는 경우, 그와 함께 적용됩니다.</p>
+
+    <section class="mb-4">
+      <h2 class="h6 fw-semibold text-body">1. 수집 항목</h2>
+      <ul class="small mb-0 ps-3">
+        <li class="mb-1">사용자가 선택·녹음·업로드한 <strong>음원 파일</strong>(예: MP3, WAV, Weba, M4A 등)</li>
+        <li class="mb-1">해당 음원에서 추출한 <strong>음향 특징(임베딩 벡터)</strong></li>
+        <li class="mb-0">소리 이름, 알림 분류, 등록 시각 등 <strong>메타데이터</strong></li>
+      </ul>
+    </section>
+
+    <section class="mb-4">
+      <h2 class="h6 fw-semibold text-body">2. 이용 목적</h2>
+      <ul class="small mb-0 ps-3">
+        <li class="mb-1"><strong>실시간 소리 감지</strong>: 등록한 소리와 유사한 소리가 감지될 때 알림·자막 등 서비스 기능 제공</li>
+        <li class="mb-1"><strong>특징 추출·품질 확인</strong>: 인식에 필요한 특징 벡터 생성 및, 제한된 기간 내 목록 화면에서의 <strong>재생(확인)</strong> 목적</li>
+        <li class="mb-0"><strong>서비스 운영·보안</strong>: 오남용 방지, 장애 대응 등 합리적 범위의 운영(로그는 별도 정책에 따름)</li>
+      </ul>
+    </section>
+
+    <section class="mb-4">
+      <h2 class="h6 fw-semibold text-body">3. 원본 파일 보관 기간 (TTL)</h2>
+      <p class="small mb-2">
+        <strong>원본 음원 파일</strong>은 개인정보 보호 및 보안을 위해 <strong>무기한 보관하지 않습니다.</strong>
+        등록 시점부터 서비스에서 정한 <strong>최대 보관 시간(시간 단위)</strong>이 지나면, 서버에 저장된 원본 파일은 <strong>자동으로 삭제</strong>되며, 이후에는 목록에서 <strong>재생할 수 없습니다.</strong>
+      </p>
+      <p class="small mb-0">
+        서비스 정책상 원본은 <strong>등록 시점부터 최장 7일(168시간)</strong>을 넘겨 서버에 보관하지 않습니다. 7일이 지나면 파일은 삭제되며, 필요 시 운영에서 <strong>24시간 이상 168시간 이하</strong> 범위로만 보관 기간을 줄일 수 있습니다(환경변수 등).
+        화면에 표시되는 숫자가 현재 적용 값입니다.
+      </p>
+    </section>
+
+    <section class="mb-4">
+      <h2 class="h6 fw-semibold text-body">4. 보관 기간 만료 이후</h2>
+      <ul class="small mb-0 ps-3">
+        <li class="mb-1">원본 파일이 삭제된 뒤에도, 이미 추출된 <strong>임베딩(특징)</strong>과 이름·분류 등 메타데이터는 DB에 남아 <strong>실시간 감지</strong>에 계속 사용될 수 있습니다.</li>
+        <li class="mb-0">사용자가 목록에서 해당 소리를 <strong>삭제</strong>하면, 메타데이터·임베딩 및 남아 있던 원본이 함께 제거되는 방향으로 동작합니다(구현 기준).</li>
+      </ul>
+    </section>
+
+    <section class="mb-4">
+      <h2 class="h6 fw-semibold text-body">5. 동의</h2>
+      <p class="small mb-0">
+        사용자가 소리 등록을 완료하는 경우, 위 수집·이용·보관(및 기간 만료 후 원본 삭제)에 <strong>동의한 것</strong>으로 봅니다. 동의를 철회하려면 등록 항목을 삭제하거나 고객 지원 등 서비스가 제공하는 절차를 이용해 주시기 바랍니다.
+      </p>
+    </section>
+
+    <p class="small text-muted mb-0">
+      문의: 서비스 운영 정책에 따릅니다. 본 문구는 제품 구현을 반영한 안내이며, 법적 검토가 필요한 경우 전문가 확인을 권장합니다.
+    </p>
+
+    <p class="mt-4 mb-0">
+      <a href="/new-sound" class="btn btn-outline-primary btn-sm">소리 등록으로 돌아가기</a>
+    </p>
+  </main>
+
+  <footer class="app-footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <img src="/static/img/lumen_logo.png" alt="Lumen">
+        <span>Lumen</span>
+      </div>
+      <div class="footer-links">
+        <a href="/">홈</a>
+        <a href="/new-sound">소리 등록</a>
+      </div>
+      <div class="footer-copy">© Lumen. 실시간 자막·소리 감지 서비스.</div>
+    </div>
+  </footer>
+</body>
+</html>

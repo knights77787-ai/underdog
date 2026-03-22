@@ -47,3 +47,28 @@ def _stt_silence_threshold() -> float:
 
 
 STT_SILENCE_RMS_THRESHOLD = _stt_silence_threshold()
+
+
+# 등록 원본 음원: 서버에 둘 수 있는 최장 시간(시간). 정책상 **최대 7일(168h) 초과 보관 불가**.
+_CUSTOM_SOUND_AUDIO_MAX_HOURS = 168
+_CUSTOM_SOUND_AUDIO_MIN_HOURS = 24
+
+
+def _custom_sound_audio_retention_hours() -> int:
+    """
+    커스텀 소리 등록 시 업로드 원본 파일을 디스크에 둘 수 있는 시간(시간 단위).
+    - 기본 168시간(7일). 7일 경과 후 원본 파일은 반드시 삭제·미보관(임베딩만 유지).
+    - 환경변수 CUSTOM_SOUND_AUDIO_RETENTION_HOURS: **24 이상 168 이하**만 허용(더 길게 두는 설정은 불가).
+    """
+    raw = os.getenv("CUSTOM_SOUND_AUDIO_RETENTION_HOURS", "").strip()
+    if raw:
+        try:
+            h = int(raw)
+            return max(_CUSTOM_SOUND_AUDIO_MIN_HOURS, min(h, _CUSTOM_SOUND_AUDIO_MAX_HOURS))
+        except ValueError:
+            pass
+    return _CUSTOM_SOUND_AUDIO_MAX_HOURS
+
+
+# 등록 음원 원본 파일 TTL (시간). 만료 후 파일 삭제·DB audio_path 비움. 임베딩은 유지.
+CUSTOM_SOUND_AUDIO_RETENTION_HOURS = _custom_sound_audio_retention_hours()

@@ -1,5 +1,6 @@
 # App/Api/routes/custom_sounds.py
 import io
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -8,10 +9,13 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Path as ApiPa
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
+from App.Core.config import CUSTOM_SOUND_AUDIO_RETENTION_HOURS, DATABASE_PATH
 from App.db.crud.custom_sounds import (
     create_custom_sound,
-    list_custom_sounds,
     delete_custom_sound,
+    expire_stale_custom_sounds_audio_for_session,
+    list_custom_sounds,
+    maybe_expire_custom_sound_audio,
 )
 from App.db.crud.sessions import get_or_create_by_client_uuid
 from App.db.database import get_db
@@ -22,7 +26,6 @@ from scipy.signal import resample
 router = APIRouter(prefix="/custom-sounds", tags=["custom-sounds"])
 
 # Backend/data/custom_sounds에 저장 (절대 경로로 CWD 의존 제거)
-from App.Core.config import DATABASE_PATH
 _UPLOAD_BASE = Path(DATABASE_PATH).resolve().parent / "custom_sounds"
 UPLOAD_DIR = _UPLOAD_BASE
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -164,13 +167,19 @@ async def upload_custom_sound(
         user_id=user_id,
     )
 
-    return {"ok": True, "data": {"custom_sound_id": row.custom_sound_id, "name": row.name}}
+    return {
+        "ok": True,
+        "data": {
+            "custom_sound_id": row.custom_sound_id,
+            "name": row.name,
+            "audio_retention_hours": CUSTOM_SOUND_AUDIO_RETENTION_HOURS,
+        },
+    }
 
 def _resolve_audio_path(audio_path: str | None) -> Path | None:
     """DB에 저장된 audio_path → 실제 파일 Path. 없으면 None."""
     if not audio_path or not audio_path.strip():
         return None
-    from App.Core.config import DATABASE_PATH
     p = Path(audio_path)
     if p.is_file():
         return p
@@ -188,14 +197,20 @@ def get_custom_sound_audio(
     session_id: str = Query(...),
     db: Session = Depends(get_db),
 ):
-    """커스텀 소리 오디오 파일 스트리밍 (재생용)."""
-    from App.db.crud.custom_sounds import list_custom_sounds
+    """커스텀 소리 오디오 파일 스트리밍 (재생용). 보관 기간 만료 시 410."""
     rows = list_custom_sounds(db, session_id)
     row = next((r for r in rows if r.custom_sound_id == custom_sound_id), None)
     if not row:
         raise HTTPException(404, "해당 소리를 찾을 수 없거나 권한이 없습니다.")
+    maybe_expire_custom_sound_audio(db, row)
     fp = _resolve_audio_path(row.audio_path)
     if not fp:
+        deadline = row.created_at + timedelta(hours=CUSTOM_SOUND_AUDIO_RETENTION_HOURS)
+        if not row.audio_path or datetime.utcnow() > deadline:
+            raise HTTPException(
+                410,
+                "원본 음원 보관 기간이 만료되어 재생할 수 없습니다. 실시간 감지(임베딩)는 계속 이용할 수 있습니다.",
+            )
         raise HTTPException(404, "오디오 파일을 찾을 수 없습니다.")
     ext = fp.suffix.lower()
     media_map = {
@@ -214,19 +229,29 @@ def get_custom_sounds(
     session_id: str = Query(...),
     db: Session = Depends(get_db),
 ):
+    expire_stale_custom_sounds_audio_for_session(db, session_id)
     rows = list_custom_sounds(db, session_id)
-    return {
-        "ok": True,
-        "count": len(rows),
-        "data": [
+    now = datetime.utcnow()
+    out = []
+    for r in rows:
+        deadline = r.created_at + timedelta(hours=CUSTOM_SOUND_AUDIO_RETENTION_HOURS)
+        audio_available = bool(r.audio_path) and now <= deadline
+        out.append(
             {
                 "custom_sound_id": r.custom_sound_id,
                 "name": r.name,
                 "event_type": r.event_type,
                 "audio_path": r.audio_path,
                 "created_at": r.created_at,
-            } for r in rows
-        ]
+                "audio_available": audio_available,
+                "audio_expires_at": deadline.isoformat() + "Z",
+            }
+        )
+    return {
+        "ok": True,
+        "count": len(out),
+        "audio_retention_hours": CUSTOM_SOUND_AUDIO_RETENTION_HOURS,
+        "data": out,
     }
 
 

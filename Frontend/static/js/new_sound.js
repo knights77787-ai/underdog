@@ -346,6 +346,12 @@ function renderSoundList(list) {
     .map((r) => {
       const { label, date } = formatSoundDateLabel(r.created_at, r.updated_at);
       const dateStr = date ? ` · ${label}: ${date}` : "";
+      const canPlay = r.audio_available !== false;
+      const playTitle = canPlay
+        ? "재생"
+        : "보관 기간이 지나 원본 파일이 없어 재생할 수 없습니다. 목록에는 그대로 보이며 실시간 감지는 유지됩니다.";
+      const playDisabled = canPlay ? "" : " disabled";
+      const playClass = canPlay ? "icon-btn play-toggle-btn" : "icon-btn play-toggle-btn opacity-50";
       return `
       <div class="sound-row" data-id="${r.custom_sound_id}">
         <div class="sound-left">
@@ -363,12 +369,12 @@ function renderSoundList(list) {
         <div class="sound-right">
           <button
             type="button"
-            class="icon-btn play-toggle-btn"
+            class="${playClass}"
             data-id="${r.custom_sound_id}"
             data-audio-path="${escapeHtml(r.audio_path || "")}"
-            aria-label="재생"
-            title="재생"
-            tabindex="0"
+            aria-label="${canPlay ? "재생" : "재생 불가(보관 기간 만료)"}"
+            title="${escapeHtml(playTitle)}"
+            tabindex="0"${playDisabled}
           >
             <i class="bi bi-play-fill"></i>
           </button>
@@ -390,16 +396,18 @@ function renderSoundList(list) {
     .join("");
 }
 
-/** 기존 등록 소리 목록을 API에서 가져옴. { ok, data } 반환 */
+/** 기존 등록 소리 목록을 API에서 가져옴. { ok, data, audio_retention_hours } 반환 */
 async function fetchExistingSoundList() {
   try {
     const url = API_BASE + "/custom-sounds?session_id=" + encodeURIComponent(SESSION_ID);
     const res = await fetch(url);
     const data = await res.json().catch(() => ({}));
     const ok = res.ok && data.ok && Array.isArray(data.data);
-    return { ok, data: ok ? data.data : [] };
+    const hours =
+      typeof data.audio_retention_hours === "number" ? data.audio_retention_hours : null;
+    return { ok, data: ok ? data.data : [], audio_retention_hours: hours };
   } catch {
-    return { ok: false, data: [] };
+    return { ok: false, data: [], audio_retention_hours: null };
   }
 }
 
@@ -409,12 +417,19 @@ async function loadSoundList() {
   stopListAudioPlayback();
   soundListStatusEl.textContent = "불러오는 중…";
 
+  const retentionNote = document.getElementById("soundListRetentionNote");
+
   try {
-    const { ok, data } = await fetchExistingSoundList();
+    const { ok, data, audio_retention_hours } = await fetchExistingSoundList();
     if (!ok) {
       soundListStatusEl.textContent = "목록을 불러오지 못했습니다.";
       soundListEl.innerHTML = "";
       return;
+    }
+    if (retentionNote && audio_retention_hours != null && audio_retention_hours > 0) {
+      const days = audio_retention_hours / 24;
+      const dayLabel = Number.isInteger(days) ? String(days) : String(Math.round(days * 10) / 10);
+      retentionNote.textContent = `등록 시점부터 원본은 최대 약 ${dayLabel}일간 목록에서 재생할 수 있습니다. 이후에는 서버의 원본 파일만 없어져 재생은 할 수 없고, 등록한 소리 항목은 목록에 그대로 보이며 실시간 감지(임베딩)는 유지됩니다.`;
     }
     if (data.length === 0) {
       soundListStatusEl.textContent = "등록된 소리가 없습니다.";
@@ -647,6 +662,10 @@ soundListEl?.addEventListener("click", async (e) => {
   // 재생
   if (!playBtn) return;
 
+  if (playBtn.disabled) {
+    return;
+  }
+
   const soundId = playBtn.dataset.id;
 
   if (!soundId) {
@@ -681,7 +700,10 @@ soundListEl?.addEventListener("click", async (e) => {
 
     listAudio.addEventListener("error", () => {
       stopListAudioPlayback();
-      setStatus("오디오 파일을 불러오지 못했습니다.", "err");
+      setStatus(
+        "오디오를 불러오지 못했습니다. 보관 기간 만료 또는 파일 없음일 수 있습니다.",
+        "err"
+      );
     });
 
     await listAudio.play();

@@ -39,6 +39,16 @@ body {
   overflow-wrap: anywhere;
 }
 
+/* 목록 탭: 안내 문구와 보관 안내를 붙이고, 상태 줄만 위쪽 여백 */
+.sound-list-retention-note {
+  margin-top: 0;
+  line-height: 1.5;
+}
+
+.sound-list-status-line {
+  margin-top: 0.65rem;
+}
+
 .btn-submit-sound {
   font-weight: 600;
   min-height: 48px;

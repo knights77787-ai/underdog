@@ -93,7 +93,7 @@
               aria-labelledby="register-tab"
               tabindex="0">
 
-              <div class="register-guide-actions mb-3 mb-md-4">
+              <div class="register-guide-actions mb-3 mb-md-4 d-flex justify-content-end">
                 <button
                   type="button"
                   class="btn btn-sm btn-outline-primary register-guide-open"
@@ -180,14 +180,11 @@
             aria-labelledby="list-tab"
             tabindex="0"
           >
-            <div class="d-flex align-items-center justify-content-between mb-3">
-              <div>
-                <h5 class="mb-1">내가 등록한 소리 목록</h5>
-                <p class="text-muted small mb-0">등록한 커스텀 소리를 여기서 확인합니다.</p>
-              </div>
-            </div>
+            <h5 class="mb-3">내가 등록한 소리 목록</h5>
 
-            <div id="soundListStatus" class="small text-muted mb-3">
+            <p class="small text-body mb-0">등록한 커스텀 소리를 여기서 확인합니다.</p>
+
+            <div id="soundListStatus" class="small text-muted sound-list-status-line mb-2">
               등록된 소리가 없습니다
             </div>
 
@@ -238,11 +235,17 @@
               <li class="mb-1">녹음 후 아래에 플레이어가 보이면 들어보고, 마음에 들지 않으면 <strong>● 녹음</strong>을 다시 눌러 <strong>재녹음</strong>할 수 있습니다.</li>
             </ul>
           </section>
-          <section class="mb-0">
+          <section class="mb-4">
             <h6 class="fw-semibold text-body">파일 형식</h6>
             <p class="small mb-0">
               업로드 가능: <strong>MP3, WAV, Weba, M4A</strong>.<br>
               이 페이지에서 브라우저로 녹음한 파일은 <strong>Weba</strong> 형식으로 저장됩니다.
+            </p>
+          </section>
+          <section class="mb-0">
+            <h6 class="fw-semibold text-body">원본 보관 기간</h6>
+            <p class="small mb-0">
+              원본 음원 파일은 서버에서 <strong>제한된 기간만</strong> 보관됩니다. 기간이 지나면 원본만 서버에서 없어져 목록에서 <strong>재생</strong>은 할 수 없고, 등록 항목은 목록에 그대로 보이며 실시간 감지에 쓰는 <strong>특징(임베딩)</strong>은 유지됩니다. 자세한 수집·이용 목적은 <a href="/legal/sound-data" target="_blank" rel="noopener">등록 음원 안내</a> 페이지를 참고하세요.
             </p>
           </section>
         </div>

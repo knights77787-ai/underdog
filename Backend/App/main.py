@@ -268,6 +268,12 @@ def frontend_new_sound():
     return _send_html("new_sound.html")
 
 
+@app.get("/legal/sound-data", response_class=FileResponse)
+def frontend_sound_data_notice():
+    """등록 음원 수집·보관 기간 안내(약관성 고지)."""
+    return _send_html("sound_data_notice.html")
+
+
 @app.get("/settings-page", response_class=FileResponse)
 def frontend_settings():
     """설정 페이지."""
