@@ -463,7 +463,86 @@ fileInput?.addEventListener("change", () => {
 });
 
 // ===== recorder =====
-btnStart?.addEventListener("click", async () => {
+/** 권한 허용 직후 스트림으로 MediaRecorder 시작 (메인 live.js와 같이 getUserMedia는 사용자 제스처 턴에서 동기 호출) */
+function startMediaRecorderFromStream(stream) {
+  const mimeCandidates = ["audio/webm;codecs=opus", "audio/webm"];
+  const mimeType = mimeCandidates.find((t) => MediaRecorder.isTypeSupported(t)) || "";
+
+  try {
+    mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+  } catch (e) {
+    console.error("MediaRecorder init failed", e);
+    try {
+      stream.getTracks().forEach((tr) => tr.stop());
+    } catch (_) {}
+    setStatus("이 브라우저에서 녹음 형식을 시작할 수 없습니다.", "err");
+    resetRecordingUi();
+    return;
+  }
+
+  recordedChunks = [];
+
+  stream.getTracks().forEach((t) => {
+    t.onended = () => {
+      if (!mediaRecorder || mediaRecorder.state === "inactive") return;
+      try {
+        mediaRecorder.stop();
+      } catch (_) {}
+      resetRecordingUi();
+      setStatus("마이크 연결이 끊겼습니다.", "err");
+    };
+  });
+
+  mediaRecorder.ondataavailable = (e) => {
+    if (e.data && e.data.size > 0) {
+      recordedChunks.push(e.data);
+    }
+  };
+
+  mediaRecorder.onstop = () => {
+    stream.getTracks().forEach((tr) => tr.stop());
+
+    const blobType = mediaRecorder.mimeType || "audio/webm";
+    recordedBlob = new Blob(recordedChunks, { type: blobType });
+
+    const ext = blobType.includes("ogg") ? "ogg" : "webm";
+    const recordedFile = new File([recordedBlob], `recorded_sound.${ext}`, {
+      type: blobType,
+    });
+
+    stopTimer();
+    setSelectedAudio(recordedFile, "record");
+    updateTimerFromAudioDuration(audioPreview);
+    updateFileMeta(recordedFile);
+
+    btnStop.disabled = true;
+    btnStart.disabled = false;
+
+    recIndicatorWrap?.classList.remove("recording");
+    setStatus("녹음이 저장되었습니다.", "ok");
+  };
+
+  try {
+    mediaRecorder.start();
+  } catch (e) {
+    console.error("mediaRecorder.start failed", e);
+    try {
+      stream.getTracks().forEach((tr) => tr.stop());
+    } catch (_) {}
+    setStatus("녹음을 시작할 수 없습니다.", "err");
+    resetRecordingUi();
+    return;
+  }
+
+  btnStart.disabled = true;
+  btnStop.disabled = false;
+
+  recIndicatorWrap?.classList.add("recording");
+  startTimer();
+  setStatus("녹음 중...", "ok");
+}
+
+btnStart?.addEventListener("click", () => {
   clearStatus();
 
   if (!navigator?.mediaDevices?.getUserMedia) {
@@ -472,76 +551,33 @@ btnStart?.addEventListener("click", async () => {
     return;
   }
 
-  try {
-    resetRecordedState();
-    setSelectedAudio(null, null);
-    updateFileMeta(null);
+  resetRecordedState();
+  setSelectedAudio(null, null);
+  updateFileMeta(null);
 
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  // async/await 금지: 권한 대화 후에도 스트림이 바로 이어지도록 이 이벤트 루프 턴에서 getUserMedia 호출 (live.js requestMicPermission과 동일 패턴)
+  navigator.mediaDevices
+    .getUserMedia({ audio: true })
+    .then((stream) => {
+      startMediaRecorderFromStream(stream);
+    })
+    .catch((err) => {
+      console.error(err);
 
-    const mimeCandidates = [
-      "audio/webm;codecs=opus",
-      "audio/webm",
-    ];
-    const mimeType = mimeCandidates.find((t) => MediaRecorder.isTypeSupported(t)) || "";
-
-    mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-    recordedChunks = [];
-
-    mediaRecorder.ondataavailable = (e) => {
-      if (e.data && e.data.size > 0) {
-        recordedChunks.push(e.data);
+      if (err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError") {
+        setStatus("마이크 권한이 거부되었습니다. 주소창에서 마이크를 허용해주세요.", "err");
+      } else if (err?.name === "NotFoundError") {
+        setStatus("마이크 장치를 찾지 못했습니다.", "err");
+      } else if (err?.name === "NotReadableError" || err?.name === "TrackStartError") {
+        setStatus("다른 앱이 마이크를 사용 중일 수 있습니다.", "err");
+      } else if (err?.name === "SecurityError") {
+        setStatus("HTTPS 또는 localhost 환경에서 실행해주세요.", "err");
+      } else {
+        setStatus("마이크를 사용할 수 없습니다. 브라우저/권한/환경을 확인해주세요.", "err");
       }
-    };
 
-    mediaRecorder.onstop = () => {
-      stream.getTracks().forEach((tr) => tr.stop());
-
-      const blobType = mediaRecorder.mimeType || "audio/webm";
-      recordedBlob = new Blob(recordedChunks, { type: blobType });
-
-      const ext = blobType.includes("ogg") ? "ogg" : "webm";
-      const recordedFile = new File([recordedBlob], `recorded_sound.${ext}`, {
-        type: blobType,
-      });
-
-      stopTimer();
-      setSelectedAudio(recordedFile, "record");
-      updateTimerFromAudioDuration(audioPreview);
-      updateFileMeta(recordedFile);
-
-      btnStop.disabled = true;
-      btnStart.disabled = false;
-
-      recIndicatorWrap?.classList.remove("recording");
-      setStatus("녹음이 저장되었습니다.", "ok");
-    };
-
-    mediaRecorder.start();
-
-    btnStart.disabled = true;
-    btnStop.disabled = false;
-
-    recIndicatorWrap?.classList.add("recording");
-    startTimer();
-    setStatus("녹음 중...", "ok");
-  } catch (err) {
-    console.error(err);
-
-    if (err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError") {
-      setStatus("마이크 권한이 거부되었습니다. 주소창에서 마이크를 허용해주세요.", "err");
-    } else if (err?.name === "NotFoundError") {
-      setStatus("마이크 장치를 찾지 못했습니다.", "err");
-    } else if (err?.name === "NotReadableError" || err?.name === "TrackStartError") {
-      setStatus("다른 앱이 마이크를 사용 중일 수 있습니다.", "err");
-    } else if (err?.name === "SecurityError") {
-      setStatus("HTTPS 또는 localhost 환경에서 실행해주세요.", "err");
-    } else {
-      setStatus("마이크를 사용할 수 없습니다. 브라우저/권한/환경을 확인해주세요.", "err");
-    }
-
-    resetRecordingUi();
-  }
+      resetRecordingUi();
+    });
 });
 
 btnStop?.addEventListener("click", () => {

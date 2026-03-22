@@ -10,33 +10,80 @@
   padding: 0 0.75rem;
 }
 
-/* 사용자 헤더: 로고 가운데 정렬 (좌/우 영역 균형으로 중앙 유지) */
+/* 위 카드와 같은 세로 기준선: main에 container-fluid 가로 패딩이 있으면 main-inner·푸터보다 카드만 더 들어가 보임 */
+main.container-fluid:has(> .main-inner) {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* 푸터 블록: 로고·링크·© 왼쪽을 한 축으로 */
+.footer-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.app-footer .footer-brand,
+.app-footer .footer-links,
+.app-footer .footer-copy {
+  margin-left: 0;
+  padding-left: 0;
+}
+
+/* 로고·좌우 버튼이 들어가는 사용자 네비: 부트스트랩 navbar 세로 패딩 제거 → 띠 높이 = .header-inner 한 곳에서만 */
+.navbar.bg-white.border-bottom:has(.header-inner) {
+  --bs-navbar-padding-y: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+/* 사용자 헤더: 로고 가운데 정렬 (띠 높이 고정, 로고만 비율 키움) */
 .navbar .header-inner {
+  --header-bar-min: 4.125rem; /* 4.5rem 대비 띠만 살짝 얇게 */
+  --header-bar-pad-y: 0.4rem;
+  --header-logo-max-h: 3.05rem; /* 띠(4.125rem−패딩) 안에서 최대한 키움 */
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
+  padding-top: var(--header-bar-pad-y);
+  padding-bottom: var(--header-bar-pad-y);
+  min-height: var(--header-bar-min);
+  box-sizing: border-box;
 }
 .navbar .header-inner .header-logo-wrap {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
 }
-/* 사용자 화면: 로고 slot (헤더 높이와 무관, absolute 배치 후 확대) */
+/* 로고 slot: 띠(.header-inner) 안에 이미지가 잘리지 않도록 세로는 패딩 제외 높이 이하로 제한 */
 .navbar .header-inner .header-logo-slot {
   position: absolute;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
   z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-height: 100%;
+  pointer-events: auto;
 }
 .navbar .header-inner .header-logo-slot .header-logo-wrap {
   position: static;
   transform: none;
+  display: flex;
+  align-items: center;
+  line-height: 0;
 }
 .navbar .header-inner .header-logo-slot img {
-  width: 98px;
-  height: 70px;
+  width: auto;
+  height: auto;
+  max-width: min(10.5rem, 58vw);
+  max-height: var(--header-logo-max-h);
   object-fit: contain;
 }
 .navbar .header-inner .header-left,
@@ -50,12 +97,8 @@
   align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
-  min-height: 2.5rem;  /* 게스트일 때 빈 상태여도 로그인 사용자와 동일한 헤더 높이 유지 */
+  min-height: 2.5rem;
 }
-.navbar .header-inner {
-  position: relative;
-}
-
 .app-footer {
   margin-top: auto;
   padding: 1.5rem 0;
@@ -89,15 +132,28 @@
   margin-bottom: 0.75rem;
 }
 
-@media (max-width: 400px) {
+/* 모바일·태블릿(세로): 좌우 여백 넓게 — 화면 끝에 콘텐츠가 붙지 않게 */
+@media (max-width: 767.98px) {
   .header-inner,
   .footer-inner,
   .main-inner {
-    padding: 0 0.5rem;
+    padding-left: max(clamp(1.0625rem, 5.5vw, 1.5rem), env(safe-area-inset-left, 0px));
+    padding-right: max(clamp(1.0625rem, 5.5vw, 1.5rem), env(safe-area-inset-right, 0px));
+  }
+}
+
+@media (max-width: 400px) {
+  .navbar .header-inner {
+    --header-bar-min: 3.75rem;
+    --header-bar-pad-y: 0.38rem;
+    --header-logo-max-h: 2.68rem;
+    min-height: var(--header-bar-min);
+    padding-top: var(--header-bar-pad-y);
+    padding-bottom: var(--header-bar-pad-y);
   }
   .navbar .header-inner .header-logo-slot img {
-    width: 70px;
-    height: 50px;
+    max-width: min(8.5rem, 62vw);
+    max-height: var(--header-logo-max-h);
   }
   .app-footer .footer-links {
     flex-wrap: nowrap;

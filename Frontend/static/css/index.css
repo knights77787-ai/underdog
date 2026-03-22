@@ -54,6 +54,15 @@ body.bg-light { background-color: #f8fafc !important; }
   height: 56px;
   margin-left: auto;
   margin-right: auto;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.mic-status-indicator.mic-status-card:hover {
+  filter: brightness(0.97);
+}
+.mic-status-indicator.mic-status-card:focus-visible {
+  outline: 2px solid var(--lumen-teal, #06b6d4);
+  outline-offset: 2px;
 }
 .mic-status-indicator.mic-status-card .mic-status-icon {
   font-size: 1.5rem;
@@ -137,7 +146,7 @@ body.bg-light { background-color: #f8fafc !important; }
 /* 모바일: 최근 감지 로그 카드형 레이아웃 */
 @media (max-width: 576px) {
   #logSection .table-responsive {
-    padding: 0 0.75rem;
+    padding: 0 1rem;
   }
   #logSection .card-body {
     padding: 0.75rem 0 !important;
@@ -156,9 +165,9 @@ body.bg-light { background-color: #f8fafc !important; }
   }
   #logTable tbody tr:nth-of-type(odd) {
     background: rgba(6, 182, 212, 0.03);
-    margin: 0 -0.75rem;
-    padding-left: 0.75rem;
-    padding-right: 0.75rem;
+    margin: 0 -1rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
   #logTable tr:last-child { border-bottom: 0; }
   #logTable td {

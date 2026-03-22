@@ -158,6 +158,7 @@ const guestCtaSection = document.getElementById("guestCtaSection");
 const micTitle = document.getElementById("micTitle");
 const micDesc  = document.getElementById("micDesc");
 const btnMic   = document.getElementById("btnMic");
+const micStatusCard = document.getElementById("micStatusCard");
 const btnVibrateTest = document.getElementById("btnVibrateTest");
 const micPermissionModal = document.getElementById("micPermissionModal");
 const micPermissionConfirm = document.getElementById("micPermissionConfirm");
@@ -222,8 +223,9 @@ function updateMicStatusUI() {
     const icon = micCard.querySelector(".mic-status-icon");
     if (icon) icon.className = iconClass;
     micCard.className = baseClass + " mic-status-card mb-2";
-    micCard.title = label;
-    micCard.setAttribute("aria-label", label);
+    const hint = on ? " (클릭하여 중단)" : " (클릭하여 실행)";
+    micCard.title = label + hint;
+    micCard.setAttribute("aria-label", label + hint);
   }
 
   if (btnMic) btnMic.textContent = on ? "마이크 중단" : "마이크 실행";
@@ -807,8 +809,8 @@ async function startAudioSend() {
   }
 }
 
-btnMic.addEventListener("click", () => {
-  // 사용자 액션(버튼 클릭) 이후에만 진동을 허용하도록 unlock
+function handleMicPrimaryAction() {
+  // 사용자 액션(버튼·아이콘 클릭) 이후에만 진동을 허용하도록 unlock
   unlockVibrationByUserGesture();
   if (btnVibrateTest) btnVibrateTest.disabled = false;
   // 이미 마이크 사용 중이면 종료 안내 모달
@@ -830,7 +832,19 @@ btnMic.addEventListener("click", () => {
 
   // 마이크 미사용 → 바로 브라우저 마이크 권한 요청 (허용 시 자동 연결·소리 감지 시작)
   requestMicPermission();
-});
+}
+
+btnMic.addEventListener("click", handleMicPrimaryAction);
+
+if (micStatusCard) {
+  micStatusCard.addEventListener("click", handleMicPrimaryAction);
+  micStatusCard.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handleMicPrimaryAction();
+    }
+  });
+}
 
 // =======================
 // 4) WS

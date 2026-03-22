@@ -3,6 +3,43 @@ body {
   background: #f8fafc !important;
 }
 
+/* 메인 카드 가독성: 좁은 화면에서도 과하게 넓지 않게 */
+.center-shell {
+  width: 100%;
+  max-width: 720px;
+  margin-inline: auto;
+}
+
+/* 녹음 안내: 의도한 위치에서만 줄바꿈 */
+.helper-text {
+  font-size: 0.9rem;
+  line-height: 1.55;
+  max-width: 22rem;
+  margin-left: auto;
+  margin-right: auto;
+  text-wrap: balance;
+}
+
+.helper-text-line {
+  display: block;
+}
+
+.helper-text-line + .helper-text-line {
+  margin-top: 0.4rem;
+}
+
+.upload-format-note {
+  line-height: 1.45;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.btn-submit-sound {
+  font-weight: 600;
+  min-height: 48px;
+  border-radius: 12px;
+}
+
 /* ===== tabs (Lumen 테마) ===== */
 .sound-tabs .nav-link {
   color: var(--lumen-primary-dark);
@@ -255,11 +292,105 @@ body {
 
 @media (max-width: 400px) {
   .sound-tabs .nav-link {
-    font-size: 0.8rem;
-    padding: 0.5rem 0.6rem;
+    font-size: 0.78rem;
+    padding: 0.5rem 0.55rem;
+    white-space: nowrap;
   }
   .main-card .card-body {
-    padding: 1rem !important;
+    padding: 1.1rem 1rem !important;
+  }
+}
+
+/* 모바일·좁은 태블릿: 녹음 영역 비율·터치 영역 */
+@media (max-width: 767.98px) {
+  .sound-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 0.25rem;
+    padding-bottom: 2px;
+  }
+
+  .sound-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sound-tabs .nav-item {
+    flex: 0 0 auto;
+  }
+
+  .sound-tabs .nav-link {
+    font-size: 0.82rem;
+    padding: 0.55rem 0.75rem;
+    white-space: nowrap;
+  }
+
+  .record-shell {
+    padding: 1rem 1.05rem;
+    border-radius: 18px;
+  }
+
+  .helper-text {
+    max-width: 100%;
+    font-size: 0.875rem;
+    padding-inline: 0.15rem;
+  }
+
+  .rec-indicator-wrap {
+    min-height: 88px;
+    margin-bottom: 0.75rem !important;
+  }
+
+  .rec-indicator {
+    width: 56px;
+    height: 56px;
+  }
+
+  .rec-pulse {
+    width: 56px;
+    height: 56px;
+  }
+
+  .record-controls {
+    width: 100%;
+    max-width: 100%;
+    gap: 0.5rem !important;
+  }
+
+  .btn-record {
+    min-height: 44px;
+    padding-top: 0.45rem;
+    padding-bottom: 0.45rem;
+    font-size: 0.9rem;
+    flex: 1 1 calc(50% - 0.25rem);
+    min-width: 0;
+  }
+
+  .record-controls .timer-pill {
+    flex: 1 1 100%;
+    max-width: 100%;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+
+  #audioPreview:not([hidden]) {
+    margin-top: 0.75rem !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .record-controls .btn-record {
+    flex: 0 0 auto;
+  }
+
+  .record-controls .timer-pill {
+    flex: 0 0 auto;
   }
 }
 
