@@ -53,7 +53,7 @@ def _get_yamnet() -> YamnetService:
             "캐시 삭제 후 재시도: 사용자 임시 폴더(AppData\\Local\\Temp) 안의 tfhub_modules 폴더 삭제. 원인: {_yamnet_error}",
         )
 
-ALLOWED_EXTENSIONS = (".wav", ".mp3", ".webm", ".m4a")
+ALLOWED_EXTENSIONS = (".wav", ".mp3", ".weba", ".m4a")
 
 def _resample_to_16k(x: np.ndarray, sr: int) -> np.ndarray:
     if sr == 16000:
@@ -83,7 +83,7 @@ def _decode_wav_to_16k_mono_f32(wav_bytes: bytes) -> np.ndarray:
     return _normalize_1s_window(x)
 
 def _decode_via_pydub(data: bytes, fmt: str) -> np.ndarray:
-    """pydub로 mp3/webm 등 디코딩 → 16k mono float32."""
+    """pydub로 mp3/weba(webm 오디오) 등 디코딩 → 16k mono float32."""
     try:
         from pydub import AudioSegment
     except ImportError:
@@ -106,8 +106,9 @@ def _decode_mp3_to_16k_mono_f32(mp3_bytes: bytes) -> np.ndarray:
     return _decode_via_pydub(mp3_bytes, "mp3")
 
 
-def _decode_webm_to_16k_mono_f32(webm_bytes: bytes) -> np.ndarray:
-    return _decode_via_pydub(webm_bytes, "webm")
+def _decode_weba_to_16k_mono_f32(weba_bytes: bytes) -> np.ndarray:
+    """.weba는 WebM 오디오 전용; pydub/FFmpeg는 webm 컨테이너로 디코딩."""
+    return _decode_via_pydub(weba_bytes, "webm")
 
 
 def _decode_m4a_to_16k_mono_f32(m4a_bytes: bytes) -> np.ndarray:
@@ -120,8 +121,8 @@ def _decode_audio_to_16k_mono_f32(data: bytes, ext: str) -> np.ndarray:
         return _decode_wav_to_16k_mono_f32(data)
     if ext == ".mp3":
         return _decode_mp3_to_16k_mono_f32(data)
-    if ext == ".webm":
-        return _decode_webm_to_16k_mono_f32(data)
+    if ext == ".weba":
+        return _decode_weba_to_16k_mono_f32(data)
     if ext == ".m4a":
         return _decode_m4a_to_16k_mono_f32(data)
     raise HTTPException(400, f"지원하지 않는 형식입니다. 사용 가능: {', '.join(ALLOWED_EXTENSIONS)}")
@@ -197,7 +198,13 @@ def get_custom_sound_audio(
     if not fp:
         raise HTTPException(404, "오디오 파일을 찾을 수 없습니다.")
     ext = fp.suffix.lower()
-    media_map = {".mp3": "audio/mpeg", ".wav": "audio/wav", ".webm": "audio/webm", ".m4a": "audio/mp4"}
+    media_map = {
+        ".mp3": "audio/mpeg",
+        ".wav": "audio/wav",
+        ".weba": "audio/webm",
+        ".webm": "audio/webm",  # 과거 업로드 분만 재생 호환
+        ".m4a": "audio/mp4",
+    }
     media_type = media_map.get(ext, "application/octet-stream")
     return FileResponse(fp, media_type=media_type)
 

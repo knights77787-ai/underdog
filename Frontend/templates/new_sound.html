@@ -93,6 +93,17 @@
               aria-labelledby="register-tab"
               tabindex="0">
 
+              <div class="register-guide-actions mb-3 mb-md-4">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-primary register-guide-open"
+                  data-bs-toggle="modal"
+                  data-bs-target="#registerGuideModal"
+                >
+                  <i class="bi bi-book-half me-1" aria-hidden="true"></i>자세한 가이드
+                </button>
+              </div>
+
               <div class="record-shell mx-auto mb-3 mb-md-4">
                 <p class="text-center text-muted helper-text mb-3 mb-md-4">
                   <span class="helper-text-line">가능한 주변 소음 없는 조용한 환경에서 녹음해 주세요.</span>
@@ -128,8 +139,8 @@
 
               <div class="mb-3">
                 <label for="fileInput" class="form-label fw-semibold mb-1">파일 업로드</label>
-                <p class="form-text text-muted small upload-format-note mb-2">지원 형식: MP3, WAV, WebM, M4A</p>
-                <input id="fileInput" type="file" class="form-control" accept=".mp3,.wav,.webm,.m4a,audio/*">
+                <p class="form-text text-muted small upload-format-note mb-2">지원 형식: MP3, WAV, Weba, M4A</p>
+                <input id="fileInput" type="file" class="form-control" accept=".mp3,.wav,.weba,.m4a,audio/*">
                 <div id="fileMeta" class="form-text"></div>
               </div>
 
@@ -191,6 +202,56 @@
     </div>
     </div>
   </main>
+
+  <!-- 소리 등록 자세한 가이드 (언제든 다시 열기) -->
+  <div
+    class="modal fade"
+    id="registerGuideModal"
+    tabindex="-1"
+    aria-labelledby="registerGuideModalLabel"
+    aria-hidden="true"
+    inert
+  >
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="registerGuideModalLabel">소리 등록 — 자세한 가이드</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+        </div>
+        <div class="modal-body register-guide-modal-body">
+          <section class="mb-4">
+            <h6 class="fw-semibold text-body">이 화면에서의 순서</h6>
+            <ol class="small mb-0 ps-3">
+              <li class="mb-1"><strong>● 녹음</strong>을 누릅니다.</li>
+              <li class="mb-1">브라우저에서 <strong>마이크 허용</strong>을 선택합니다. (허용되면 곧바로 녹음이 진행됩니다.)</li>
+              <li class="mb-1">필요한 소리가 끝나면 <strong>■ 중지</strong>를 눌러 저장합니다.</li>
+              <li class="mb-1">또는 <strong>파일 업로드</strong>에서 MP3·WAV·Weba·M4A 중 하나를 선택합니다.</li>
+              <li class="mb-1"><strong>소리 이름</strong>과 <strong>소리 알림 분류</strong>를 입력·선택합니다.</li>
+              <li><strong>등록</strong>을 누르면 메인 화면 실시간 감지에 반영됩니다.</li>
+            </ol>
+          </section>
+          <section class="mb-4">
+            <h6 class="fw-semibold text-body">녹음 팁</h6>
+            <ul class="small mb-0 ps-3">
+              <li class="mb-1">가능하면 <strong>주변이 조용한 곳</strong>에서 녹음하면 인식이 더 잘 됩니다.</li>
+              <li class="mb-1">특정 가전 소리(예: 전자레인지)를 남기고 싶다면, <strong>끝나기 몇 초 전부터 녹음을 시작</strong>하고 소리가 끝난 뒤 중지하는 방식을 쓸 수 있습니다.</li>
+              <li class="mb-1">녹음 후 아래에 플레이어가 보이면 들어보고, 마음에 들지 않으면 <strong>● 녹음</strong>을 다시 눌러 <strong>재녹음</strong>할 수 있습니다.</li>
+            </ul>
+          </section>
+          <section class="mb-0">
+            <h6 class="fw-semibold text-body">파일 형식</h6>
+            <p class="small mb-0">
+              업로드 가능: <strong>MP3, WAV, Weba, M4A</strong>.<br>
+              이 페이지에서 브라우저로 녹음한 파일은 <strong>Weba</strong> 형식으로 저장됩니다.
+            </p>
+          </section>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" data-bs-dismiss="modal">닫기</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <footer class="app-footer">
     <div class="footer-inner">

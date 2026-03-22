@@ -3,11 +3,16 @@ body {
   background: #f8fafc !important;
 }
 
-/* 메인 카드 가독성: 좁은 화면에서도 과하게 넓지 않게 */
+/* PC: 카드 너비는 main-inner(1200px)까지 — 이전과 동일. 모바일만 살짝 좁혀 가독성 */
 .center-shell {
   width: 100%;
-  max-width: 720px;
-  margin-inline: auto;
+}
+
+@media (max-width: 767.98px) {
+  .center-shell {
+    max-width: 720px;
+    margin-inline: auto;
+  }
 }
 
 /* 녹음 안내: 의도한 위치에서만 줄바꿈 */
@@ -38,6 +43,16 @@ body {
   font-weight: 600;
   min-height: 48px;
   border-radius: 12px;
+}
+
+.register-guide-modal-body section h6 {
+  color: var(--lumen-primary-dark, #1e3a5f);
+  font-size: 0.95rem;
+}
+
+.register-guide-modal-body ol li,
+.register-guide-modal-body ul li {
+  line-height: 1.55;
 }
 
 /* ===== tabs (Lumen 테마) ===== */
