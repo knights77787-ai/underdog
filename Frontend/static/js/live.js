@@ -636,6 +636,9 @@ function vibrateByLevel(eventType) {
 
 function setupVibrationTestButton() {
   if (!btnVibrateTest) return;
+  // UI에서 진동 테스트 버튼 숨김(hidden). 진동 unlock은 마이크 버튼 등으로 유지.
+  if (btnVibrateTest.hasAttribute("hidden")) return;
+
   if (!isAndroidDevice() && !supportsVibrateAPI()) return;
 
   btnVibrateTest.classList.remove("d-none");
@@ -1184,6 +1187,7 @@ function setupFooterAuthLinks() {
 
 function setupCaptionTestAllButton() {
   if (!btnCaptionTestAll) return;
+  if (btnCaptionTestAll.hasAttribute("hidden")) return;
   updateCaptionTestButtonUI(false);
   btnCaptionTestAll.addEventListener("click", async () => {
     if (!SESSION_ID) {
