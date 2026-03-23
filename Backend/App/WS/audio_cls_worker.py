@@ -151,15 +151,23 @@ class AudioClsWorker:
             try:
                 sid = item["sid"]
                 ts_ms = item["ts_ms"]
-                audio = item["audio"]  # float32 16k (16000,)
+                audio = item["audio"]  # float32 16k (예: 4초 윈도우)
                 conn_prefix = item.get("conn_prefix", "")
 
                 # handlers에서 미리 읽어 넣어준 값 사용 (db/스레드 혼용 방지)
                 cooldown_sec = int(item.get("cooldown_sec", 5))
                 alert_enabled = bool(item.get("alert_enabled", True))
 
+                def _last_1s(x: np.ndarray) -> np.ndarray:
+                    # custom_sounds 업로드 임베딩도 1초(마지막 1초)를 사용하므로 동일한 방식으로 맞춥니다.
+                    if x.shape[0] >= 16000:
+                        return x[-16000:].astype(np.float32, copy=False)
+                    pad = 16000 - x.shape[0]
+                    return np.pad(x, (0, pad), mode="constant", constant_values=0.0).astype(np.float32)
+
                 # 1) live embedding 구하기 (커스텀 사운드 매칭용)
-                emb_live = await asyncio.to_thread(self.yamnet.embedding_1s, audio)
+                audio_1s = _last_1s(audio)
+                emb_live = await asyncio.to_thread(self.yamnet.embedding_1s, audio_1s)
                 best, best_sim = await asyncio.to_thread(
                     _match_custom_sound, sid, emb_live
                 )
