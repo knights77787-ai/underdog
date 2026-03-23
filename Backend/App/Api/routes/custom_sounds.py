@@ -73,15 +73,23 @@ def _resample_to_16k(x: np.ndarray, sr: int) -> np.ndarray:
     return y.astype(np.float32)
 
 def _normalize_1s_window(x: np.ndarray) -> np.ndarray:
-    """
-    1초(16000 samples) 윈도우를 만들기.
-
-    녹음 UI 특성상 “앞부분 무음/메타 구간”이 섞이는 경우가 있어,
-    업로드 임베딩은 앞 1초 대신 마지막 1초를 사용합니다.
-    """
+    """호환용: 마지막 1초(또는 짧으면 0 패딩) 16000 samples 윈도우 생성."""
     if x.shape[0] < 16000:
-        return np.pad(x, (0, 16000 - x.shape[0]), mode="constant", constant_values=0.0).astype(np.float32)
+        return (
+            np.pad(x, (0, 16000 - x.shape[0]), mode="constant", constant_values=0.0)
+            .astype(np.float32)
+        )
     return x[-16000:].astype(np.float32)
+
+
+def _window_1s_from_start(x: np.ndarray) -> np.ndarray:
+    """시작 1초(또는 짧으면 0 패딩) 16000 samples 윈도우 생성."""
+    if x.shape[0] < 16000:
+        return (
+            np.pad(x, (0, 16000 - x.shape[0]), mode="constant", constant_values=0.0)
+            .astype(np.float32)
+        )
+    return x[:16000].astype(np.float32)
 
 def _decode_wav_to_16k_mono_f32(wav_bytes: bytes) -> np.ndarray:
     audio, sr = tf.audio.decode_wav(wav_bytes)  # (samples, channels) float32 -1..1
@@ -89,7 +97,7 @@ def _decode_wav_to_16k_mono_f32(wav_bytes: bytes) -> np.ndarray:
     sr = int(sr.numpy())
     x = audio.numpy().astype(np.float32)
     x = _resample_to_16k(x, sr)
-    return _normalize_1s_window(x)
+    return x
 
 def _decode_via_pydub(data: bytes, fmt: str) -> np.ndarray:
     """pydub로 mp3/weba(webm 오디오) 등 디코딩 → 16k mono float32."""
@@ -108,7 +116,7 @@ def _decode_via_pydub(data: bytes, fmt: str) -> np.ndarray:
     sr = seg.frame_rate
     samples = np.array(seg.get_array_of_samples(), dtype=np.float32) / 32768.0
     samples = _resample_to_16k(samples, sr)
-    return _normalize_1s_window(samples)
+    return samples
 
 
 def _decode_mp3_to_16k_mono_f32(mp3_bytes: bytes) -> np.ndarray:
@@ -155,10 +163,38 @@ async def upload_custom_sound(
         raise HTTPException(400, f"지원 형식: {', '.join(ALLOWED_EXTENSIONS)}")
 
     raw_bytes = await file.read()
-    x = _decode_audio_to_16k_mono_f32(raw_bytes, ext)
+    x16k = _decode_audio_to_16k_mono_f32(raw_bytes, ext)
 
     yamnet = _get_yamnet()
-    emb = yamnet.embedding_1s(x)
+    # 업로드 임베딩을 "시작/가운데/끝" 여러 1초 조각으로 만들고 평균 내서
+    # 녹음 타이밍(짖는 구간이 앞/뒤에 안 들어가는 경우)에 덜 민감하게 합니다.
+    x_start = _window_1s_from_start(x16k)
+    x_end = _normalize_1s_window(x16k)  # last 1s
+
+    if x16k.shape[0] >= 16000:
+        mid = int(x16k.shape[0] // 2)
+        s = max(0, mid - 8000)
+        e = s + 16000
+        x_mid = x16k[s:e]
+        if x_mid.shape[0] < 16000:
+            x_mid = np.pad(
+                x_mid, (0, 16000 - x_mid.shape[0]), mode="constant", constant_values=0.0
+            ).astype(np.float32)
+        else:
+            x_mid = x_mid.astype(np.float32)
+    else:
+        x_mid = x16k
+    if x_mid.shape[0] != 16000:
+        x_mid = _normalize_1s_window(x_mid)
+
+    emb_start = yamnet.embedding_1s(x_start)
+    emb_mid = yamnet.embedding_1s(x_mid)
+    emb_end = yamnet.embedding_1s(x_end)
+    emb = (emb_start + emb_mid + emb_end) / 3.0
+
+    # 평균 후에도 코사인 유사도 계산용으로 정규화(단위 벡터)
+    n = np.linalg.norm(emb) + 1e-9
+    emb = (emb / n).astype(np.float32)
 
     # 파일 저장 (원본 확장자 유지). DB에는 "data/custom_sounds/..." 형태로 저장
     save_path = UPLOAD_DIR / f"{session_id}_{file.filename}"

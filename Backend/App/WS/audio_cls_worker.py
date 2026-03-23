@@ -2,6 +2,7 @@
 # db 세션은 worker에 넘기지 말고, settings는 handlers에서 미리 읽어 item에 값만 넘김.
 # 커스텀 사운드: 실시간 오디오 embedding → DB 저장 커스텀 소리와 유사도 비교 → Event-builder(alert/로그) 통합.
 import asyncio
+import os
 import time
 import numpy as np
 
@@ -18,7 +19,7 @@ from App.Services.memory_logs import memory_logs
 logger = get_logger("yamnet.worker")
 
 # ✔️‼️커스텀 소리 매칭 임계값 ‼️✔️
-CUSTOM_THRESHOLD = 0.70  # 코사인 유사도 임계값 (0.75~0.9, 환경에 따라 조정)
+CUSTOM_THRESHOLD = float(os.getenv("CUSTOM_SOUND_THRESHOLD", "0.55"))  # cosine similarity 임계값
 
 # YAMNet CSV index: 개·동물·짖음 계열 (Animal=67 … Whimper (dog)=75, Growling=74)
 _PET_SOUND_INDICES: tuple[int, ...] = (67, 68, 69, 70, 71, 72, 73, 74, 75)
@@ -103,8 +104,8 @@ def _resolve_yamnet_classification(
     return top_i, top_score, label, event_type, keyword
 
 
-def _match_custom_sound(session_id: str, emb_live: np.ndarray):
-    """세션별 커스텀 사운드 중 emb_live와 가장 유사한 항목 찾기."""
+def _match_custom_sound(session_id: str, emb_live_candidates: list[np.ndarray]):
+    """세션별 커스텀 사운드 중 후보 임베딩들(여러 1초 윈도우) 중 최대 유사도가 가장 큰 항목 찾기."""
     from App.db.database import SessionLocal
     from App.db.models import CustomSound
     from App.db.crud.custom_sounds import _blob_to_emb
@@ -122,7 +123,9 @@ def _match_custom_sound(session_id: str, emb_live: np.ndarray):
             if not r.embed_blob or not r.embed_dim:
                 continue
             emb = _blob_to_emb(r.embed_blob, r.embed_dim)
-            sim = float(np.dot(emb_live, emb))
+            # 2개 후보 임베딩에 대해 최대 유사도 선택
+            sims = [float(np.dot(c, emb)) for c in emb_live_candidates]
+            sim = max(sims) if sims else 0.0
             if sim > best_sim:
                 best_sim = sim
                 best = r
@@ -158,18 +161,45 @@ class AudioClsWorker:
                 cooldown_sec = int(item.get("cooldown_sec", 5))
                 alert_enabled = bool(item.get("alert_enabled", True))
 
-                def _last_1s(x: np.ndarray) -> np.ndarray:
-                    # custom_sounds 업로드 임베딩도 1초(마지막 1초)를 사용하므로 동일한 방식으로 맞춥니다.
-                    if x.shape[0] >= 16000:
-                        return x[-16000:].astype(np.float32, copy=False)
-                    pad = 16000 - x.shape[0]
-                    return np.pad(x, (0, pad), mode="constant", constant_values=0.0).astype(np.float32)
-
                 # 1) live embedding 구하기 (커스텀 사운드 매칭용)
-                audio_1s = _last_1s(audio)
-                emb_live = await asyncio.to_thread(self.yamnet.embedding_1s, audio_1s)
+                # 4초 윈도우 안에서 여러 1초 조각을 뽑아 그중 최대 유사도로 판정합니다.
+                def _window_at(x: np.ndarray, start_sample: int) -> np.ndarray:
+                    start_sample = int(start_sample)
+                    end_sample = start_sample + 16000
+                    if x.shape[0] >= end_sample and start_sample >= 0:
+                        return x[start_sample:end_sample].astype(np.float32, copy=False)
+                    # 부족한 구간은 0 패딩
+                    if x.shape[0] <= start_sample:
+                        return np.zeros((16000,), dtype=np.float32)
+                    sliced = x[start_sample:min(end_sample, x.shape[0])]
+                    pad = 16000 - sliced.shape[0]
+                    if pad > 0:
+                        sliced = np.pad(
+                            sliced, (0, pad), mode="constant", constant_values=0.0
+                        )
+                    return sliced.astype(np.float32, copy=False)
+
+                n = int(audio.shape[0])
+                if n >= 4 * 16000:
+                    offsets = [0, 16000, 32000, 48000]
+                else:
+                    max_start = max(0, n - 16000)
+                    offsets = [0, max_start // 3, (2 * max_start) // 3, max_start]
+
+                # 후보(중복 제거 후) 임베딩 계산
+                uniq_offsets = []
+                for o in offsets:
+                    if o not in uniq_offsets:
+                        uniq_offsets.append(o)
+                emb_live_candidates: list[np.ndarray] = []
+                for o in uniq_offsets:
+                    win = _window_at(audio, o)
+                    emb_live_candidates.append(
+                        await asyncio.to_thread(self.yamnet.embedding_1s, win)
+                    )
+
                 best, best_sim = await asyncio.to_thread(
-                    _match_custom_sound, sid, emb_live
+                    _match_custom_sound, sid, emb_live_candidates
                 )
                 if best is not None and best_sim >= CUSTOM_THRESHOLD:
                     kw_custom = f"custom:{best.custom_sound_id}"
