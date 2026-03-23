@@ -338,7 +338,10 @@ function setupLogTableFeedbackClicks() {
   });
 }
 
-function appendLogRow({ ts, ts_ms, type, text, score, event_type, keyword, event_id, subgroup }) {
+function appendLogRow(
+  { ts, ts_ms, type, text, score, event_type, keyword, event_id, subgroup },
+  { persistLocal=true } = {}
+) {
   const tr = document.createElement("tr");
   const kind = (type === "alert")
     ? (event_type === "danger" ? "위험/경고" : event_type === "caution" ? "주의" : "생활알림")
@@ -381,16 +384,55 @@ function appendLogRow({ ts, ts_ms, type, text, score, event_type, keyword, event
     logTbody.removeChild(logTbody.lastChild);
   }
 
-  saveToLocalLog({
-    ts_ms: ts_ms ?? ts ?? Date.now(),
-    type,
-    text,
-    category: event_type || (type === "alert" ? "alert" : "caption"),
-    keyword: keyword || null,
-    subgroup: subgroup || null,
-    score: typeof score === "number" ? score : null,
-    event_id: event_id != null ? event_id : undefined,
-  });
+  if (persistLocal) {
+    saveToLocalLog({
+      session_id: SESSION_ID || null,
+      ts_ms: ts_ms ?? ts ?? Date.now(),
+      type,
+      text,
+      category: event_type || (type === "alert" ? "alert" : "caption"),
+      keyword: keyword || null,
+      subgroup: subgroup || null,
+      score: typeof score === "number" ? score : null,
+      event_id: event_id != null ? event_id : undefined,
+    });
+  }
+}
+
+function loadLocalLogsIntoTable() {
+  if (!logTbody) return;
+  let list = null;
+  try {
+    const raw = localStorage.getItem(LOCAL_LOG_KEY);
+    if (!raw) return;
+    list = JSON.parse(raw);
+  } catch (_) {
+    return;
+  }
+  if (!Array.isArray(list) || list.length === 0) return;
+
+  // 저장 순서가 최신→구 순이라, prepend 사용을 고려해 구→신 순으로 렌더
+  for (let i = list.length - 1; i >= 0; i--) {
+    const e = list[i] || {};
+    const type = e.type;
+    if (!type) continue;
+    const event_type = type === "alert" ? (e.category || "danger") : undefined;
+
+    appendLogRow(
+      {
+        ts_ms: e.ts_ms,
+        ts: e.ts_ms,
+        type,
+        text: e.text,
+        score: e.score,
+        event_type,
+        keyword: e.keyword || "",
+        event_id: e.event_id,
+        subgroup: e.subgroup || "",
+      },
+      { persistLocal: false }
+    );
+  }
 }
 
 // 세션 확보 + WebSocket 연결 (세션 없으면 /auth/guest 호출)
@@ -1243,6 +1285,7 @@ async function loadSettingsForCaption() {
     setHeroNormal();
     updateUserSection();
     updateLogSectionVisibility();
+    loadLocalLogsIntoTable();
     setupLogTableFeedbackClicks();
     setupVibrationTestButton();
     setupUserDropdown();

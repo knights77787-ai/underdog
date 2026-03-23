@@ -11,6 +11,7 @@ function getProvider() {
   }
 }
 // 라이브와 동일한 session_id 사용 → 등록한 소리가 실시간 감지에 연동됨
+// 중요: session_id가 없으면 임시값("S1")로 저장하지 말고, /auth/guest로 확실히 발급받도록 함.
 let SESSION_ID = (function () {
   const params = new URLSearchParams(document.location.search);
   const fromUrl = params.get("session_id");
@@ -21,15 +22,37 @@ let SESSION_ID = (function () {
     return fromUrl;
   }
   try {
-    const stored = localStorage.getItem(SESSION_STORAGE_KEY);
-    if (stored) return stored;
-    const fallback = "S1";
-    localStorage.setItem(SESSION_STORAGE_KEY, fallback);
-    return fallback;
+    return localStorage.getItem(SESSION_STORAGE_KEY) || null;
   } catch (_) {
-    return "S1";
+    return null;
   }
 })();
+
+async function ensureSessionId() {
+  if (SESSION_ID) return SESSION_ID;
+  try {
+    const res = await fetch(API_BASE + "/auth/guest", { method: "POST" });
+    const data = await res.json().catch(() => ({}));
+    const sid = data && (data.session_id ?? data.sessionId);
+    if (!res.ok || !(data.ok === true || data.ok === "true") || !sid) {
+      throw new Error(data?.detail || res.statusText || "session_id 발급 실패");
+    }
+    SESSION_ID = String(sid);
+    try {
+      localStorage.setItem(SESSION_STORAGE_KEY, SESSION_ID);
+    } catch (_) {}
+
+    // URL에도 session_id 반영(디버깅/재진입 편의)
+    const url = new URL(document.location.href);
+    url.searchParams.set("session_id", SESSION_ID);
+    history.replaceState(null, "", url.toString());
+  } catch (e) {
+    console.error("ensureSessionId failed", e);
+    setStatus("세션을 만들 수 없습니다. 새로고침 후 다시 시도해 주세요.", "err");
+    throw e;
+  }
+  return SESSION_ID;
+}
 if (SESSION_ID) {
   try {
     window.UnderdogApp?.setSessionId(SESSION_ID);
@@ -399,6 +422,7 @@ function renderSoundList(list) {
 /** 기존 등록 소리 목록을 API에서 가져옴. { ok, data, audio_retention_hours } 반환 */
 async function fetchExistingSoundList() {
   try {
+    if (!SESSION_ID) await ensureSessionId();
     const url = API_BASE + "/custom-sounds?session_id=" + encodeURIComponent(SESSION_ID);
     const res = await fetch(url);
     const data = await res.json().catch(() => ({}));
@@ -413,6 +437,14 @@ async function fetchExistingSoundList() {
 
 async function loadSoundList() {
   if (!soundListEl || !soundListStatusEl) return;
+
+  if (!SESSION_ID) {
+    try {
+      await ensureSessionId();
+    } catch (_) {
+      return;
+    }
+  }
 
   stopListAudioPlayback();
   soundListStatusEl.textContent = "불러오는 중…";
@@ -448,6 +480,8 @@ async function loadSoundList() {
 updateFileMeta(null);
 btnStop.disabled = true;
 audioPreview.hidden = true;
+if (btnStart) btnStart.disabled = true;
+if (btnSubmit) btnSubmit.disabled = true;
 
 // ===== file select =====
 fileInput?.addEventListener("change", () => {
@@ -617,6 +651,14 @@ soundListEl?.addEventListener("click", async (e) => {
   const playBtn = e.target.closest(".play-toggle-btn");
   const deleteBtn = e.target.closest(".delete-sound-btn");
 
+  if (!SESSION_ID) {
+    try {
+      await ensureSessionId();
+    } catch (_) {
+      return;
+    }
+  }
+
   // 삭제
   if (deleteBtn) {
     const soundId = deleteBtn.dataset.id;
@@ -718,6 +760,14 @@ soundListEl?.addEventListener("click", async (e) => {
 btnSubmit?.addEventListener("click", async () => {
   clearStatus();
 
+  if (!SESSION_ID) {
+    try {
+      await ensureSessionId();
+    } catch (_) {
+      return;
+    }
+  }
+
   const result = validateBeforeSubmit();
   if (!result.ok) {
     setStatus(result.message, "err");
@@ -752,7 +802,8 @@ btnSubmit?.addEventListener("click", async () => {
   setStatus("등록 중…", "ok");
 
   try {
-    const url = API_BASE + "/custom-sounds?session_id=" + encodeURIComponent(SESSION_ID);
+    const url =
+      API_BASE + "/custom-sounds?session_id=" + encodeURIComponent(SESSION_ID);
     const res = await fetch(url, {
       method: "POST",
       body: form,
@@ -845,8 +896,15 @@ function setupUserDropdown() {
   });
 }
 
-updateUserSection();
-setupUserDropdown();
+ensureSessionId()
+  .then(() => {
+    updateUserSection();
+    setupUserDropdown();
+  })
+  .finally(() => {
+    if (btnStart) btnStart.disabled = false;
+    if (btnSubmit) btnSubmit.disabled = false;
+  });
 
 // 등록 가이드 모달: 닫힌 상태 inert·표시 시 해제 (접근성)
 (function setupRegisterGuideModalA11y() {

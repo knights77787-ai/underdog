@@ -202,6 +202,15 @@ class AudioClsWorker:
                     _match_custom_sound, sid, emb_live_candidates
                 )
                 if best is not None and best_sim >= CUSTOM_THRESHOLD:
+                    logger.info(
+                        "%s custom_match sid=%s custom_sound_id=%s name=%s event_type=%s sim=%.3f",
+                        conn_prefix,
+                        sid,
+                        getattr(best, "custom_sound_id", None),
+                        getattr(best, "name", None),
+                        getattr(best, "event_type", None),
+                        best_sim,
+                    )
                     kw_custom = f"custom:{best.custom_sound_id}"
                     if not self.cooldown_check_fn(
                         sid, kw_custom, best.event_type, cooldown_sec, ts_ms
