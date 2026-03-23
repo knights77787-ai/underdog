@@ -1221,10 +1221,31 @@ function setupFooterAuthLinks() {
       e.preventDefault();
       alert("로그인이 필요한 서비스입니다.");
       window.location.href = "/login";
+      return;
     }
   };
-  if (footerSoundReg) footerSoundReg.addEventListener("click", (e) => intercept(e, footerSoundReg));
-  if (footerSettings) footerSettings.addEventListener("click", (e) => intercept(e, footerSettings));
+
+  // session_id 유지: 푸터 링크는 기본 href에 session_id가 없어서
+  // 새로 소리 등록을 했을 때 다른 세션으로 저장되는 경우가 생깁니다.
+  if (footerSoundReg) {
+    footerSoundReg.addEventListener("click", (e) => {
+      intercept(e, footerSoundReg);
+      if (e.defaultPrevented) return;
+      if (!SESSION_ID) return;
+      e.preventDefault();
+      window.location.href = "/new-sound?session_id=" + encodeURIComponent(SESSION_ID);
+    });
+  }
+  if (footerSettings) {
+    footerSettings.addEventListener("click", (e) => {
+      intercept(e, footerSettings);
+      if (e.defaultPrevented) return;
+      if (!SESSION_ID) return;
+      e.preventDefault();
+      window.location.href =
+        "/settings-page?session_id=" + encodeURIComponent(SESSION_ID);
+    });
+  }
 }
 
 function setupCaptionTestAllButton() {

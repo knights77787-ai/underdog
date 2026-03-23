@@ -18,8 +18,13 @@ from App.Services.memory_logs import memory_logs
 
 logger = get_logger("yamnet.worker")
 
+# custom_sound 매칭 디버그 로그를 너무 자주 찍지 않기 위한 간단한 throttle
+_last_custom_debug_log_ts_by_sid: dict[str, int] = {}
+
 # ✔️‼️커스텀 소리 매칭 임계값 ‼️✔️
-CUSTOM_THRESHOLD = float(os.getenv("CUSTOM_SOUND_THRESHOLD", "0.55"))  # cosine similarity 임계값
+# cosine similarity 값 스케일은 모델/환경/전처리에 따라 달라질 수 있어,
+# 기본값을 낮춰 “아예 안 뜨는” 상황을 먼저 제거합니다.
+CUSTOM_THRESHOLD = float(os.getenv("CUSTOM_SOUND_THRESHOLD", "0.35"))  # cosine similarity 임계값
 
 # YAMNet CSV index: 개·동물·짖음 계열 (Animal=67 … Whimper (dog)=75, Growling=74)
 _PET_SOUND_INDICES: tuple[int, ...] = (67, 68, 69, 70, 71, 72, 73, 74, 75)
@@ -119,9 +124,11 @@ def _match_custom_sound(session_id: str, emb_live_candidates: list[np.ndarray]):
         )
         best = None
         best_sim = 0.0
+        usable_cnt = 0
         for r in rows:
             if not r.embed_blob or not r.embed_dim:
                 continue
+            usable_cnt += 1
             emb = _blob_to_emb(r.embed_blob, r.embed_dim)
             # 2개 후보 임베딩에 대해 최대 유사도 선택
             sims = [float(np.dot(c, emb)) for c in emb_live_candidates]
@@ -129,7 +136,7 @@ def _match_custom_sound(session_id: str, emb_live_candidates: list[np.ndarray]):
             if sim > best_sim:
                 best_sim = sim
                 best = r
-        return best, best_sim
+        return best, best_sim, usable_cnt
     finally:
         db.close()
 
@@ -198,9 +205,24 @@ class AudioClsWorker:
                         await asyncio.to_thread(self.yamnet.embedding_1s, win)
                     )
 
-                best, best_sim = await asyncio.to_thread(
+                best, best_sim, usable_cnt = await asyncio.to_thread(
                     _match_custom_sound, sid, emb_live_candidates
                 )
+
+                # 임계값 미달/미검출 원인(사용 가능한 임베딩 0건, sim 낮음 등)을 보기 위한 로그.
+                # 너무 자주 찍히지 않도록 sid당 10초에 1회만 출력합니다.
+                last_dbg = _last_custom_debug_log_ts_by_sid.get(sid, 0)
+                if ts_ms - last_dbg > 10000:
+                    logger.info(
+                        "%s custom_match_debug sid=%s usable=%s best_id=%s sim=%.3f thr=%.3f",
+                        conn_prefix,
+                        sid,
+                        usable_cnt,
+                        getattr(best, "custom_sound_id", None),
+                        best_sim,
+                        CUSTOM_THRESHOLD,
+                    )
+                    _last_custom_debug_log_ts_by_sid[sid] = ts_ms
                 if best is not None and best_sim >= CUSTOM_THRESHOLD:
                     logger.info(
                         "%s custom_match sid=%s custom_sound_id=%s name=%s event_type=%s sim=%.3f",

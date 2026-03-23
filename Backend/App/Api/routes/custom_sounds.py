@@ -24,6 +24,7 @@ from App.Services.yamnet_service import YamnetService
 from scipy.signal import resample
 
 router = APIRouter(prefix="/custom-sounds", tags=["custom-sounds"])
+_upload_debug_last_ts: int = 0
 
 # Backend/data/custom_sounds에 저장 (절대 경로로 CWD 의존 제거)
 _UPLOAD_BASE = Path(DATABASE_PATH).resolve().parent / "custom_sounds"
@@ -213,6 +214,17 @@ async def upload_custom_sound(
         audio_path=audio_path_for_db,
         user_id=user_id,
     )
+
+    # 업로드 직후 세션/ID를 로그로 남겨, 실시간 매칭 워커의 sid와 매칭되는지 확인합니다.
+    # 너무 자주 찍히지 않도록 1초 throttle.
+    global _upload_debug_last_ts
+    now_ts = int(datetime.utcnow().timestamp() * 1000)
+    if now_ts - _upload_debug_last_ts > 1000:
+        print(
+            f"[custom_sounds.upload] session_id={session_id} custom_sound_id={row.custom_sound_id} event_type={event_type} name={name}",
+            flush=True,
+        )
+        _upload_debug_last_ts = now_ts
 
     return {
         "ok": True,
