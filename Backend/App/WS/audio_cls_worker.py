@@ -24,7 +24,12 @@ _last_custom_debug_log_ts_by_sid: dict[str, int] = {}
 # ✔️‼️커스텀 소리 매칭 임계값 ‼️✔️
 # cosine similarity 값 스케일은 모델/환경/전처리에 따라 달라질 수 있어,
 # 기본값을 낮춰 “아예 안 뜨는” 상황을 먼저 제거합니다.
-CUSTOM_THRESHOLD = float(os.getenv("CUSTOM_SOUND_THRESHOLD", "0.35"))  # cosine similarity 임계값
+CUSTOM_THRESHOLD = float(os.getenv("CUSTOM_SOUND_THRESHOLD", "0.70"))  # cosine similarity 임계값
+
+# 커스텀 매칭은 소리가 들어올 때만 의미가 있습니다.
+# (마이크가 아주 미세한 소음까지 계속 보내면 임베딩 유사도가 우연히 임계값을 넘을 수 있어 오탐 폭주 가능)
+# rms가 너무 낮으면 커스텀 알림 브로드캐스트/DB저장을 스킵합니다.
+CUSTOM_MIN_RMS = float(os.getenv("CUSTOM_SOUND_MIN_RMS", "0.005"))
 
 # YAMNet CSV index: 개·동물·짖음 계열 (Animal=67 … Whimper (dog)=75, Growling=74)
 _PET_SOUND_INDICES: tuple[int, ...] = (67, 68, 69, 70, 71, 72, 73, 74, 75)
@@ -163,6 +168,8 @@ class AudioClsWorker:
                 ts_ms = item["ts_ms"]
                 audio = item["audio"]  # float32 16k (예: 4초 윈도우)
                 conn_prefix = item.get("conn_prefix", "")
+                # 커스텀 오탐 방지용: 입력 에너지(RMS) 계산
+                audio_rms = float(np.sqrt(np.mean(np.square(audio))) + 1e-12)
 
                 # handlers에서 미리 읽어 넣어준 값 사용 (db/스레드 혼용 방지)
                 cooldown_sec = int(item.get("cooldown_sec", 5))
@@ -223,7 +230,7 @@ class AudioClsWorker:
                         CUSTOM_THRESHOLD,
                     )
                     _last_custom_debug_log_ts_by_sid[sid] = ts_ms
-                if best is not None and best_sim >= CUSTOM_THRESHOLD:
+                if best is not None and best_sim >= CUSTOM_THRESHOLD and audio_rms >= CUSTOM_MIN_RMS:
                     logger.info(
                         "%s custom_match sid=%s custom_sound_id=%s name=%s event_type=%s sim=%.3f",
                         conn_prefix,
