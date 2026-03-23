@@ -272,7 +272,7 @@ function updateCaptionTestButtonUI(enabled) {
 }
 
 const LOCAL_LOG_KEY = "underdog_event_log";
-const MAX_LOCAL_LOGS = 30;
+const MAX_LOCAL_LOGS = 10;
 /** 알림 로그 행(tr) → 피드백용 메타 (event_id 등) */
 const logRowAlertMeta = new WeakMap();
 
@@ -380,7 +380,7 @@ function appendLogRow(
 
   logTbody.prepend(tr);
 
-  while (logTbody.children.length > 30) {
+  while (logTbody.children.length > 10) {
     logTbody.removeChild(logTbody.lastChild);
   }
 
