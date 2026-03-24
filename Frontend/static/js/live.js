@@ -359,7 +359,9 @@ function appendLogRow(
   tdContent.textContent = contentLine;
   const tdProb = document.createElement("td");
   tdProb.textContent = prob;
-  tr.append(tdTime, tdKind, tdContent, tdProb);
+  const tdAction = document.createElement("td");
+  tdAction.className = "text-nowrap";
+  tr.append(tdTime, tdKind, tdContent, tdProb, tdAction);
 
   if (type === "alert" && event_id != null) {
     tr.classList.add("log-row-clickable");
@@ -374,8 +376,35 @@ function appendLogRow(
       event_type: event_type || "danger",
       ts_ms: ts_ms ?? ts ?? Date.now(),
     });
+    const btnYes = document.createElement("button");
+    btnYes.type = "button";
+    btnYes.className = "btn btn-sm btn-outline-success me-1";
+    btnYes.textContent = "맞아요";
+    btnYes.title = "이 이벤트가 맞아요";
+    btnYes.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      selectLogRowForFeedback(tr);
+      sendFeedback("up");
+    });
+
+    const btnNo = document.createElement("button");
+    btnNo.type = "button";
+    btnNo.className = "btn btn-sm btn-outline-danger";
+    btnNo.textContent = "아니에요";
+    btnNo.title = "이 이벤트는 오탐이에요";
+    btnNo.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      selectLogRowForFeedback(tr);
+      showFeedbackCommentModal();
+    });
+    tdAction.append(btnYes, btnNo);
   } else if (type === "alert") {
     tr.title = "이 기록은 서버 이벤트 ID가 없어 피드백을 보낼 수 없습니다";
+    tdAction.textContent = "-";
+  } else {
+    tdAction.textContent = "-";
   }
 
   logTbody.prepend(tr);
@@ -628,6 +657,25 @@ function supportsVibrateAPI() {
 
 function unlockVibrationByUserGesture() {
   vibrationUnlockedByUser = true;
+}
+
+// 일부 안드로이드 브라우저는 특정 버튼 클릭보다 "문서 첫 사용자 제스처"를 더 안정적으로 인식합니다.
+// 첫 터치/클릭/키입력에서 진동 unlock을 선행해 알림 진동 누락을 줄입니다.
+function setupVibrationAutoUnlock() {
+  const onceUnlock = () => {
+    unlockVibrationByUserGesture();
+    if (btnVibrateTest) btnVibrateTest.disabled = false;
+    try {
+      document.removeEventListener("pointerdown", onceUnlock, true);
+      document.removeEventListener("touchstart", onceUnlock, true);
+      document.removeEventListener("click", onceUnlock, true);
+      document.removeEventListener("keydown", onceUnlock, true);
+    } catch (_) {}
+  };
+  document.addEventListener("pointerdown", onceUnlock, { capture: true, passive: true });
+  document.addEventListener("touchstart", onceUnlock, { capture: true, passive: true });
+  document.addEventListener("click", onceUnlock, { capture: true });
+  document.addEventListener("keydown", onceUnlock, { capture: true });
 }
 
 function canVibrate() {
@@ -1308,6 +1356,7 @@ async function loadSettingsForCaption() {
     updateLogSectionVisibility();
     loadLocalLogsIntoTable();
     setupLogTableFeedbackClicks();
+    setupVibrationAutoUnlock();
     setupVibrationTestButton();
     setupUserDropdown();
     setupFooterAuthLinks();
