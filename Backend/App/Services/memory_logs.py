@@ -72,6 +72,21 @@ def get_alerts(limit: int, session_id: str | None = None) -> list:
     return list(source)[-limit:][::-1]
 
 
+def purge_logs_for_session(session_id: str | None) -> None:
+    """로그아웃 등: 해당 WS session_id(=client_session_uuid)의 메모리 로그만 제거."""
+    global captions_log, alerts_log
+    if not session_id:
+        return
+    captions_log = deque(
+        (e for e in captions_log if e.get("session_id") != session_id),
+        maxlen=MAX_CAPTIONS,
+    )
+    alerts_log = deque(
+        (e for e in alerts_log if e.get("session_id") != session_id),
+        maxlen=MAX_ALERTS,
+    )
+
+
 # A방식 통일: from App.Services.memory_logs import memory_logs
 # (모듈 자체를 memory_logs로 노출해 한 인스턴스만 쓰도록)
 import sys

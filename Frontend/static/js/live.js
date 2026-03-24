@@ -428,8 +428,27 @@ function appendLogRow(
   }
 }
 
+/** 로그인 사용자만: 이번 탭·이 session_id 로드 이후 이벤트만 로그에 반영 (sessionStorage 기준 시각). */
+function getVisitLogCutoffMs() {
+  if (typeof isGuest === "function" && isGuest()) return 0;
+  if (!SESSION_ID) return 0;
+  const key = "underdog_visit_log_cutoff_" + SESSION_ID;
+  try {
+    let v = sessionStorage.getItem(key);
+    if (!v) {
+      v = String(Date.now());
+      sessionStorage.setItem(key, v);
+    }
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) ? n : Date.now();
+  } catch (_) {
+    return Date.now();
+  }
+}
+
 function loadLocalLogsIntoTable() {
   if (!logTbody) return;
+  if (typeof isGuest === "function" && isGuest()) return;
   let list = null;
   try {
     const raw = localStorage.getItem(LOCAL_LOG_KEY);
@@ -440,11 +459,17 @@ function loadLocalLogsIntoTable() {
   }
   if (!Array.isArray(list) || list.length === 0) return;
 
+  const cutoff = getVisitLogCutoffMs();
+  const sid = SESSION_ID;
+
   // 저장 순서가 최신→구 순이라, prepend 사용을 고려해 구→신 순으로 렌더
   for (let i = list.length - 1; i >= 0; i--) {
     const e = list[i] || {};
     const type = e.type;
     if (!type) continue;
+    if (sid && String(e.session_id || "") !== String(sid)) continue;
+    const rowTs = Number(e.ts_ms);
+    if (Number.isFinite(rowTs) && rowTs < cutoff) continue;
     const event_type = type === "alert" ? (e.category || "danger") : undefined;
 
     appendLogRow(
@@ -1250,12 +1275,35 @@ function setupUserDropdown() {
     });
   }
 
-  // 로그아웃: 메인으로 이동, session_id·provider 제거
-  userDropdownLogout.addEventListener("click", (e) => {
+  // 로그아웃: 이 브라우저 DB 세션 이벤트 삭제(API) → 메인으로 이동, session_id·provider·로컬 로그 제거
+  userDropdownLogout.addEventListener("click", async (e) => {
     e.preventDefault();
+    const sid = SESSION_ID || (typeof localStorage !== "undefined" && localStorage.getItem(SESSION_STORAGE_KEY));
+    stopMicAndRelease();
+    try {
+      if (typeof client !== "undefined" && client && typeof client.disconnect === "function") {
+        client.disconnect();
+      }
+    } catch (_) {}
+    try {
+      if (sid) {
+        await fetch(API_BASE + "/auth/clear-session-events", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: String(sid) }),
+        });
+      }
+    } catch (_) {}
     try {
       localStorage.removeItem(SESSION_STORAGE_KEY);
       localStorage.removeItem(PROVIDER_STORAGE_KEY);
+      localStorage.removeItem(LOCAL_LOG_KEY);
+      const keysToRemove = [];
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const k = sessionStorage.key(i);
+        if (k && k.indexOf("underdog_visit_log_cutoff_") === 0) keysToRemove.push(k);
+      }
+      keysToRemove.forEach((k) => sessionStorage.removeItem(k));
     } catch (_) {}
     window.location.href = "/";
   });

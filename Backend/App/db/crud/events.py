@@ -6,6 +6,38 @@ from App.db.models import Event, EventTranscript, EventFeedback
 from App.db.models import Session as SessionModel
 
 
+def delete_events_for_client_session_uuid(db: Session, client_session_uuid: str) -> int:
+    """해당 클라이언트 세션(client_session_uuid)에 속한 이벤트·트랜스크립트·피드백 삭제.
+
+    계정(user_id) 전체가 아니라 이 브라우저 세션에 매핑된 DB 행만 제거합니다.
+    Returns: 삭제된 events 개수."""
+    from sqlalchemy import delete
+
+    if not (client_session_uuid or "").strip():
+        return 0
+    sess_row = (
+        db.query(SessionModel)
+        .filter(SessionModel.client_session_uuid == client_session_uuid.strip())
+        .first()
+    )
+    if not sess_row:
+        return 0
+    subq = (
+        db.query(Event.event_id)
+        .filter(Event.session_id == sess_row.session_id)
+        .all()
+    )
+    to_delete = [r[0] for r in subq]
+    if not to_delete:
+        return 0
+    n = len(to_delete)
+    db.execute(delete(EventFeedback).where(EventFeedback.event_id.in_(to_delete)))
+    db.execute(delete(EventTranscript).where(EventTranscript.event_id.in_(to_delete)))
+    db.execute(delete(Event).where(Event.event_id.in_(to_delete)))
+    db.commit()
+    return n
+
+
 def delete_events_older_than(db: Session, cutoff_ts_ms: int) -> int:
     """cutoff_ts_ms보다 오래된 이벤트 삭제 (event_feedback → event_transcripts → events 순).
     Returns: 삭제된 events 개수."""

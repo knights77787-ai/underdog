@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 import httpx
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, Query
 from fastapi.responses import RedirectResponse, JSONResponse, HTMLResponse
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from App.Core.config import ADMIN_TOKEN, DEV
@@ -344,6 +345,32 @@ async def auth_mobile_done(
 #
 # 현재 로그인 사용자 정보 (OAuth 로그인 시에만, session_id로 조회)
 #
+
+class ClearSessionEventsIn(BaseModel):
+    session_id: str = Field(..., min_length=1, description="WS/라이브의 session_id (= client_session_uuid)")
+
+
+@router.post("/clear-session-events")
+def clear_session_events(
+    body: ClearSessionEventsIn,
+    db: Session = Depends(get_db),
+):
+    """로그아웃 시: 이 브라우저 세션에 매핑된 이벤트만 DB에서 삭제 (계정 전체 아님).
+
+    - 이벤트·트랜스크립트·피드백 제거
+    - 프로세스 메모리 로그·쿨다운·VAD 상태 정리
+    """
+    from App.db.crud import events as crud_events
+    from App.Services.memory_logs import purge_logs_for_session
+    from App.WS import handlers as ws_handlers
+
+    sid = (body.session_id or "").strip()
+    deleted = crud_events.delete_events_for_client_session_uuid(db, sid)
+    purge_logs_for_session(sid)
+    ws_handlers.clear_cooldown_for_session(sid)
+    ws_handlers.AUDIO_STATES.remove(sid)
+    return {"ok": True, "deleted_events": deleted}
+
 
 @router.get("/me")
 def get_me(
