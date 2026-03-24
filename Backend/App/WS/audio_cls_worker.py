@@ -28,6 +28,9 @@ CUSTOM_THRESHOLD = float(os.getenv("CUSTOM_SOUND_THRESHOLD", "0.40"))
 # 입력 음압이 충분히 큰 구간은 커스텀 임계값을 약간 완화해 미탐을 줄입니다.
 CUSTOM_THRESHOLD_LOUD = float(os.getenv("CUSTOM_SOUND_THRESHOLD_LOUD", "0.34"))
 CUSTOM_LOUD_RMS = float(os.getenv("CUSTOM_SOUND_LOUD_RMS", "0.018"))
+# 음성(사람 말) 구간에서는 커스텀 오탐이 매우 잘 나므로, 충분히 강한 sim가 아니면 커스텀을 막습니다.
+CUSTOM_SPEECH_BLOCK_SCORE = float(os.getenv("CUSTOM_SOUND_SPEECH_BLOCK_SCORE", "0.28"))
+CUSTOM_SPEECH_ALLOW_STRONG_SIM = float(os.getenv("CUSTOM_SOUND_SPEECH_ALLOW_STRONG_SIM", "0.62"))
 
 # 커스텀 매칭은 소리가 들어올 때만 의미가 있습니다.
 # (마이크가 아주 미세한 소음까지 계속 보내면 임베딩 유사도가 우연히 임계값을 넘을 수 있어 오탐 폭주 가능)
@@ -86,6 +89,22 @@ _CONFUSER_ALERT_LABELS: frozenset[str] = frozenset(
         "Sound effect",
         "Pulse",
         "Hum",
+    }
+)
+
+_SPEECHISH_LABELS: frozenset[str] = frozenset(
+    {
+        "Speech",
+        "Conversation",
+        "Narration, monologue",
+        "Female speech, woman speaking",
+        "Male speech, man speaking",
+        "Child speech, kid speaking",
+        "Babbling",
+        "Speech synthesizer",
+        "Shout",
+        "Yell",
+        "Whispering",
     }
 )
 
@@ -291,6 +310,10 @@ class AudioClsWorker:
                     _rank_custom_sounds_by_similarity, sid, emb_live_candidates
                 )
                 best, best_sim, pick_reason = _resolve_custom_pick(ranked, mean_sc)
+                is_speech_dominant = (
+                    (label in _SPEECHISH_LABELS and top_score >= CUSTOM_SPEECH_BLOCK_SCORE)
+                    or (keyword and str(keyword).startswith("speech:"))
+                )
 
                 # 임계값 미달/미검출 원인(사용 가능한 임베딩 0건, sim 낮음 등)을 보기 위한 로그.
                 # 너무 자주 찍히지 않도록 sid당 10초에 1회만 출력합니다.
@@ -304,7 +327,7 @@ class AudioClsWorker:
                         else CUSTOM_THRESHOLD
                     )
                     logger.info(
-                        "%s custom_match_debug sid=%s usable=%s pick=%s id1=%s s1=%.3f id2=%s s2=%.3f thr=%.3f rms=%.4f",
+                        "%s custom_match_debug sid=%s usable=%s pick=%s id1=%s s1=%.3f id2=%s s2=%.3f thr=%.3f rms=%.4f speech=%s top_label=%s top=%.3f",
                         conn_prefix,
                         sid,
                         usable_cnt,
@@ -315,6 +338,9 @@ class AudioClsWorker:
                         float(_r1[1]) if _r1 else 0.0,
                         dbg_eff_thr,
                         audio_rms,
+                        int(is_speech_dominant),
+                        label,
+                        top_score,
                     )
                     _last_custom_debug_log_ts_by_sid[sid] = ts_ms
                 eff_threshold = (
@@ -326,6 +352,7 @@ class AudioClsWorker:
                     best is not None
                     and best_sim >= eff_threshold
                     and audio_rms >= CUSTOM_MIN_RMS
+                    and (not is_speech_dominant or best_sim >= CUSTOM_SPEECH_ALLOW_STRONG_SIM)
                 ):
                     logger.info(
                         "%s custom_match sid=%s custom_sound_id=%s name=%s event_type=%s sim=%.3f thr=%.3f rms=%.4f pick=%s",
