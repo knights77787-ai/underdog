@@ -214,9 +214,7 @@ function buildAudioUrl(audioPath) {
     return normalized;
   }
 
-  const base = (typeof API_BASE !== "undefined" ? API_BASE : "").replace(/\/$/, "");
   let path = normalized;
-
   if (normalized.startsWith("/")) {
     path = normalized;
   } else if (normalized.startsWith("data/")) {
@@ -224,7 +222,14 @@ function buildAudioUrl(audioPath) {
   } else {
     path = "/data/" + normalized;
   }
-  return base ? base + path : path;
+
+  // 저장된 원본(audio_path)은 정적 파일(/data/...) 경로이므로 API prefix와 분리된 오리진 기준으로 조합.
+  const origin =
+    typeof location !== "undefined" && location.origin
+      ? location.origin.replace(/\/$/, "")
+      : "";
+  const rawUrl = origin ? origin + path : path;
+  return encodeURI(rawUrl);
 }
 
 function resetPlayButtonUi(btn) {
@@ -724,14 +729,19 @@ soundListEl?.addEventListener("click", async (e) => {
 
   stopListAudioPlayback();
 
-  const audioUrl =
+  const audioPath = playBtn.dataset.audioPath || "";
+  const directAudioUrl = buildAudioUrl(audioPath);
+  const fallbackAudioUrl =
     API_BASE +
     "/custom-sounds/" +
     encodeURIComponent(soundId) +
     "/audio?session_id=" +
     encodeURIComponent(SESSION_ID);
+  const audioUrl = directAudioUrl || fallbackAudioUrl;
 
   try {
+    const shouldTryFallback = !!directAudioUrl && directAudioUrl !== fallbackAudioUrl;
+    let triedFallback = false;
     listAudio = new Audio(audioUrl);
     currentPlayingId = soundId;
     currentPlayButton = playBtn;
@@ -742,7 +752,15 @@ soundListEl?.addEventListener("click", async (e) => {
       stopListAudioPlayback();
     });
 
-    listAudio.addEventListener("error", () => {
+    listAudio.addEventListener("error", async () => {
+      if (shouldTryFallback && !triedFallback && listAudio) {
+        triedFallback = true;
+        try {
+          listAudio.src = fallbackAudioUrl;
+          await listAudio.play();
+          return;
+        } catch (_) {}
+      }
       stopListAudioPlayback();
       setStatus(
         "오디오를 불러오지 못했습니다. 보관 기간 만료 또는 파일 없음일 수 있습니다.",
