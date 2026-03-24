@@ -35,6 +35,13 @@ CUSTOM_MIN_RMS = float(os.getenv("CUSTOM_SOUND_MIN_RMS", "0.005"))
 # (일반 cooldown_sec가 5초인데 4초 윈도우가 ~6초마다 들어오면 매번 쿨다운이 풀려 연속 알림이 납니다.)
 CUSTOM_COOLDOWN_SEC = int(os.getenv("CUSTOM_SOUND_COOLDOWN_SEC", "45"))
 
+# 등록 커스텀이 2개 이상일 때 1·2위 유사도가 이 정도로 붙으면 "애매"로 보고 아래 펫 보조/스킵 로직을 탑니다.
+CUSTOM_AMBIGUITY_MARGIN = float(os.getenv("CUSTOM_SOUND_AMBIGUITY_MARGIN", "0.12"))
+# 애매한데 1위가 생활알림(alert)·2위가 경고/주의일 때, 2위가 1위와 이 정도 이내로 붙어 있으면 2위(펫 쪽)를 우선합니다.
+CUSTOM_PET_TIGHT_GAP = float(os.getenv("CUSTOM_SOUND_PET_TIGHT_GAP", "0.06"))
+# 펫 대역(mean_sc) 최대값이 이 이상일 때만 위 우선/스킵을 적용합니다.
+CUSTOM_PET_ASSIST_MIN = float(os.getenv("CUSTOM_SOUND_PET_ASSIST_MIN", "0.18"))
+
 # YAMNet CSV index: 개·동물·짖음 계열 (Animal=67 … Whimper (dog)=75, Growling=74)
 _PET_SOUND_INDICES: tuple[int, ...] = (67, 68, 69, 70, 71, 72, 73, 74, 75)
 
@@ -118,8 +125,10 @@ def _resolve_yamnet_classification(
     return top_i, top_score, label, event_type, keyword
 
 
-def _match_custom_sound(session_id: str, emb_live_candidates: list[np.ndarray]):
-    """세션별 커스텀 사운드 중 후보 임베딩들(여러 1초 윈도우) 중 최대 유사도가 가장 큰 항목 찾기."""
+def _rank_custom_sounds_by_similarity(
+    session_id: str, emb_live_candidates: list[np.ndarray]
+) -> tuple[list[tuple[object, float]], int]:
+    """세션별 커스텀 사운드마다 live 후보 임베딩과의 최대 유사도를 구하고, sim 내림차순으로 정렬."""
     from App.db.database import SessionLocal
     from App.db.models import CustomSound
     from App.db.crud.custom_sounds import _blob_to_emb
@@ -131,23 +140,59 @@ def _match_custom_sound(session_id: str, emb_live_candidates: list[np.ndarray]):
             .filter(CustomSound.client_session_uuid == session_id)
             .all()
         )
-        best = None
-        best_sim = 0.0
+        ranked: list[tuple[object, float]] = []
         usable_cnt = 0
         for r in rows:
             if not r.embed_blob or not r.embed_dim:
                 continue
             usable_cnt += 1
             emb = _blob_to_emb(r.embed_blob, r.embed_dim)
-            # 2개 후보 임베딩에 대해 최대 유사도 선택
             sims = [float(np.dot(c, emb)) for c in emb_live_candidates]
             sim = max(sims) if sims else 0.0
-            if sim > best_sim:
-                best_sim = sim
-                best = r
-        return best, best_sim, usable_cnt
+            ranked.append((r, sim))
+        ranked.sort(key=lambda t: -t[1])
+        return ranked, usable_cnt
     finally:
         db.close()
+
+
+def _resolve_custom_pick(
+    ranked: list[tuple[object, float]],
+    mean_sc: np.ndarray,
+) -> tuple[object | None, float, str]:
+    """
+    유사도 순위만으로는 열차(alert)가 개 짖음(danger)보다 우연히 위로 올라가는 경우가 있어,
+    1·2위가 애매할 때 YAMNet 펫 대역 점수로 생활알림보다 경고/주의 등록을 우선하거나, 커스텀을 포기합니다.
+
+    Returns: (row_or_none, sim, reason) reason: "top" | "pet_prefer" | "skip_ambiguous_pet"
+    """
+    if not ranked:
+        return None, 0.0, "top"
+    r0, s0 = ranked[0]
+    if len(ranked) == 1:
+        return r0, s0, "top"
+
+    r1, s1 = ranked[1]
+    et0 = (getattr(r0, "event_type", None) or "").strip()
+    et1 = (getattr(r1, "event_type", None) or "").strip()
+
+    if s0 - s1 >= CUSTOM_AMBIGUITY_MARGIN:
+        return r0, s0, "top"
+
+    pet_score = float(max(float(mean_sc[ix]) for ix in _PET_SOUND_INDICES))
+
+    # 애매 + 1위 생활알림 + 2위 경고/주의 + 펫 신호: 짖음 쪽 등록을 우선
+    if (
+        pet_score >= CUSTOM_PET_ASSIST_MIN
+        and et0 == "alert"
+        and et1 in ("danger", "caution")
+    ):
+        if s1 >= s0 - CUSTOM_PET_TIGHT_GAP:
+            return r1, s1, "pet_prefer"
+        # 1위만 유사도가 튀고 펫 신호는 강함 → 잘못된 커스텀(열차)일 가능성, YAMNet 경로에 맡김
+        return None, 0.0, "skip_ambiguous_pet"
+
+    return r0, s0, "top"
 
 
 class AudioClsWorker:
@@ -227,21 +272,27 @@ class AudioClsWorker:
                         await asyncio.to_thread(self.yamnet.embedding_1s, win)
                     )
 
-                best, best_sim, usable_cnt = await asyncio.to_thread(
-                    _match_custom_sound, sid, emb_live_candidates
+                ranked, usable_cnt = await asyncio.to_thread(
+                    _rank_custom_sounds_by_similarity, sid, emb_live_candidates
                 )
+                best, best_sim, pick_reason = _resolve_custom_pick(ranked, mean_sc)
 
                 # 임계값 미달/미검출 원인(사용 가능한 임베딩 0건, sim 낮음 등)을 보기 위한 로그.
                 # 너무 자주 찍히지 않도록 sid당 10초에 1회만 출력합니다.
                 last_dbg = _last_custom_debug_log_ts_by_sid.get(sid, 0)
                 if ts_ms - last_dbg > 10000:
+                    _r0 = ranked[0] if ranked else None
+                    _r1 = ranked[1] if len(ranked) > 1 else None
                     logger.info(
-                        "%s custom_match_debug sid=%s usable=%s best_id=%s sim=%.3f thr=%.3f",
+                        "%s custom_match_debug sid=%s usable=%s pick=%s id1=%s s1=%.3f id2=%s s2=%.3f thr=%.3f",
                         conn_prefix,
                         sid,
                         usable_cnt,
-                        getattr(best, "custom_sound_id", None),
-                        best_sim,
+                        pick_reason,
+                        getattr(_r0[0], "custom_sound_id", None) if _r0 else None,
+                        float(_r0[1]) if _r0 else 0.0,
+                        getattr(_r1[0], "custom_sound_id", None) if _r1 else None,
+                        float(_r1[1]) if _r1 else 0.0,
                         CUSTOM_THRESHOLD,
                     )
                     _last_custom_debug_log_ts_by_sid[sid] = ts_ms
@@ -251,13 +302,14 @@ class AudioClsWorker:
                     and audio_rms >= CUSTOM_MIN_RMS
                 ):
                     logger.info(
-                        "%s custom_match sid=%s custom_sound_id=%s name=%s event_type=%s sim=%.3f",
+                        "%s custom_match sid=%s custom_sound_id=%s name=%s event_type=%s sim=%.3f pick=%s",
                         conn_prefix,
                         sid,
                         getattr(best, "custom_sound_id", None),
                         getattr(best, "name", None),
                         getattr(best, "event_type", None),
                         best_sim,
+                        pick_reason,
                     )
                     kw_custom = f"custom:{best.custom_sound_id}"
                     custom_cd = max(cooldown_sec, CUSTOM_COOLDOWN_SEC)
