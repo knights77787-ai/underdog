@@ -2,6 +2,8 @@
 const API_BASE = window.APP_CONFIG?.API_BASE || (typeof location !== "undefined" && location.origin && !/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/i.test(location.origin) ? location.origin : "http://127.0.0.1:8000");
 const SESSION_STORAGE_KEY = "underdog_session_id";
 const PROVIDER_STORAGE_KEY = "underdog_provider";
+/** 소리 등록 페이지 진입 시 자세한 가이드 모달 자동 표시 여부 (체크 시 다음부터 자동 표시 안 함) */
+const REGISTER_GUIDE_MODAL_DISMISS_KEY = "lumen_register_guide_modal_dismissed";
 
 function getProvider() {
   try {
@@ -906,10 +908,12 @@ ensureSessionId()
     if (btnSubmit) btnSubmit.disabled = false;
   });
 
-// 등록 가이드 모달: 닫힌 상태 inert·표시 시 해제 (접근성)
-(function setupRegisterGuideModalA11y() {
+// 등록 가이드 모달: 닫힌 상태 inert·표시 시 해제 (접근성) + 첫 진입 시 자동 열기 / 다음에 뜨지 않기
+(function setupRegisterGuideModal() {
   const el = document.getElementById("registerGuideModal");
+  const dontShowAgain = document.getElementById("registerGuideDontShowAgain");
   if (!el) return;
+
   el.addEventListener("shown.bs.modal", () => {
     el.removeAttribute("inert");
     el.setAttribute("aria-hidden", "false");
@@ -923,5 +927,29 @@ ensureSessionId()
     }
     el.setAttribute("inert", "");
     el.setAttribute("aria-hidden", "true");
+
+    if (dontShowAgain && dontShowAgain.checked) {
+      try {
+        localStorage.setItem(REGISTER_GUIDE_MODAL_DISMISS_KEY, "1");
+      } catch (_) {}
+    }
+    if (dontShowAgain) {
+      dontShowAgain.checked = false;
+    }
+  });
+
+  let dismissed = false;
+  try {
+    dismissed = localStorage.getItem(REGISTER_GUIDE_MODAL_DISMISS_KEY) === "1";
+  } catch (_) {}
+
+  if (dismissed || typeof bootstrap === "undefined" || !bootstrap.Modal) return;
+
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      try {
+        bootstrap.Modal.getOrCreateInstance(el).show();
+      } catch (_) {}
+    }, 0);
   });
 })();
