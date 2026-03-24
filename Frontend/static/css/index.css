@@ -97,6 +97,28 @@ body.bg-light { background-color: #f8fafc !important; }
   font-weight: 700 !important;
   border: none !important;
 }
+
+/* 위험/경고·생활알림: PC는 한 줄, 모바일만 두 줄 스택 */
+.hero-badge .hero-badge-stack {
+  display: inline;
+}
+.hero-badge .hero-badge-line {
+  display: inline;
+}
+
+@media (max-width: 767.98px) {
+  .hero-badge .hero-badge-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.12;
+    text-align: center;
+  }
+  .hero-badge .hero-badge-line {
+    display: block;
+  }
+}
 .hero-badge-danger {
   background: rgba(220, 38, 38, 0.2) !important;
   color: #b91c1c !important;

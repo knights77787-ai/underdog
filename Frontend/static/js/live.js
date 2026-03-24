@@ -630,6 +630,7 @@ function heroTitleSubgroupFromParts(subgroup, keyword) {
 function setHeroNormal() {
   if (heroCard) heroCard.classList.remove("hero-alert-danger", "hero-alert-caution", "hero-alert-alert");
   heroBadge.className = "badge bg-secondary-subtle text-secondary border px-3 py-2";
+  heroBadge.removeAttribute("aria-label");
   heroBadge.textContent = "상태";
   heroTitle.textContent = "대기중";
   heroTitle.className = "fs-5 fw-bold";
@@ -644,7 +645,18 @@ function setHeroAlert(descText, event_type, titleSubgroup) {
     heroCard.classList.add("hero-alert-" + et);
   }
   heroBadge.className = "badge px-3 py-2 hero-badge hero-badge-" + et;
-  heroBadge.textContent = HERO_LABELS[et];
+  heroBadge.removeAttribute("aria-label");
+  if (et === "danger") {
+    heroBadge.setAttribute("aria-label", "위험/경고");
+    heroBadge.innerHTML =
+      '<span class="hero-badge-stack"><span class="hero-badge-line">위험/</span><span class="hero-badge-line">경고</span></span>';
+  } else if (et === "alert") {
+    heroBadge.setAttribute("aria-label", "생활알림");
+    heroBadge.innerHTML =
+      '<span class="hero-badge-stack"><span class="hero-badge-line">생활</span><span class="hero-badge-line">알림</span></span>';
+  } else {
+    heroBadge.textContent = HERO_LABELS[et];
+  }
   const sub = (titleSubgroup && String(titleSubgroup).trim()) || "";
   heroTitle.textContent = sub || HERO_TITLE_FALLBACK[et];
   heroTitle.className = "fs-5 fw-bold hero-title-" + et;

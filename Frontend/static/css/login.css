@@ -15,13 +15,13 @@
   text-decoration: none;
 }
 
-/* 메인 영역 - footer-inner와 같은 max-width·padding으로 안쪽 정렬 */
+/* 메인 영역 - PC·태블릿 기본(넉넉한 여백). 모바일은 아래 단일 @media에서 덮어씀 */
 .login-main {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 2rem 0.75rem 3rem;
+  padding: 3rem 0.75rem 4rem;
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
@@ -31,12 +31,13 @@
 /* 히어로 섹션 */
 .login-hero {
   text-align: center;
-  margin-bottom: 2.5rem;
+  margin-bottom: 3rem;
 }
 
 .login-title {
   margin-bottom: 0.75rem;
   line-height: 0;
+  font-size: 2rem;
 }
 .login-title .login-hero-logo {
   width: 120px;
@@ -48,11 +49,11 @@
 }
 
 .login-tagline {
-  font-size: 0.95rem;
+  font-size: 1rem;
   color: #64748b;
   line-height: 1.6;
   margin: 0;
-  max-width: 280px;
+  max-width: 320px;
 }
 
 /* 로그인 카드 */
@@ -152,14 +153,18 @@
   flex-shrink: 0;
 }
 
-/* 하단 기능 요약 */
+/* 히어로와 로그인 카드 사이 기능 요약 */
 .login-features {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 1.5rem 2rem;
-  margin-top: 2.5rem;
+  margin-top: 0;
+  margin-bottom: 1.75rem;
   padding: 0 1rem;
+  width: 100%;
+  max-width: 400px;
+  box-sizing: border-box;
 }
 
 .login-feature {
@@ -175,36 +180,78 @@
   color: var(--lumen-teal);
 }
 
-@media (min-width: 576px) {
+/* 모바일(767 이하)만 별도 — PC는 위 기본 스타일. 스크린샷 비율: 카드~푸터 넉넉 */
+@media (max-width: 767.98px) {
   .login-main {
-    padding: 3rem 0.75rem 4rem;
-  }
-
-  .login-title {
-    font-size: 2rem;
-  }
-
-  .login-tagline {
-    font-size: 1rem;
-    max-width: 320px;
+    padding-left: max(clamp(1rem, 5vw, 1.5rem), env(safe-area-inset-left, 0px));
+    padding-right: max(clamp(1rem, 5vw, 1.5rem), env(safe-area-inset-right, 0px));
+    padding-top: clamp(1.15rem, 3.8vw, 1.75rem);
+    /* 카드 하단 ~ 푸터: 고정 최소 + 뷰포트 높이 비율(약 20%대 느낌) */
+    padding-bottom: max(
+      5rem,
+      calc(18vh + 2rem),
+      calc(2.75rem + env(safe-area-inset-bottom, 0px))
+    );
   }
 
   .login-hero {
-    margin-bottom: 3rem;
-  }
-}
-
-@media (max-width: 767.98px) {
-  .login-main {
-    padding-left: max(clamp(1.0625rem, 5.5vw, 1.5rem), env(safe-area-inset-left, 0px));
-    padding-right: max(clamp(1.0625rem, 5.5vw, 1.5rem), env(safe-area-inset-right, 0px));
+    margin-bottom: clamp(1.15rem, 3.6vw, 1.75rem);
   }
 
-  /* 기능 요약: 라벨 줄바꿈 방지 — 매우 좁을 때만 가로 스크롤 */
+  .login-title .login-hero-logo {
+    width: clamp(100px, 28vw, 115px);
+  }
+
+  .login-tagline {
+    font-size: clamp(0.88rem, 3.5vw, 0.95rem);
+    line-height: 1.55;
+    max-width: min(92vw, 300px);
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .login-card-wrap {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .login-card {
+    border-radius: clamp(17px, 4.5vw, 20px);
+  }
+
+  .login-card-header {
+    padding: clamp(1.45rem, 4.2vw, 1.65rem) clamp(1.25rem, 5vw, 2rem) 0;
+    text-align: center;
+  }
+
+  .login-card-title {
+    font-size: clamp(1.28rem, 4vw, 1.4rem);
+  }
+
+  .login-card-desc {
+    font-size: clamp(0.84rem, 3.2vw, 0.9rem);
+  }
+
+  .login-card-body {
+    padding: clamp(1.2rem, 3.8vw, 1.35rem) clamp(1.25rem, 5vw, 2rem)
+      clamp(1.65rem, 4.8vw, 2rem);
+    gap: clamp(0.65rem, 2.5vw, 0.75rem);
+  }
+
+  .btn-login {
+    min-height: clamp(48px, 12.5vw, 52px);
+    font-size: clamp(0.92rem, 3.5vw, 0.98rem);
+    padding: 0.78rem clamp(0.95rem, 4vw, 1.1rem);
+    border-radius: clamp(13px, 3.6vw, 14px);
+  }
+
+  /* 기능 요약: 한 줄 유지, 매우 좁을 때만 가로 스크롤 */
   .login-features {
+    margin-bottom: clamp(1.25rem, 4vw, 1.65rem);
+    padding: 0 clamp(0.7rem, 4vw, 1.1rem);
     flex-wrap: nowrap;
     justify-content: center;
-    gap: 0.45rem 0.6rem;
+    gap: clamp(0.32rem, 2vw, 0.5rem) clamp(0.45rem, 2.4vw, 0.65rem);
     max-width: 100%;
     overflow-x: auto;
     overflow-y: hidden;
@@ -217,33 +264,13 @@
   .login-feature {
     flex: 0 0 auto;
     white-space: nowrap;
+    font-size: clamp(0.72rem, 3.1vw, 0.85rem);
+    gap: clamp(0.35rem, 2vw, 0.5rem);
+  }
+  .login-feature i {
+    font-size: clamp(0.82rem, 3.4vw, 1rem);
   }
   .login-feature span {
     white-space: nowrap;
-  }
-}
-
-@media (max-width: 400px) {
-  .login-main {
-    padding: 1.5rem clamp(1rem, 5vw, 1.25rem) 2rem;
-  }
-  .login-card-wrap {
-    max-width: 100%;
-  }
-  .login-card-header,
-  .login-card-body {
-    padding-left: 1.25rem !important;
-    padding-right: 1.25rem !important;
-  }
-  .login-features {
-    gap: 0.35rem 0.5rem;
-    padding: 0 clamp(1rem, 5vw, 1.25rem);
-    margin-top: 1.5rem;
-  }
-  .login-feature {
-    font-size: 0.72rem;
-  }
-  .login-feature i {
-    font-size: 0.85rem;
   }
 }

@@ -310,7 +310,8 @@ class AudioClsWorker:
                     _rank_custom_sounds_by_similarity, sid, emb_live_candidates
                 )
                 best, best_sim, pick_reason = _resolve_custom_pick(ranked, mean_sc)
-                is_speech_dominant = (
+                # keyword가 None이면 (False or None)이 되어 None이 될 수 있음 → bool로 고정
+                is_speech_dominant = bool(
                     (label in _SPEECHISH_LABELS and top_score >= CUSTOM_SPEECH_BLOCK_SCORE)
                     or (keyword and str(keyword).startswith("speech:"))
                 )
