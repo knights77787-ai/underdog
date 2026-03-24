@@ -1100,14 +1100,32 @@ function setupFeedbackCommentModal() {
   const inputEl = document.getElementById("feedbackCommentInput");
   const submitBtn = document.getElementById("feedbackCommentSubmit");
   if (!modalEl || !inputEl || !submitBtn) return;
-  modalEl.addEventListener("shown.bs.modal", () => modalEl.removeAttribute("inert"));
-  modalEl.addEventListener("hidden.bs.modal", () => modalEl.setAttribute("inert", ""));
+  modalEl.addEventListener("shown.bs.modal", () => {
+    modalEl.removeAttribute("inert");
+    modalEl.setAttribute("aria-hidden", "false");
+  });
+  modalEl.addEventListener("hidden.bs.modal", () => {
+    const ae = document.activeElement;
+    if (ae && typeof ae.blur === "function" && modalEl.contains(ae)) {
+      try {
+        ae.blur();
+      } catch (_) {}
+    }
+    modalEl.setAttribute("inert", "");
+    modalEl.setAttribute("aria-hidden", "true");
+  });
   submitBtn.addEventListener("click", () => {
     const comment = (inputEl.value || "").trim();
     if (!comment) {
       showToast("피드백", "코멘트를 입력해 주세요.", true);
       inputEl.focus();
       return;
+    }
+    const ae = document.activeElement;
+    if (ae && typeof ae.blur === "function" && modalEl.contains(ae)) {
+      try {
+        ae.blur();
+      } catch (_) {}
     }
     bootstrap.Modal.getInstance(modalEl)?.hide();
     sendFeedback("down", comment);
