@@ -31,10 +31,6 @@ CUSTOM_THRESHOLD = float(os.getenv("CUSTOM_SOUND_THRESHOLD", "0.30"))  # cosine 
 # rms가 너무 낮으면 커스텀 알림 브로드캐스트/DB저장을 스킵합니다.
 CUSTOM_MIN_RMS = float(os.getenv("CUSTOM_SOUND_MIN_RMS", "0.005"))
 
-# 커스텀 매칭은 펫/짖음 계열로 의심되는 구간에서만 의미가 있습니다.
-# YAMNet의 펫/짖음 인덱스 프레임 점수(pet_score)가 이 이상일 때만 custom 알림을 허용합니다.
-CUSTOM_PET_GATE_FACTOR = float(os.getenv("CUSTOM_PET_GATE_FACTOR", "0.70"))
-
 # YAMNet CSV index: 개·동물·짖음 계열 (Animal=67 … Whimper (dog)=75, Growling=74)
 _PET_SOUND_INDICES: tuple[int, ...] = (67, 68, 69, 70, 71, 72, 73, 74, 75)
 
@@ -179,10 +175,8 @@ class AudioClsWorker:
                 cooldown_sec = int(item.get("cooldown_sec", 5))
                 alert_enabled = bool(item.get("alert_enabled", True))
 
-                # 0) YAMNet 프레임 점수는 먼저 구해서
-                #    - 커스텀 오탐을 막기 위한 pet_score 게이트
-                #    - 이후 YAMNet 알림 분류(중복 계산 방지)
-                #    용으로 재사용합니다.
+                # 0) YAMNet mean_scores는 먼저 구해서 이후 YAMNet 알림 분류에 재사용합니다.
+                #    (커스텀 소리는 클락션·초인종 등 비-펫도 등록하므로 pet_score 게이트는 쓰지 않습니다.)
                 t0 = time.perf_counter()
                 mean_sc = await asyncio.to_thread(self.yamnet.mean_scores, audio)
                 dt_ms = int((time.perf_counter() - t0) * 1000)
@@ -191,8 +185,6 @@ class AudioClsWorker:
                 top_i, top_score, label, event_type, keyword = _resolve_yamnet_classification(
                     mean_sc, self.yamnet.index_to_label
                 )
-                pet_score = float(max(float(mean_sc[ix]) for ix in _PET_SOUND_INDICES))
-                pet_gate_thr = float(get_audio_min_score() * CUSTOM_PET_GATE_FACTOR)
 
                 # 1) live embedding 구하기 (커스텀 사운드 매칭용)
                 # 4초 윈도우 안에서 여러 1초 조각을 뽑아 그중 최대 유사도로 판정합니다.
@@ -253,7 +245,6 @@ class AudioClsWorker:
                     best is not None
                     and best_sim >= CUSTOM_THRESHOLD
                     and audio_rms >= CUSTOM_MIN_RMS
-                    and pet_score >= pet_gate_thr
                 ):
                     logger.info(
                         "%s custom_match sid=%s custom_sound_id=%s name=%s event_type=%s sim=%.3f",
