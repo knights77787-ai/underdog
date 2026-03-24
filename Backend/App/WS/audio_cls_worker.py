@@ -25,6 +25,9 @@ _last_custom_debug_log_ts_by_sid: dict[str, int] = {}
 # 배경·무음에서도 임베딩 유사도가 ~0.32~0.42까지 우연히 올라갈 수 있어 기본은 중간값으로 둡니다.
 # (0.48은 오탐은 잘 막지만 미탐이 커서 기본을 0.42로 완화)
 CUSTOM_THRESHOLD = float(os.getenv("CUSTOM_SOUND_THRESHOLD", "0.42"))
+# 입력 음압이 충분히 큰 구간은 커스텀 임계값을 약간 완화해 미탐을 줄입니다.
+CUSTOM_THRESHOLD_LOUD = float(os.getenv("CUSTOM_SOUND_THRESHOLD_LOUD", "0.36"))
+CUSTOM_LOUD_RMS = float(os.getenv("CUSTOM_SOUND_LOUD_RMS", "0.018"))
 
 # 커스텀 매칭은 소리가 들어올 때만 의미가 있습니다.
 # (마이크가 아주 미세한 소음까지 계속 보내면 임베딩 유사도가 우연히 임계값을 넘을 수 있어 오탐 폭주 가능)
@@ -294,8 +297,13 @@ class AudioClsWorker:
                 if ts_ms - last_dbg > 10000:
                     _r0 = ranked[0] if ranked else None
                     _r1 = ranked[1] if len(ranked) > 1 else None
+                    dbg_eff_thr = (
+                        CUSTOM_THRESHOLD_LOUD
+                        if audio_rms >= CUSTOM_LOUD_RMS
+                        else CUSTOM_THRESHOLD
+                    )
                     logger.info(
-                        "%s custom_match_debug sid=%s usable=%s pick=%s id1=%s s1=%.3f id2=%s s2=%.3f thr=%.3f",
+                        "%s custom_match_debug sid=%s usable=%s pick=%s id1=%s s1=%.3f id2=%s s2=%.3f thr=%.3f rms=%.4f",
                         conn_prefix,
                         sid,
                         usable_cnt,
@@ -304,22 +312,30 @@ class AudioClsWorker:
                         float(_r0[1]) if _r0 else 0.0,
                         getattr(_r1[0], "custom_sound_id", None) if _r1 else None,
                         float(_r1[1]) if _r1 else 0.0,
-                        CUSTOM_THRESHOLD,
+                        dbg_eff_thr,
+                        audio_rms,
                     )
                     _last_custom_debug_log_ts_by_sid[sid] = ts_ms
+                eff_threshold = (
+                    CUSTOM_THRESHOLD_LOUD
+                    if audio_rms >= CUSTOM_LOUD_RMS
+                    else CUSTOM_THRESHOLD
+                )
                 if (
                     best is not None
-                    and best_sim >= CUSTOM_THRESHOLD
+                    and best_sim >= eff_threshold
                     and audio_rms >= CUSTOM_MIN_RMS
                 ):
                     logger.info(
-                        "%s custom_match sid=%s custom_sound_id=%s name=%s event_type=%s sim=%.3f pick=%s",
+                        "%s custom_match sid=%s custom_sound_id=%s name=%s event_type=%s sim=%.3f thr=%.3f rms=%.4f pick=%s",
                         conn_prefix,
                         sid,
                         getattr(best, "custom_sound_id", None),
                         getattr(best, "name", None),
                         getattr(best, "event_type", None),
                         best_sim,
+                        eff_threshold,
+                        audio_rms,
                         pick_reason,
                     )
                     kw_custom = f"custom:{best.custom_sound_id}"
