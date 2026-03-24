@@ -24,7 +24,7 @@ _last_custom_debug_log_ts_by_sid: dict[str, int] = {}
 # ✔️‼️커스텀 소리 매칭 임계값 ‼️✔️
 # 배경·무음에서도 임베딩 유사도가 ~0.32~0.42까지 우연히 올라갈 수 있어
 # 기본 임계값은 0.35로 시작하고 환경에 따라 조정합니다.
-CUSTOM_THRESHOLD = float(os.getenv("CUSTOM_SOUND_THRESHOLD", "0.35"))
+CUSTOM_THRESHOLD = float(os.getenv("CUSTOM_SOUND_THRESHOLD", "0.32"))
 # 입력 음압이 충분히 큰 구간은 커스텀 임계값을 약간 완화해 미탐을 줄입니다.
 CUSTOM_THRESHOLD_LOUD = float(os.getenv("CUSTOM_SOUND_THRESHOLD_LOUD", "0.34"))
 CUSTOM_LOUD_RMS = float(os.getenv("CUSTOM_SOUND_LOUD_RMS", "0.018"))
