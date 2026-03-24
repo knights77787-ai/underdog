@@ -31,6 +31,10 @@ CUSTOM_THRESHOLD = float(os.getenv("CUSTOM_SOUND_THRESHOLD", "0.30"))  # cosine 
 # rms가 너무 낮으면 커스텀 알림 브로드캐스트/DB저장을 스킵합니다.
 CUSTOM_MIN_RMS = float(os.getenv("CUSTOM_SOUND_MIN_RMS", "0.005"))
 
+# 동일 커스텀 소리는 한 번 울린 뒤 최소 이 간격(초) 동안은 다시 알림하지 않습니다.
+# (일반 cooldown_sec가 5초인데 4초 윈도우가 ~6초마다 들어오면 매번 쿨다운이 풀려 연속 알림이 납니다.)
+CUSTOM_COOLDOWN_SEC = int(os.getenv("CUSTOM_SOUND_COOLDOWN_SEC", "45"))
+
 # YAMNet CSV index: 개·동물·짖음 계열 (Animal=67 … Whimper (dog)=75, Growling=74)
 _PET_SOUND_INDICES: tuple[int, ...] = (67, 68, 69, 70, 71, 72, 73, 74, 75)
 
@@ -256,8 +260,9 @@ class AudioClsWorker:
                         best_sim,
                     )
                     kw_custom = f"custom:{best.custom_sound_id}"
+                    custom_cd = max(cooldown_sec, CUSTOM_COOLDOWN_SEC)
                     if not self.cooldown_check_fn(
-                        sid, kw_custom, best.event_type, cooldown_sec, ts_ms
+                        sid, kw_custom, best.event_type, custom_cd, ts_ms
                     ):
                         text_custom = f"CustomSound:{best.name} (sim={best_sim:.2f})"
                         event_id = await asyncio.to_thread(
