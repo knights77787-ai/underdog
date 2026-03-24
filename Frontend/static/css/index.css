@@ -139,9 +139,14 @@ body.bg-light { background-color: #f8fafc !important; }
 #logTable td:first-child { padding-left: 1rem; }
 #logTable .col-time { width: 12%; min-width: 2.5em; }
 #logTable .col-type { width: 12%; }
-#logTable .col-content { width: 64%; }
-#logTable .col-prob { width: 12%; }
+#logTable .col-content { width: 48%; }
+#logTable .col-prob { width: 10%; }
+#logTable .col-action { width: 18%; }
 #logTable td:nth-child(4) { text-align: left; }
+#logTable td:nth-child(5) {
+  text-align: right;
+  white-space: nowrap;
+}
 
 /* 모바일: 최근 감지 로그 카드형 레이아웃 */
 @media (max-width: 576px) {
@@ -199,6 +204,16 @@ body.bg-light { background-color: #f8fafc !important; }
     content: "내용";
     display: block;
     margin-bottom: 0.15rem;
+  }
+  #logTable td:nth-child(5) {
+    order: 5;
+    flex: 1 1 100%;
+    margin-top: 0.35rem;
+    text-align: right;
+  }
+  #logTable td:nth-child(5)::before {
+    content: "";
+    display: none;
   }
 }
 
