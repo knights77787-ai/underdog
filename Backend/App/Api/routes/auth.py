@@ -16,9 +16,8 @@ from App.db.database import get_db
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-# 관리자 로그인용 쿠키 설정
+# 관리자 로그인용 쿠키 (세션 쿠키: 브라우저 종료 시 삭제 → 재접속 시 로그인 필요)
 ADMIN_COOKIE_NAME = "admin_token"
-ADMIN_COOKIE_MAX_AGE = 60 * 60 * 24  # 24시간
 
 
 def _redirect_uri_from_request(request: Request, path: str) -> str:
@@ -437,7 +436,6 @@ async def admin_login(
         redirect.set_cookie(
             key=ADMIN_COOKIE_NAME,
             value=token or "dev-bypass",
-            max_age=ADMIN_COOKIE_MAX_AGE,
             httponly=True,
             samesite="lax",
         )
@@ -453,7 +451,6 @@ async def admin_login(
     redirect.set_cookie(
         key=ADMIN_COOKIE_NAME,
         value=token.strip(),
-        max_age=ADMIN_COOKIE_MAX_AGE,
         httponly=True,
         samesite="lax",
     )

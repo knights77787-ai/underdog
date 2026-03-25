@@ -140,15 +140,13 @@ async function loadFeedback() {
         const dateStr = it.segment_start_ms ? formatDate(it.segment_start_ms) : "-";
         const typeLabel = EVENT_TYPE_LABEL[it.event_type] || it.event_type || "-";
         const voteLabel = VOTE_LABEL[it.vote] || it.vote || "-";
-        const sess = (it.client_session_uuid || "").slice(0, 8) + (it.client_session_uuid && it.client_session_uuid.length > 8 ? "…" : "");
         tr.innerHTML = `
           <td class="small">${dateStr} ${tsStr}</td>
           <td><span class="badge bg-${it.vote === "up" ? "success" : "danger"}">${voteLabel}</span></td>
           <td class="small">${typeLabel}</td>
           <td class="text-truncate small" style="max-width:100px" title="${(it.keyword || "").replace(/"/g, "&quot;")}">${it.keyword || "-"}</td>
-          <td class="text-truncate small" style="max-width:180px" title="${(it.text || "").replace(/"/g, "&quot;")}">${it.text || "-"}</td>
-          <td class="small">${sess || "-"}</td>
-          <td class="text-truncate small" style="max-width:120px" title="${(it.comment || "").replace(/"/g, "&quot;")}">${it.comment || "-"}</td>
+          <td class="text-truncate small admin-feedback-text-col" title="${(it.text || "").replace(/"/g, "&quot;")}">${it.text || "-"}</td>
+          <td class="small admin-feedback-comment-col text-break" title="${(it.comment || "").replace(/"/g, "&quot;")}">${it.comment || "-"}</td>
         `;
         tbody.appendChild(tr);
       });

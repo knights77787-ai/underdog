@@ -33,3 +33,17 @@ body {
   font-weight: 600;
   font-size: 0.75rem;
 }
+
+/* 피드백 목록: 세션 제거 후 코멘트·내용 너비 */
+.admin-feedback-table .admin-feedback-text-col {
+  max-width: 14rem;
+}
+
+.admin-feedback-table .admin-feedback-comment-col {
+  min-width: 12rem;
+  width: 38%;
+  max-width: 36rem;
+  white-space: normal;
+  word-break: break-word;
+  vertical-align: top;
+}

@@ -38,7 +38,7 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")  # 0=all 1=INFO 2=WARN 3=ERRO
 from App.Core.logging import setup_logging
 setup_logging(os.environ.get("LOG_LEVEL", "INFO").upper())
 
-from fastapi import FastAPI, Request
+from fastapi import Cookie, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -51,7 +51,7 @@ from App.Api.routes.custom_phrase_audio import router as custom_phrase_audio_rou
 from App.Api.routes.custom_sounds import router as custom_sounds_router
 from App.Api.routes.settings import router as settings_router
 from App.Api.routes.push import router as push_router
-from App.Core.config import DATABASE_PATH
+from App.Core.config import ADMIN_TOKEN, DATABASE_PATH, DEV
 from App.Core.env_flags import is_heavy_workers_enabled
 from App.Core.logging import get_logger
 from App.Services.audio_rules import reload_audio_rules
@@ -287,8 +287,13 @@ def frontend_admin_login():
 
 
 @app.get("/admin", response_class=FileResponse)
-def frontend_admin():
-    """관리자 대시보드 페이지. 로그인 필요."""
+def frontend_admin(admin_token: str | None = Cookie(default=None, alias="admin_token")):
+    """관리자 대시보드. 유효한 admin_token 쿠키 없으면 로그인 페이지로 (DEV=1 은 예외)."""
+    if not DEV:
+        if not ADMIN_TOKEN:
+            return RedirectResponse(url="/admin-login", status_code=302)
+        if (admin_token or "").strip() != ADMIN_TOKEN:
+            return RedirectResponse(url="/admin-login", status_code=302)
     return _send_html("admin.html")
 
 
