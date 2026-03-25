@@ -108,19 +108,19 @@
       <div class="col-12">
         <div id="heroCard" class="card shadow-sm">
           <div class="card-body d-flex align-items-center justify-content-between gap-3">
-            <div class="d-flex align-items-center gap-3">
-              <div id="heroBadge" class="badge bg-secondary-subtle text-secondary border px-3 py-2">
+            <div class="d-flex align-items-center gap-3 min-w-0 flex-grow-1 hero-card-main">
+              <div id="heroBadge" class="badge bg-secondary-subtle text-secondary border px-3 py-2 flex-shrink-0">
                 상태
               </div>
 
-              <div>
+              <div class="min-w-0 flex-grow-1">
                 <div class="fs-5 fw-bold" id="heroTitle">대기중</div>
                 <div class="text-muted small" id="heroDesc"></div>
               </div>
             </div>
 
-            <!-- Feedback (UI only today) -->
-            <div class="d-flex gap-2">
+            <!-- Feedback: 라벨 한 줄 고정 (모바일에서 줄바꿈 방지) -->
+            <div class="d-flex gap-2 flex-nowrap align-items-center hero-feedback-btns">
               <button id="btnFeedbackYes" class="btn btn-sm btn-outline-success" disabled>맞아요</button>
               <button id="btnFeedbackNo" class="btn btn-sm btn-outline-danger" disabled>아니에요</button>
             </div>
