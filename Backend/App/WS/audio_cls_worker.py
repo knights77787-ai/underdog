@@ -72,6 +72,11 @@ _BARKISH_LABELS: frozenset[str] = frozenset(
         "Growling",
     }
 )
+_ANIMAL_TOP_LABELS: frozenset[str] = frozenset(
+    {"Animal", "Dog", "Domestic animals, pets"}
+)
+YAMNET_ANIMAL_STRICT_MIN = float(os.getenv("YAMNET_ANIMAL_STRICT_MIN", "0.62"))
+YAMNET_ANIMAL_BARKISH_MIN = float(os.getenv("YAMNET_ANIMAL_BARKISH_MIN", "0.26"))
 
 # 1위가 생활알림이지만 개 짖음이 실제일 때 흔히 위로 뜨는 YAMNet 라벨
 _CONFUSER_ALERT_LABELS: frozenset[str] = frozenset(
@@ -134,6 +139,16 @@ def _resolve_yamnet_classification(
     ps = float(mean_sc[pi])
     plabel = index_to_label.get(pi, str(pi))
     pet_et, pet_kw = classify_audio(pi, ps, plabel)
+
+    # 탭/의자 마찰 같은 비-동물 소리가 YAMNet top=Animal/Dog로 튀는 오탐을 줄이기 위한 보정:
+    # 1) Animal top 점수가 매우 높지 않으면,
+    # 2) Bark 계열(개 짖음) 보조 근거가 있을 때만 Animal 계열 경고를 허용.
+    if label in _ANIMAL_TOP_LABELS:
+        barkish_support = plabel in _BARKISH_LABELS and ps >= max(
+            floor_bark, YAMNET_ANIMAL_BARKISH_MIN
+        )
+        if (not barkish_support) and top_score < YAMNET_ANIMAL_STRICT_MIN:
+            event_type, keyword = None, None
 
     if not pet_et or plabel not in _BARKISH_LABELS or ps < floor_bark:
         return top_i, top_score, label, event_type, keyword
