@@ -55,7 +55,7 @@ AUDIO_STATES = AudioStateStore()
 # 비말(1초) 오디오 분류용 큐. maxsize로 폭주 방지 (처리 지연 시 버퍼 확대)
 # 120으로 여유 두고, 아래에서 큐 과다 시 비말 enqueue 스킵해 STT에 CPU 양보
 AUDIOCLS_QUEUE: asyncio.Queue = asyncio.Queue(maxsize=120)
-# STT 직렬화: VAD_END → 큐 → 단일 워커가 Whisper 실행 (동시 다중 STT 방지)
+# STT 큐: VAD_END → 큐. 실제 소비는 main.py에서 STT 워커 3개 병렬 실행.
 STT_QUEUE: asyncio.Queue = asyncio.Queue(maxsize=32)
 
 # 쿨다운: (session_id, keyword, event_type) -> 마지막 발행 ts_ms (스펙과 동일)
@@ -100,13 +100,13 @@ async def _enqueue_audiocls(
         audio_logger.warning("%s AUDIOCLS_QUEUE_FULL sid=%s", conn_prefix, sid)
 
 
-# 세션별 설정 캐시 (TTL 10초). caption/alert 판정 시 DB 조회 완화
+# 세션별 설정 캐시 (TTL 1초). caption/alert 판정 시 DB 조회 완화
 _settings_cache_ttl_sec = 1  # 테스트 버튼 등 설정 변경 반영을 빠르게 하기 위함
 _settings_cache: dict[str, tuple[dict, float]] = {}  # client_session_uuid -> (settings, cached_at)
 
 
 def _get_settings(client_session_uuid: str) -> dict:
-    """세션 설정 조회. 세션별 10초 캐시로 DB 조회 완화."""
+    """세션 설정 조회. 세션별 1초 캐시로 DB 조회 완화."""
     now = time.monotonic()
     entry = _settings_cache.get(client_session_uuid)
     if entry is not None:

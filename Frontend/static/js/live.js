@@ -6,8 +6,9 @@
 // capture: true 로 다른 스크립트보다 먼저 처리해 콘솔 Uncaught 노이즈를 줄인다.
 (() => {
   try {
-    if (window.__underdogUnhandledRejectionPayloadGuardInstalled) return;
-    window.__underdogUnhandledRejectionPayloadGuardInstalled = true;
+    // index.html의 초기가드와 동일 플래그를 사용해 중복 등록을 방지합니다.
+    if (window.__lumenEarlyRejectionGuard) return;
+    window.__lumenEarlyRejectionGuard = true;
 
     function rejectionToMessage(reason) {
       if (reason == null) return "";
@@ -88,23 +89,13 @@ function getDefaultWsUrl() {
   return "ws://127.0.0.1:8000/ws";
 }
 const WS_URL = getDefaultWsUrl();
-const SESSION_STORAGE_KEY = "underdog_session_id";
-const PROVIDER_STORAGE_KEY = "underdog_provider";
+const SESSION_STORAGE_KEY =
+  window.UnderdogAuthNav?.SESSION_STORAGE_KEY || "underdog_session_id";
+const PROVIDER_STORAGE_KEY =
+  window.UnderdogAuthNav?.PROVIDER_STORAGE_KEY || "underdog_provider";
 let SESSION_ID = (function () {
-  const params = new URLSearchParams(document.location.search);
-  const fromUrl = params.get("session_id");
-  const providerFromUrl = params.get("provider");
-  if (providerFromUrl) {
-    try {
-      localStorage.setItem(PROVIDER_STORAGE_KEY, providerFromUrl);
-    } catch (_) {}
-  }
-  if (fromUrl) return fromUrl;
-  try {
-    return localStorage.getItem(SESSION_STORAGE_KEY) || null;
-  } catch (_) {
-    return null;
-  }
+  window.UnderdogAuthNav?.syncFromUrl?.();
+  return window.UnderdogAuthNav?.getSessionId?.() || null;
 })();
 if (SESSION_ID) {
   try {
@@ -576,21 +567,13 @@ function stopMicAndRelease() {
 }
 
 function showToast(title, body, danger=true) {
-  const toastEl = document.createElement("div");
-  toastEl.className = `toast ${danger ? "text-bg-danger" : "text-bg-primary"} border-0`;
-  toastEl.innerHTML = `
-    <div class="d-flex">
-      <div class="toast-body">
-        <div class="fw-semibold">${title}</div>
-        <div>${body}</div>
-      </div>
-      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-    </div>
-  `;
-  toastContainer.appendChild(toastEl);
-  const t = new bootstrap.Toast(toastEl, { delay: 2500 });
-  t.show();
-  toastEl.addEventListener("hidden.bs.toast", () => toastEl.remove());
+  window.UnderdogToastUI?.showToast?.({
+    title,
+    body,
+    tone: danger ? "danger" : "info",
+    containerId: "toastContainer",
+    delayMs: 2500,
+  });
 }
 
 /** 배지: 소리 등록 폼「소리 알림 분류」와 동일 (danger / caution / alert) */
@@ -1175,13 +1158,7 @@ setupFeedbackCommentModal();
 
 // 로그인 상태: provider 있으면 사용자 아이콘+드롭다운, 없으면 '다른 계정' 버튼
 function getProvider() {
-  const fromUrl = new URLSearchParams(document.location.search).get("provider");
-  if (fromUrl) return fromUrl;
-  try {
-    return localStorage.getItem(PROVIDER_STORAGE_KEY) || null;
-  } catch (_) {
-    return null;
-  }
+  return window.UnderdogAuthNav?.getProvider?.() || null;
 }
 
 function isGuest() {
@@ -1225,23 +1202,10 @@ async function loadUserInfo() {
   userInfoInFlight = true;
   userInfoLastFetchTs = now;
   try {
-    const res = await fetch(API_BASE + "/auth/me?session_id=" + encodeURIComponent(SESSION_ID));
-    // provider(localStorage)는 남아있는데 실제 세션이 게스트이거나 유저가 없는 경우 404가 날 수 있음.
-    // 이 경우 provider 상태를 정리해서 이후 반복 호출/콘솔 노이즈를 줄인다.
-    if (res.status === 404) {
-      try {
-        localStorage.removeItem(PROVIDER_STORAGE_KEY);
-      } catch (_) {}
-      // 30초간 /auth/me 재호출 중단 (updateUserSection에서 다시 호출될 수 있어 선적용)
-      userInfoStopUntilTs = Date.now() + 30000;
-      // 게스트 UI로 전환(로그 섹션/CTA 포함)
-      updateUserSection();
-      return;
-    }
-    const data = await res.json().catch(() => ({}));
-    const ok = res.ok && data && (data.ok === true || data.ok === "true");
-    const name = (data && (data.name ?? data.user?.name)) || "사용자";
-    const email = (data && (data.email ?? data.user?.email)) || "-";
+    const result = await window.UnderdogAuthNav?.fetchMe?.(API_BASE, SESSION_ID);
+    const ok = !!result?.ok;
+    const name = result?.name || "사용자";
+    const email = result?.email || "-";
     if (!ok) {
       // provider는 남아있지만 실제로는 유저가 없는 상태일 수 있음.
       try {
@@ -1264,60 +1228,31 @@ async function loadUserInfo() {
 function setupUserDropdown() {
   const userDropdownSettings = document.getElementById("userDropdownSettings");
   if (!userDropdownWrap || !btnUserIcon || !userDropdownSoundReg || !userDropdownLogout) return;
-
-  // 소리등록: /new-sound?session_id=xxx (같은 세션으로 커스텀 소리 등록 → 마이크에서 감지)
-  userDropdownSoundReg.addEventListener("click", (e) => {
-    e.preventDefault();
-    const sid = SESSION_ID || (typeof localStorage !== "undefined" && localStorage.getItem(SESSION_STORAGE_KEY));
-    const url = "/new-sound" + (sid ? "?session_id=" + encodeURIComponent(sid) : "");
-    window.location.href = url;
-  });
-
-  // 설정: 설정 페이지로 이동 (session_id, provider 전달)
-  if (userDropdownSettings) {
-    userDropdownSettings.addEventListener("click", (e) => {
-      e.preventDefault();
-      const sid = SESSION_ID || (typeof localStorage !== "undefined" && localStorage.getItem(SESSION_STORAGE_KEY));
-      const prov = getProvider();
-      const params = new URLSearchParams();
-      if (sid) params.set("session_id", sid);
-      if (prov) params.set("provider", prov);
-      const qs = params.toString();
-      window.location.href = "/settings-page" + (qs ? "?" + qs : "");
-    });
-  }
-
-  // 로그아웃: 이 브라우저 DB 세션 이벤트 삭제(API) → 메인으로 이동, session_id·provider·로컬 로그 제거
-  userDropdownLogout.addEventListener("click", async (e) => {
-    e.preventDefault();
-    const sid = SESSION_ID || (typeof localStorage !== "undefined" && localStorage.getItem(SESSION_STORAGE_KEY));
-    stopMicAndRelease();
-    try {
-      if (typeof client !== "undefined" && client && typeof client.disconnect === "function") {
-        client.disconnect();
-      }
-    } catch (_) {}
-    try {
-      if (sid) {
-        await fetch(API_BASE + "/auth/clear-session-events", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ session_id: String(sid) }),
-        });
-      }
-    } catch (_) {}
-    try {
-      localStorage.removeItem(SESSION_STORAGE_KEY);
-      localStorage.removeItem(PROVIDER_STORAGE_KEY);
-      localStorage.removeItem(LOCAL_LOG_KEY);
-      const keysToRemove = [];
-      for (let i = 0; i < sessionStorage.length; i++) {
-        const k = sessionStorage.key(i);
-        if (k && k.indexOf("underdog_visit_log_cutoff_") === 0) keysToRemove.push(k);
-      }
-      keysToRemove.forEach((k) => sessionStorage.removeItem(k));
-    } catch (_) {}
-    window.location.href = "/";
+  window.UnderdogAuthNav?.bindUserDropdown?.({
+    apiBase: API_BASE,
+    sessionId: SESSION_ID,
+    soundRegEl: userDropdownSoundReg,
+    settingsEl: userDropdownSettings,
+    logoutEl: userDropdownLogout,
+    onBeforeLogout: async () => {
+      stopMicAndRelease();
+      try {
+        if (typeof client !== "undefined" && client && typeof client.disconnect === "function") {
+          client.disconnect();
+        }
+      } catch (_) {}
+    },
+    onAfterLogout: async () => {
+      try {
+        localStorage.removeItem(LOCAL_LOG_KEY);
+        const keysToRemove = [];
+        for (let i = 0; i < sessionStorage.length; i++) {
+          const k = sessionStorage.key(i);
+          if (k && k.indexOf("underdog_visit_log_cutoff_") === 0) keysToRemove.push(k);
+        }
+        keysToRemove.forEach((k) => sessionStorage.removeItem(k));
+      } catch (_) {}
+    },
   });
 
   // mouseover 시 드롭다운 표시 (Bootstrap/요소 없으면 무시)

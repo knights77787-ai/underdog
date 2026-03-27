@@ -5,17 +5,8 @@ from __future__ import annotations
 import numpy as np
 from sqlalchemy.orm import Session
 
+from App.db.crud.embed_codec import blob_to_emb, emb_to_blob
 from App.db.models import CustomPhraseAudio
-
-
-def _emb_to_blob(emb: np.ndarray) -> tuple[bytes, int]:
-    emb = emb.astype(np.float32)
-    return emb.tobytes(), emb.shape[0]
-
-
-def _blob_to_emb(blob: bytes, dim: int) -> np.ndarray:
-    return np.frombuffer(blob, dtype=np.float32, count=dim)
-
 
 def create_phrase(
     db: Session,
@@ -26,7 +17,7 @@ def create_phrase(
     emb: np.ndarray,
     audio_path: str | None = None,
 ) -> CustomPhraseAudio:
-    blob, dim = _emb_to_blob(emb)
+    blob, dim = emb_to_blob(emb)
     row = CustomPhraseAudio(
         client_session_uuid=client_session_uuid,
         name=name,

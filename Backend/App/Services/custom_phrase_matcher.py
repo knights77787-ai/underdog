@@ -14,8 +14,8 @@ def match_phrase(session_id: str, speech_audio_16k_f32: np.ndarray):
         (row or None, sim: float)
     """
     from App.db.database import SessionLocal
+    from App.db.crud.embed_codec import blob_to_emb
     from App.db.models import CustomPhraseAudio
-    from App.db.crud.custom_phrase_audio import _blob_to_emb
 
     emb_live = PHRASE_EMB.embed_16k_f32(speech_audio_16k_f32)
 
@@ -31,7 +31,7 @@ def match_phrase(session_id: str, speech_audio_16k_f32: np.ndarray):
         for r in rows:
             if not r.embed_blob or not r.embed_dim:
                 continue
-            emb = _blob_to_emb(r.embed_blob, r.embed_dim)
+            emb = blob_to_emb(r.embed_blob, r.embed_dim)
             sim = float(np.dot(emb_live, emb))
             if sim > best_sim:
                 best_sim = sim

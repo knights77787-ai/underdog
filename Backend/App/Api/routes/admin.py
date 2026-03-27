@@ -12,7 +12,7 @@ from App.Core.security import require_admin_token
 from App.WS.handlers import AUDIOCLS_QUEUE, STT_QUEUE, _persist_alert
 from App.WS.manager import manager
 from App.db.crud import events as crud_events
-from App.db.crud.feedback import list_feedback, list_feedback_admin
+from App.db.crud.feedback import list_feedback_admin
 from App.db.database import get_db
 from App.Services.audio_rules import get_audio_rules_status, reload_audio_rules
 from App.Services.event_type_utils import event_type_to_category

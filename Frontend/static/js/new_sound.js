@@ -1,33 +1,26 @@
 // 배포(HTTPS)에서는 config 미적재 시에도 현재 오리진 사용 (API/WS 도메인 일치)
 const API_BASE = window.APP_CONFIG?.API_BASE || (typeof location !== "undefined" && location.origin && !/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/i.test(location.origin) ? location.origin : "http://127.0.0.1:8000");
-const SESSION_STORAGE_KEY = "underdog_session_id";
-const PROVIDER_STORAGE_KEY = "underdog_provider";
+const SESSION_STORAGE_KEY =
+  window.UnderdogAuthNav?.SESSION_STORAGE_KEY || "underdog_session_id";
+const PROVIDER_STORAGE_KEY =
+  window.UnderdogAuthNav?.PROVIDER_STORAGE_KEY || "underdog_provider";
 /** 소리 등록 페이지 진입 시 자세한 가이드 모달 자동 표시 여부 (체크 시 다음부터 자동 표시 안 함) */
 const REGISTER_GUIDE_MODAL_DISMISS_KEY = "lumen_register_guide_modal_dismissed";
+const UI_MSG = window.UnderdogMessages?.newSound || {
+  duplicateRegistered: "이미 등록하신 소리입니다.",
+  registerFailed: "등록에 실패했습니다.",
+  registerDoneTitle: "등록 완료",
+  networkFailed: "서버에 연결할 수 없습니다. 백엔드를 확인하세요.",
+};
 
 function getProvider() {
-  try {
-    return (localStorage.getItem(PROVIDER_STORAGE_KEY) || "").toLowerCase();
-  } catch (_) {
-    return "";
-  }
+  return (window.UnderdogAuthNav?.getProvider?.() || "").toLowerCase();
 }
 // 라이브와 동일한 session_id 사용 → 등록한 소리가 실시간 감지에 연동됨
 // 중요: session_id가 없으면 임시값("S1")로 저장하지 말고, /auth/guest로 확실히 발급받도록 함.
 let SESSION_ID = (function () {
-  const params = new URLSearchParams(document.location.search);
-  const fromUrl = params.get("session_id");
-  if (fromUrl) {
-    try {
-      localStorage.setItem(SESSION_STORAGE_KEY, fromUrl);
-    } catch (_) {}
-    return fromUrl;
-  }
-  try {
-    return localStorage.getItem(SESSION_STORAGE_KEY) || null;
-  } catch (_) {
-    return null;
-  }
+  window.UnderdogAuthNav?.syncFromUrl?.();
+  return window.UnderdogAuthNav?.getSessionId?.() || null;
 })();
 
 async function ensureSessionId() {
@@ -109,12 +102,27 @@ let timerId = null;
 
 // ===== helpers =====
 function setStatus(msg, type = "") {
-  statusEl.textContent = msg;
-  statusEl.className = "status small mb-3" + (type ? ` ${type}` : "");
+  window.UnderdogStatusUI?.setStatus?.(statusEl, msg, {
+    type,
+    baseClass: "status small mb-3",
+    classMap: { ok: "ok", err: "err" },
+  });
 }
 
 function clearStatus() {
-  setStatus("");
+  window.UnderdogStatusUI?.clearStatus?.(statusEl, {
+    baseClass: "status small mb-3",
+    classMap: { ok: "ok", err: "err" },
+  });
+}
+
+function showToast(title, body, tone = "danger") {
+  window.UnderdogToastUI?.showToast?.({
+    title,
+    body,
+    tone,
+    delayMs: 2600,
+  });
 }
 
 function fmtTime(sec) {
@@ -802,7 +810,7 @@ btnSubmit?.addEventListener("click", async () => {
       (r) => (r.name || "").trim().toLowerCase() === nameLower
     );
     if (hasSameName) {
-      alert("이미 등록하신 소리입니다.");
+      showToast("중복 등록", UI_MSG.duplicateRegistered, "warning");
       return;
     }
   }
@@ -832,7 +840,9 @@ btnSubmit?.addEventListener("click", async () => {
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok || !data.ok) {
-      setStatus(data.detail || res.statusText || "등록에 실패했습니다.", "err");
+      const failMsg = data.detail || res.statusText || UI_MSG.registerFailed;
+      setStatus(failMsg, "err");
+      showToast("등록 실패", failMsg, "danger");
       return;
     }
 
@@ -855,12 +865,15 @@ btnSubmit?.addEventListener("click", async () => {
         `"${data.data?.name || result.name}" 등록 완료. 품질 안내: ${warnings.join(" ")}`,
         "ok"
       );
+      showToast(UI_MSG.registerDoneTitle, `품질 안내: ${warnings.join(" ")}`, "warning");
     } else {
       setStatus(`"${data.data?.name || result.name}" 소리가 등록되었습니다.`, "ok");
+      showToast(UI_MSG.registerDoneTitle, `"${data.data?.name || result.name}" 소리가 등록되었습니다.`, "success");
     }
   } catch (err) {
     console.error(err);
-    setStatus("서버에 연결할 수 없습니다. 백엔드를 확인하세요.", "err");
+    setStatus(UI_MSG.networkFailed, "err");
+    showToast("연결 실패", UI_MSG.networkFailed, "danger");
   } finally {
     btnSubmit.disabled = false;
   }
@@ -882,46 +895,22 @@ async function updateUserSection() {
   }
   if (btnLogin) btnLogin.classList.add("d-none");
   userDropdownWrap.classList.remove("d-none");
-  try {
-    const res = await fetch(API_BASE + "/auth/me?session_id=" + encodeURIComponent(urlSessionId || ""));
-    const data = await res.json().catch(() => ({}));
-    if (res.ok && data.ok) {
-      if (userDropdownName) userDropdownName.textContent = data.name || "사용자";
-      if (userDropdownEmail) userDropdownEmail.textContent = data.email || "-";
-    } else {
-      if (userDropdownName) userDropdownName.textContent = "사용자";
-      if (userDropdownEmail) userDropdownEmail.textContent = "-";
-    }
-  } catch (_) {
-    if (userDropdownName) userDropdownName.textContent = "사용자";
-    if (userDropdownEmail) userDropdownEmail.textContent = "-";
-  }
+  await window.UnderdogAuthNav?.loadUserIdentity?.({
+    apiBase: API_BASE,
+    sessionId: urlSessionId || SESSION_ID,
+    nameEl: userDropdownName,
+    emailEl: userDropdownEmail,
+  });
 }
 
 function setupUserDropdown() {
   if (!userDropdownWrap || !btnUserIcon || !userDropdownSoundReg || !userDropdownLogout) return;
-
-  userDropdownSoundReg.addEventListener("click", (e) => {
-    e.preventDefault();
-    const url = "/new-sound" + (SESSION_ID ? "?session_id=" + encodeURIComponent(SESSION_ID) : "");
-    window.location.href = url;
-  });
-
-  if (userDropdownSettings) {
-    userDropdownSettings.addEventListener("click", (e) => {
-      e.preventDefault();
-      const url = "/settings-page" + (SESSION_ID ? "?session_id=" + encodeURIComponent(SESSION_ID) : "");
-      window.location.href = url;
-    });
-  }
-
-  userDropdownLogout.addEventListener("click", (e) => {
-    e.preventDefault();
-    try {
-      localStorage.removeItem(SESSION_STORAGE_KEY);
-      localStorage.removeItem(PROVIDER_STORAGE_KEY);
-    } catch (_) {}
-    window.location.href = "/";
+  window.UnderdogAuthNav?.bindUserDropdown?.({
+    apiBase: API_BASE,
+    sessionId: SESSION_ID,
+    soundRegEl: userDropdownSoundReg,
+    settingsEl: userDropdownSettings,
+    logoutEl: userDropdownLogout,
   });
 }
 

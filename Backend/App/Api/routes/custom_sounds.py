@@ -1,29 +1,27 @@
 # App/Api/routes/custom_sounds.py
-import io
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
 import numpy as np
-import tensorflow as tf
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Path as ApiPath, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from App.Core.config import CUSTOM_SOUND_AUDIO_RETENTION_HOURS, DATABASE_PATH
+from App.Services.audio_io import decode_audio_to_16k_mono_f32
 from App.db.crud.custom_sounds import (
     create_custom_sound,
     delete_custom_sound,
     expire_stale_custom_sounds_audio_for_session,
     list_custom_sounds,
     maybe_expire_custom_sound_audio,
+    resolve_custom_sound_disk_path,
 )
 from App.db.crud.sessions import get_or_create_by_client_uuid
 from App.db.database import get_db
 from App.db.models import Session as SessionModel
 from App.Services.yamnet_service import YamnetService
-
-from scipy.signal import resample
 
 router = APIRouter(prefix="/custom-sounds", tags=["custom-sounds"])
 _upload_debug_last_ts: int = 0
@@ -55,7 +53,7 @@ def _get_yamnet() -> YamnetService:
         raise HTTPException(
             503,
             f"YAMNET 모델 로드 실패(캐시 손상 가능). "
-            "TF Hub 캐시 삭제 후 재시도: 사용자 임시 폴더(AppData\\Local\\Temp) 안의 tfhub_modules 폴더 삭제. 원인: {_yamnet_error}",
+            f"TF Hub 캐시 삭제 후 재시도: 사용자 임시 폴더(AppData\\Local\\Temp) 안의 tfhub_modules 폴더 삭제. 원인: {_yamnet_error}",
         )
     try:
         _yamnet_instance = YamnetService()
@@ -65,7 +63,7 @@ def _get_yamnet() -> YamnetService:
         raise HTTPException(
             503,
             f"YAMNET 모델 로드 실패. "
-            "캐시 삭제 후 재시도: 사용자 임시 폴더(AppData\\Local\\Temp) 안의 tfhub_modules 폴더 삭제. 원인: {_yamnet_error}",
+            f"캐시 삭제 후 재시도: 사용자 임시 폴더(AppData\\Local\\Temp) 안의 tfhub_modules 폴더 삭제. 원인: {_yamnet_error}",
         )
 
 ALLOWED_EXTENSIONS = (".wav", ".mp3", ".weba", ".m4a", ".ogg")
@@ -93,20 +91,6 @@ def _custom_sound_quality_report(x16k: np.ndarray) -> dict:
         "warnings": warnings,
     }
 
-def _resample_to_16k(x: np.ndarray, sr: int) -> np.ndarray:
-    if sr == 16000:
-        return x.astype(np.float32)
-
-    if sr <= 0:
-        raise ValueError("invalid sample rate")
-
-    new_len = int(round(len(x) * 16000 / sr))
-    if new_len <= 0:
-        raise ValueError("invalid resample length")
-
-    y = resample(x, new_len)
-    return y.astype(np.float32)
-
 def _normalize_1s_window(x: np.ndarray) -> np.ndarray:
     """호환용: 마지막 1초(또는 짧으면 0 패딩) 16000 samples 윈도우 생성."""
     if x.shape[0] < 16000:
@@ -126,64 +110,6 @@ def _window_1s_from_start(x: np.ndarray) -> np.ndarray:
         )
     return x[:16000].astype(np.float32)
 
-def _decode_wav_to_16k_mono_f32(wav_bytes: bytes) -> np.ndarray:
-    audio, sr = tf.audio.decode_wav(wav_bytes)  # (samples, channels) float32 -1..1
-    audio = tf.reduce_mean(audio, axis=1)
-    sr = int(sr.numpy())
-    x = audio.numpy().astype(np.float32)
-    x = _resample_to_16k(x, sr)
-    return x
-
-def _decode_via_pydub(data: bytes, fmt: str) -> np.ndarray:
-    """pydub로 mp3/weba(webm 오디오) 등 디코딩 → 16k mono float32."""
-    try:
-        from pydub import AudioSegment
-    except ImportError:
-        raise HTTPException(
-            503,
-            "오디오 디코딩을 위해 pydub가 필요합니다. pip install pydub 및 ffmpeg 설치 후 이용하세요.",
-        )
-    try:
-        seg = AudioSegment.from_file(io.BytesIO(data), format=fmt)
-    except Exception as e:
-        raise HTTPException(400, f"{fmt.upper()} 디코딩 실패. ffmpeg 설치 여부를 확인하세요: {e!s}")
-    seg = seg.set_channels(1)
-    sr = seg.frame_rate
-    samples = np.array(seg.get_array_of_samples(), dtype=np.float32) / 32768.0
-    samples = _resample_to_16k(samples, sr)
-    return samples
-
-
-def _decode_mp3_to_16k_mono_f32(mp3_bytes: bytes) -> np.ndarray:
-    return _decode_via_pydub(mp3_bytes, "mp3")
-
-
-def _decode_weba_to_16k_mono_f32(weba_bytes: bytes) -> np.ndarray:
-    """.weba는 WebM 오디오 전용; pydub/FFmpeg는 webm 컨테이너로 디코딩."""
-    return _decode_via_pydub(weba_bytes, "webm")
-
-
-def _decode_m4a_to_16k_mono_f32(m4a_bytes: bytes) -> np.ndarray:
-    return _decode_via_pydub(m4a_bytes, "m4a")
-
-def _decode_ogg_to_16k_mono_f32(ogg_bytes: bytes) -> np.ndarray:
-    return _decode_via_pydub(ogg_bytes, "ogg")
-
-
-def _decode_audio_to_16k_mono_f32(data: bytes, ext: str) -> np.ndarray:
-    ext = ext.lower()
-    if ext == ".wav":
-        return _decode_wav_to_16k_mono_f32(data)
-    if ext == ".mp3":
-        return _decode_mp3_to_16k_mono_f32(data)
-    if ext == ".weba":
-        return _decode_weba_to_16k_mono_f32(data)
-    if ext == ".m4a":
-        return _decode_m4a_to_16k_mono_f32(data)
-    if ext == ".ogg":
-        return _decode_ogg_to_16k_mono_f32(data)
-    raise HTTPException(400, f"지원하지 않는 형식입니다. 사용 가능: {', '.join(ALLOWED_EXTENSIONS)}")
-
 @router.post("")
 async def upload_custom_sound(
     session_id: str = Query(..., description="클라이언트 세션 문자열 예: S1"),
@@ -201,7 +127,7 @@ async def upload_custom_sound(
         raise HTTPException(400, f"지원 형식: {', '.join(ALLOWED_EXTENSIONS)}")
 
     raw_bytes = await file.read()
-    x16k = _decode_audio_to_16k_mono_f32(raw_bytes, ext)
+    x16k = decode_audio_to_16k_mono_f32(raw_bytes, ext, allowed_extensions=ALLOWED_EXTENSIONS)
 
     yamnet = _get_yamnet()
     # 업로드 임베딩을 "시작/가운데/끝" 여러 1초 조각으로 만들고 평균 내서
@@ -289,21 +215,6 @@ async def upload_custom_sound(
         },
     }
 
-def _resolve_audio_path(audio_path: str | None) -> Path | None:
-    """DB에 저장된 audio_path → 실제 파일 Path. 없으면 None."""
-    if not audio_path or not audio_path.strip():
-        return None
-    p = Path(audio_path)
-    if p.is_file():
-        return p
-    rel = audio_path.replace("\\", "/")
-    if rel.startswith("data/"):
-        rel = rel[5:]
-    _data_dir = Path(DATABASE_PATH).resolve().parent
-    full = _data_dir / rel
-    return full if full.is_file() else None
-
-
 @router.get("/{custom_sound_id}/audio")
 def get_custom_sound_audio(
     custom_sound_id: int = ApiPath(...),
@@ -317,7 +228,7 @@ def get_custom_sound_audio(
     if not row:
         raise HTTPException(404, "해당 소리를 찾을 수 없거나 권한이 없습니다.")
     maybe_expire_custom_sound_audio(db, row)
-    fp = _resolve_audio_path(row.audio_path)
+    fp = resolve_custom_sound_disk_path(row.audio_path)
     if not fp:
         deadline = row.created_at + timedelta(hours=CUSTOM_SOUND_AUDIO_RETENTION_HOURS)
         if not row.audio_path or datetime.utcnow() > deadline:

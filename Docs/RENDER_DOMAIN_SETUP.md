@@ -61,7 +61,7 @@ Render 안내에 나온 대로만 넣으면 됩니다.
 | `GOOGLE_CLIENT_SECRET` | (Google 콘솔 값) | .env와 동일 |
 | `KAKAO_CLIENT_ID` | (Kakao 값) | .env와 동일 |
 | `KAKAO_CLIENT_SECRET` | (Kakao 값) | .env와 동일 |
-| `OPENAI_API_KEY` | (선택) OpenAI API 키 | 설정 시 STT를 로컬 Whisper 대신 OpenAI Whisper API로 사용 → 서버 메모리 절감. 없으면 로컬 모델 사용. |
+| `OPENAI_API_KEY` | (선택) OpenAI API 키 | 설정 시 STT를 OpenAI Whisper API로 사용. **없으면 현재 코드 기준 STT 비활성화**(로컬 fallback 없음). |
 
 - 도메인을 **한 개만** 쓴다면 `FRONTEND_AUTH_REDIRECT_URL=/live` 로 두고, 사용자가 접속하는 주소가 `https://yourdomain.com` 이면 자동으로 `https://yourdomain.com/live` 로 리다이렉트됩니다.
 - **DEV** 변수는 배포 환경에서는 넣지 않거나 `0`으로 두세요.

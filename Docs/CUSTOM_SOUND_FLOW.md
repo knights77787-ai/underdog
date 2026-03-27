@@ -15,7 +15,7 @@ DB에 embedding 저장            AUDIOCLS_QUEUE
   ↓                                ↓
 client_session_uuid = 세션ID    세션별 custom sound와 유사도 비교
                                     ↓
-                              유사도 ≥ 0.75 → 알림(alert) 브로드캐스트
+                              유사도/음압/말소리 가드 통과 시 alert 브로드캐스트
 ```
 
 **핵심**: **같은 `session_id`** 로 등록하고, 같은 `session_id` 로 라이브에서 마이크를 켜야 연동됩니다.
@@ -54,10 +54,10 @@ AUDIOCLS_QUEUE에서 4초 오디오 꺼냄
     ↓
 YAMNet embedding_1s(audio) → emb_live (1024차원)
     ↓
-_match_custom_sound(session_id, emb_live):
-  - DB에서 client_session_uuid == session_id 인 커스텀 소리만 조회
-  - 각 소리의 embedding과 emb_live의 코사인 유사도 계산 (dot product, 정규화됨)
-  - 유사도 최댓값 ≥ 0.75 이면 해당 소리로 매칭
+_rank_custom_sounds_by_similarity(session_id, emb_live_candidates):
+  - DB에서 같은 session_id(로그인 사용자는 user_id 포함) 커스텀 소리 조회
+  - 각 소리의 embedding과 live 후보(여러 1초 윈도우)의 최대 코사인 유사도 계산
+  - _resolve_custom_pick으로 top1/top2 애매 구간 보정 후 후보 선택
     ↓
 매칭 시:
   - DB에 alert 이벤트 저장
@@ -68,7 +68,7 @@ _match_custom_sound(session_id, emb_live):
 ### 2-4. YAMNet 클래스(521종) 등록 방식
 
 - YAMNet(TF Hub)은 **521개** 환경음 클래스를 내며, 표시 이름은 `Backend/App/resources/yamnet_class_map.csv` 와 동일해야 한다.
-- `event_types.json` 의 **`daily_labels`** 에 위 CSV의 **전체 `display_name` 521개**를 넣어 두었다. 이제 1위 클래스가 `min_score` 이상이면 기본적으로 **생활 알림(`alert` 티어)** 로 나갈 수 있다.
+- 전체 521 라벨 카탈로그는 `Shared/constants/yamnet_class_catalog.json` 이고, 운영 분류는 `Shared/constants/event_types.json` 의 선별 라벨 목록을 사용한다.
 - **`warning_labels` → `caution_labels` → `daily_labels`** 순으로 매칭하므로, 사이렌·기차·차량 경적·개(`Dog`/`Animal`) 등은 기존처럼 **위험/주의가 우선**이다.
 - 전체 목록(인덱스·mid·이름)은 `Shared/constants/yamnet_class_catalog.json` 에 JSON으로도 있다(검색·문서용).
 - **주의**: 클래스에 `Speech`, `Conversation` 등 **말소리**도 포함된다. 주변 대화가 크면 비언어 알림이 잦아질 수 있어, 필요하면 `min_score` 를 올리거나 `daily_labels` 에서 일부만 남기도록 다시 줄인다.
@@ -79,8 +79,10 @@ _match_custom_sound(session_id, emb_live):
 
 ### 2-5. 유사도 임계값 (커스텀 소리)
 
-- `CUSTOM_THRESHOLD` 는 코드의 `audio_cls_worker.py` 값을 따름 (현재 대략 0.70 전후).
-- 환경에 따라 0.75~0.9 사이로 조정 가능.
+- 변수명은 `CUSTOM_SOUND_*` 계열을 사용한다.
+- 주요값: `CUSTOM_SOUND_THRESHOLD`, `CUSTOM_SOUND_THRESHOLD_LOUD`, `CUSTOM_SOUND_MIN_RMS`,
+  `CUSTOM_SOUND_TOP2_MIN_GAP`, `CUSTOM_SOUND_SPEECH_BLOCK_SCORE`, `CUSTOM_SOUND_COOLDOWN_SEC`.
+- 개별 등록음은 `match_threshold`(DB 컬럼)로 전역값보다 우선 적용할 수 있다.
 
 ---
 

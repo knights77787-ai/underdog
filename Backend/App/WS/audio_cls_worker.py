@@ -13,6 +13,7 @@ from App.Services.audio_rules import (
     get_audio_min_score,
     yamnet_subgroup_for_label,
 )
+from App.Services.event_type_utils import event_type_to_category
 from App.Services.yamnet_service import YamnetService
 from App.Services.memory_logs import memory_logs
 
@@ -22,8 +23,10 @@ logger = get_logger("yamnet.worker")
 _last_custom_debug_log_ts_by_sid: dict[str, int] = {}
 _last_custom_pick_by_sid: dict[str, tuple[int, int]] = {}  # sid -> (custom_sound_id, ts_ms)
 
-# ✔️‼️커스텀 소리 매칭 임계값 ‼️✔️
-# 기본값은 저장소 루트 .env(CUSTOM_SOUND_*)와 맞춤. 환경변수가 있으면 그쪽이 우선.
+# ✔️ 커스텀 매칭 핵심 튜닝값
+# - 기본 임계값: CUSTOM_THRESHOLD
+# - 큰 소리 구간 임계값: CUSTOM_THRESHOLD_LOUD (RMS 기준)
+# - 개별 등록음 임계값(match_threshold)이 있으면 위 전역값보다 우선
 CUSTOM_THRESHOLD = float(os.getenv("CUSTOM_SOUND_THRESHOLD", "0.75"))
 # 입력 음압이 충분히 큰 구간은 커스텀 임계값을 약간 완화해 미탐을 줄입니다.
 CUSTOM_THRESHOLD_LOUD = float(os.getenv("CUSTOM_SOUND_THRESHOLD_LOUD", "0.75"))
@@ -39,8 +42,8 @@ CUSTOM_STICKY_SIM_GAP = float(os.getenv("CUSTOM_SOUND_STICKY_SIM_GAP", "0.03"))
 # rms가 너무 낮으면 커스텀 알림 브로드캐스트/DB저장을 스킵합니다.
 CUSTOM_MIN_RMS = float(os.getenv("CUSTOM_SOUND_MIN_RMS", "0.022"))
 
-# 등록이 2개 이상일 때 1위·2위 유사도 차가 이 미만이면 “배경에서 임의로 한 라벨이 이긴” 것으로 보고 커스텀 알림을 내지 않습니다.
-# (단, 1위가 아래 STRONG 이상이면 차이가 작아도 허용)
+# 등록이 2개 이상일 때 1위·2위 유사도 차가 이 미만이고,
+# 1위 sim도 STRONG 미만이면 “배경에서 임의로 한 라벨이 이긴” 것으로 보고 커스텀 알림을 내지 않습니다.
 CUSTOM_TOP2_MIN_GAP = float(os.getenv("CUSTOM_SOUND_TOP2_MIN_GAP", "0.08"))
 CUSTOM_STRONG_SIM = float(os.getenv("CUSTOM_SOUND_STRONG_SIM", "0.70"))
 
@@ -159,8 +162,8 @@ def _rank_custom_sounds_by_similarity(
 ) -> tuple[list[tuple[object, float]], int]:
     """세션별 커스텀 사운드마다 live 후보 임베딩과의 최대 유사도를 구하고, sim 내림차순으로 정렬."""
     from App.db.database import SessionLocal
+    from App.db.crud.embed_codec import blob_to_emb
     from App.db.models import CustomSound
-    from App.db.crud.custom_sounds import _blob_to_emb
 
     db = SessionLocal()
     try:
@@ -175,7 +178,7 @@ def _rank_custom_sounds_by_similarity(
             if not r.embed_blob or not r.embed_dim:
                 continue
             usable_cnt += 1
-            emb = _blob_to_emb(r.embed_blob, r.embed_dim)
+            emb = blob_to_emb(r.embed_blob, r.embed_dim)
             sims = [float(np.dot(c, emb)) for c in emb_live_candidates]
             sim = max(sims) if sims else 0.0
             ranked.append((r, sim))
@@ -206,9 +209,9 @@ def _resolve_custom_pick(
     et1 = (getattr(r1, "event_type", None) or "").strip()
 
     gap = s0 - s1
-    # 1·2위가 매우 근접하고(sim 동률), 1위 자체도 낮은 유사도면 배경/잡음에서 흔히 발생하는 패턴.
-    # "정말 강한 매칭"이 아닐 때에만 보수적으로 스킵합니다.
-    low_sim_floor = max(CUSTOM_THRESHOLD - 0.02, 0.30)
+    # 1·2위가 매우 근접(sim 동률) + 1위 sim도 충분히 강하지 않으면 배경/잡음 패턴으로 간주.
+    # CUSTOM_STRONG_SIM은 "동률이어도 통과 가능한 강한 매칭" 기준으로 사용합니다.
+    low_sim_floor = max(CUSTOM_STRONG_SIM, CUSTOM_THRESHOLD - 0.02, 0.30)
     if gap < CUSTOM_TOP2_MIN_GAP and s0 < low_sim_floor:
         return None, 0.0, "skip_ambiguous_multi"
 
@@ -418,7 +421,7 @@ class AudioClsWorker:
                             custom_pick_reason=str(pick_reason),
                         )
                         # Event-builder 통합: memory_logs에 추가 (최근 감지 로그·API 일관성)
-                        _cat = {"danger": "warning", "caution": "caution", "alert": "daily"}.get(best.event_type, "daily")
+                        _cat = event_type_to_category(best.event_type)
                         _sub = (best.name or "").strip() or None
                         entry_custom = memory_logs.append_alert(
                             sid,
@@ -470,7 +473,7 @@ class AudioClsWorker:
                 )
 
                 # Event-builder 통합: memory_logs에 추가
-                category = {"danger": "warning", "caution": "caution", "alert": "daily"}.get(event_type, "daily")
+                category = event_type_to_category(event_type)
                 subgroup_ui = yamnet_subgroup_for_label(label or "") or None
                 entry = memory_logs.append_alert(
                     sid, text, kw_prefixed, event_type, category,
