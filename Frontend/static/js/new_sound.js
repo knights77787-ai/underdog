@@ -848,7 +848,16 @@ btnSubmit?.addEventListener("click", async () => {
       const tab = new bootstrap.Tab(listTab);
       tab.show();
     }
-    setStatus(`"${data.data?.name || result.name}" 소리가 등록되었습니다.`, "ok");
+    const q = data?.data?.quality;
+    const warnings = Array.isArray(q?.warnings) ? q.warnings : [];
+    if (warnings.length > 0) {
+      setStatus(
+        `"${data.data?.name || result.name}" 등록 완료. 품질 안내: ${warnings.join(" ")}`,
+        "ok"
+      );
+    } else {
+      setStatus(`"${data.data?.name || result.name}" 소리가 등록되었습니다.`, "ok");
+    }
   } catch (err) {
     console.error(err);
     setStatus("서버에 연결할 수 없습니다. 백엔드를 확인하세요.", "err");

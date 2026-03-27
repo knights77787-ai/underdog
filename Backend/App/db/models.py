@@ -62,6 +62,8 @@ class CustomSound(Base):
     audio_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
     embed_dim: Mapped[int | None] = mapped_column(Integer, nullable=True)
     embed_blob: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    # 개별 커스텀 소리 임계값(없으면 전역 CUSTOM_SOUND_THRESHOLD 사용)
+    match_threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
@@ -94,6 +96,10 @@ class Event(Base):
     topk_labels: Mapped[str | None] = mapped_column(Text, nullable=True)
     matched_custom_sound_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     custom_similarity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # custom 판정 관측값(튜닝/분석용)
+    custom_threshold_used: Mapped[float | None] = mapped_column(Float, nullable=True)
+    custom_rms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    custom_pick_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)
     segment_start_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     segment_end_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     vad_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)

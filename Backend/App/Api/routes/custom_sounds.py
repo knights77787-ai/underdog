@@ -1,5 +1,6 @@
 # App/Api/routes/custom_sounds.py
 import io
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -58,6 +59,29 @@ def _get_yamnet() -> YamnetService:
         )
 
 ALLOWED_EXTENSIONS = (".wav", ".mp3", ".weba", ".m4a", ".ogg")
+
+
+def _custom_sound_quality_report(x16k: np.ndarray) -> dict:
+    """등록 음원 품질 지표(간단): 길이, RMS, clipping 비율, 권고 메시지."""
+    n = int(x16k.shape[0])
+    secs = float(n / 16000.0) if n > 0 else 0.0
+    rms = float(np.sqrt(np.mean(np.square(x16k))) + 1e-12) if n > 0 else 0.0
+    clip_ratio = float(np.mean(np.abs(x16k) >= 0.98)) if n > 0 else 0.0
+    warnings: list[str] = []
+    if secs < 1.0:
+        warnings.append("소리 길이가 매우 짧습니다(1초 미만).")
+    elif secs < 2.0:
+        warnings.append("소리 길이가 짧습니다(2초 미만).")
+    if rms < 0.01:
+        warnings.append("입력 음압이 낮습니다. 소리를 더 가깝고 크게 녹음해 주세요.")
+    if clip_ratio > 0.05:
+        warnings.append("클리핑(찢어짐) 비율이 높습니다. 입력 볼륨을 조금 낮춰 녹음해 주세요.")
+    return {
+        "duration_sec": round(secs, 3),
+        "rms": round(rms, 6),
+        "clip_ratio": round(clip_ratio, 6),
+        "warnings": warnings,
+    }
 
 def _resample_to_16k(x: np.ndarray, sr: int) -> np.ndarray:
     if sr == 16000:
@@ -155,6 +179,9 @@ async def upload_custom_sound(
     session_id: str = Query(..., description="클라이언트 세션 문자열 예: S1"),
     name: str = Form(...),
     event_type: str = Form(..., description="danger | caution | alert"),
+    match_threshold: float | None = Form(
+        None, description="0~1. 개별 커스텀 임계값(비우면 전역 설정 사용)"
+    ),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
@@ -205,6 +232,20 @@ async def upload_custom_sound(
     session_row = get_or_create_by_client_uuid(db, session_id)
     user_id = session_row.user_id if session_row else None
 
+    if match_threshold is not None:
+        try:
+            match_threshold = float(match_threshold)
+        except (TypeError, ValueError):
+            raise HTTPException(400, "match_threshold는 숫자여야 합니다.")
+        if not (0.0 < match_threshold <= 1.0):
+            raise HTTPException(400, "match_threshold는 0~1 범위여야 합니다.")
+    else:
+        # 기본은 운영 .env 기준(없으면 코드 기본값 0.75)
+        mt = (os.getenv("CUSTOM_SOUND_THRESHOLD") or "").strip()
+        match_threshold = float(mt) if mt else 0.75
+
+    quality = _custom_sound_quality_report(x16k)
+
     row = create_custom_sound(
         db=db,
         client_session_uuid=session_id,
@@ -213,6 +254,7 @@ async def upload_custom_sound(
         emb=emb,
         audio_path=audio_path_for_db,
         user_id=user_id,
+        match_threshold=match_threshold,
     )
 
     # 업로드 직후 세션/ID를 로그로 남겨, 실시간 매칭 워커의 sid와 매칭되는지 확인합니다.
@@ -231,6 +273,8 @@ async def upload_custom_sound(
         "data": {
             "custom_sound_id": row.custom_sound_id,
             "name": row.name,
+            "match_threshold": row.match_threshold,
+            "quality": quality,
             "audio_retention_hours": CUSTOM_SOUND_AUDIO_RETENTION_HOURS,
         },
     }
@@ -301,6 +345,7 @@ def get_custom_sounds(
                 "custom_sound_id": r.custom_sound_id,
                 "name": r.name,
                 "event_type": r.event_type,
+                "match_threshold": r.match_threshold,
                 "audio_path": r.audio_path,
                 "created_at": r.created_at,
                 "audio_available": audio_available,

@@ -20,6 +20,7 @@ logger = get_logger("yamnet.worker")
 
 # custom_sound 매칭 디버그 로그를 너무 자주 찍지 않기 위한 간단한 throttle
 _last_custom_debug_log_ts_by_sid: dict[str, int] = {}
+_last_custom_pick_by_sid: dict[str, tuple[int, int]] = {}  # sid -> (custom_sound_id, ts_ms)
 
 # ✔️‼️커스텀 소리 매칭 임계값 ‼️✔️
 # 기본값은 저장소 루트 .env(CUSTOM_SOUND_*)와 맞춤. 환경변수가 있으면 그쪽이 우선.
@@ -30,6 +31,8 @@ CUSTOM_LOUD_RMS = float(os.getenv("CUSTOM_SOUND_LOUD_RMS", "0.020"))
 # 음성(사람 말) 구간에서는 커스텀 오탐이 매우 잘 나므로, 충분히 강한 sim가 아니면 커스텀을 막습니다.
 CUSTOM_SPEECH_BLOCK_SCORE = float(os.getenv("CUSTOM_SOUND_SPEECH_BLOCK_SCORE", "0.38"))
 CUSTOM_SPEECH_ALLOW_STRONG_SIM = float(os.getenv("CUSTOM_SOUND_SPEECH_ALLOW_STRONG_SIM", "0.62"))
+CUSTOM_STICKY_SEC = int(os.getenv("CUSTOM_SOUND_STICKY_SEC", "8"))
+CUSTOM_STICKY_SIM_GAP = float(os.getenv("CUSTOM_SOUND_STICKY_SIM_GAP", "0.03"))
 
 # 커스텀 매칭은 소리가 들어올 때만 의미가 있습니다.
 # (마이크가 아주 미세한 소음까지 계속 보내면 임베딩 유사도가 우연히 임계값을 넘을 수 있어 오탐 폭주 가능)
@@ -309,6 +312,26 @@ class AudioClsWorker:
                     _rank_custom_sounds_by_similarity, sid, emb_live_candidates
                 )
                 best, best_sim, pick_reason = _resolve_custom_pick(ranked, mean_sc)
+                # 직전 승자와 점수가 거의 비슷하면 짧은 구간 라벨 점프를 줄이기 위해 직전 승자를 유지합니다.
+                prev_pick = _last_custom_pick_by_sid.get(sid)
+                if (
+                    prev_pick is not None
+                    and ranked
+                    and (ts_ms - int(prev_pick[1])) <= CUSTOM_STICKY_SEC * 1000
+                ):
+                    prev_id = int(prev_pick[0])
+                    r0_id = int(getattr(ranked[0][0], "custom_sound_id", -1))
+                    if r0_id != prev_id:
+                        prev_row = next(
+                            (row for row, _sim in ranked if int(getattr(row, "custom_sound_id", -1)) == prev_id),
+                            None,
+                        )
+                        prev_sim = next(
+                            (float(_sim) for row, _sim in ranked if int(getattr(row, "custom_sound_id", -1)) == prev_id),
+                            0.0,
+                        )
+                        if prev_row is not None and prev_sim >= float(ranked[0][1]) - CUSTOM_STICKY_SIM_GAP:
+                            best, best_sim, pick_reason = prev_row, prev_sim, "sticky_prev"
                 # keyword가 None이면 (False or None)이 되어 None이 될 수 있음 → bool로 고정
                 is_speech_dominant = bool(
                     (label in _SPEECHISH_LABELS and top_score >= CUSTOM_SPEECH_BLOCK_SCORE)
@@ -348,9 +371,14 @@ class AudioClsWorker:
                     if audio_rms >= CUSTOM_LOUD_RMS
                     else CUSTOM_THRESHOLD
                 )
+                threshold_for_best = (
+                    float(getattr(best, "match_threshold", 0.0))
+                    if best is not None and getattr(best, "match_threshold", None) is not None
+                    else eff_threshold
+                )
                 if (
                     best is not None
-                    and best_sim >= eff_threshold
+                    and best_sim >= threshold_for_best
                     and audio_rms >= CUSTOM_MIN_RMS
                     and (not is_speech_dominant or best_sim >= CUSTOM_SPEECH_ALLOW_STRONG_SIM)
                 ):
@@ -362,9 +390,13 @@ class AudioClsWorker:
                         getattr(best, "name", None),
                         getattr(best, "event_type", None),
                         best_sim,
-                        eff_threshold,
+                        threshold_for_best,
                         audio_rms,
                         pick_reason,
+                    )
+                    _last_custom_pick_by_sid[sid] = (
+                        int(getattr(best, "custom_sound_id", 0)),
+                        ts_ms,
                     )
                     kw_custom = f"custom:{best.custom_sound_id}"
                     custom_cd = max(cooldown_sec, CUSTOM_COOLDOWN_SEC)
@@ -381,6 +413,9 @@ class AudioClsWorker:
                             ts_ms,
                             matched_custom_sound_id=best.custom_sound_id,
                             custom_similarity=float(best_sim),
+                            custom_threshold_used=float(threshold_for_best),
+                            custom_rms=float(audio_rms),
+                            custom_pick_reason=str(pick_reason),
                         )
                         # Event-builder 통합: memory_logs에 추가 (최근 감지 로그·API 일관성)
                         _cat = {"danger": "warning", "caution": "caution", "alert": "daily"}.get(best.event_type, "daily")

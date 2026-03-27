@@ -92,6 +92,9 @@ def create_alert_event(
     *,
     matched_custom_sound_id: int | None = None,
     custom_similarity: float | None = None,
+    custom_threshold_used: float | None = None,
+    custom_rms: float | None = None,
+    custom_pick_reason: str | None = None,
 ) -> int:
     sess = crud_sessions.get_or_create_by_client_uuid(db, client_session_uuid)
     event = Event(
@@ -101,6 +104,9 @@ def create_alert_event(
         segment_start_ms=ts_ms,
         matched_custom_sound_id=matched_custom_sound_id,
         custom_similarity=custom_similarity,
+        custom_threshold_used=custom_threshold_used,
+        custom_rms=custom_rms,
+        custom_pick_reason=custom_pick_reason,
     )
     try:
         db.add(event)
