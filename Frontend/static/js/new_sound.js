@@ -173,7 +173,7 @@ function formatFileSize(bytes) {
 
 function isAllowedAudioFile(file) {
   if (!file) return false;
-  const allowedExtensions = [".mp3", ".wav", ".weba", ".m4a", ".ogg"];
+  const allowedExtensions = [".mp3", ".wav", ".weba", ".m4a", ".mp4", ".ogg"];
   const lowerName = file.name.toLowerCase();
   return allowedExtensions.some((ext) => lowerName.endsWith(ext));
 }
@@ -348,7 +348,7 @@ function validateBeforeSubmit() {
   }
 
   if (!isAllowedAudioFile(selectedAudioFile)) {
-    return { ok: false, message: "지원하는 파일 형식은 mp3, wav, weba, m4a, ogg 입니다." };
+    return { ok: false, message: "지원하는 파일 형식은 mp3, wav, weba, m4a, mp4, ogg 입니다." };
   }
 
   return {
@@ -516,7 +516,7 @@ fileInput?.addEventListener("change", () => {
     fileInput.value = "";
     updateFileMeta(null);
     setSelectedAudio(null, null);
-    setStatus("업로드 가능한 파일 형식은 mp3, wav, weba, m4a, ogg 입니다.", "err");
+    setStatus("업로드 가능한 파일 형식은 mp3, wav, weba, m4a, mp4, ogg 입니다.", "err");
     return;
   }
 

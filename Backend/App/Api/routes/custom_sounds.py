@@ -66,7 +66,7 @@ def _get_yamnet() -> YamnetService:
             f"캐시 삭제 후 재시도: 사용자 임시 폴더(AppData\\Local\\Temp) 안의 tfhub_modules 폴더 삭제. 원인: {_yamnet_error}",
         )
 
-ALLOWED_EXTENSIONS = (".wav", ".mp3", ".weba", ".m4a", ".ogg")
+ALLOWED_EXTENSIONS = (".wav", ".mp3", ".weba", ".m4a", ".mp4", ".ogg")
 
 
 def _custom_sound_quality_report(x16k: np.ndarray) -> dict:
@@ -244,6 +244,7 @@ def get_custom_sound_audio(
         ".weba": "audio/webm",
         ".webm": "audio/webm",  # 과거 업로드 분만 재생 호환
         ".m4a": "audio/mp4",
+        ".mp4": "audio/mp4",
         ".ogg": "audio/ogg",
     }
     media_type = media_map.get(ext, "application/octet-stream")

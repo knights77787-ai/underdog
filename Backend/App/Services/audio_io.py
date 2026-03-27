@@ -63,6 +63,8 @@ def decode_audio_to_16k_mono_f32(
         return decode_via_pydub(data, "webm")
     if ext == ".m4a":
         return decode_via_pydub(data, "m4a")
+    if ext == ".mp4":
+        return decode_via_pydub(data, "mp4")
     if ext == ".ogg":
         return decode_via_pydub(data, "ogg")
     raise HTTPException(400, f"지원하지 않는 형식입니다. 사용 가능: {', '.join(allowed_extensions)}")
