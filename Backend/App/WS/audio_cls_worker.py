@@ -22,29 +22,28 @@ logger = get_logger("yamnet.worker")
 _last_custom_debug_log_ts_by_sid: dict[str, int] = {}
 
 # ✔️‼️커스텀 소리 매칭 임계값 ‼️✔️
-# 배경·무음에서도 임베딩 유사도가 ~0.32~0.42까지 우연히 올라갈 수 있어
-# 기본 임계값은 0.35로 시작하고 환경에 따라 조정합니다.
-CUSTOM_THRESHOLD = float(os.getenv("CUSTOM_SOUND_THRESHOLD", "0.32"))
+# 기본값은 저장소 루트 .env(CUSTOM_SOUND_*)와 맞춤. 환경변수가 있으면 그쪽이 우선.
+CUSTOM_THRESHOLD = float(os.getenv("CUSTOM_SOUND_THRESHOLD", "0.75"))
 # 입력 음압이 충분히 큰 구간은 커스텀 임계값을 약간 완화해 미탐을 줄입니다.
-CUSTOM_THRESHOLD_LOUD = float(os.getenv("CUSTOM_SOUND_THRESHOLD_LOUD", "0.34"))
-CUSTOM_LOUD_RMS = float(os.getenv("CUSTOM_SOUND_LOUD_RMS", "0.018"))
+CUSTOM_THRESHOLD_LOUD = float(os.getenv("CUSTOM_SOUND_THRESHOLD_LOUD", "0.75"))
+CUSTOM_LOUD_RMS = float(os.getenv("CUSTOM_SOUND_LOUD_RMS", "0.020"))
 # 음성(사람 말) 구간에서는 커스텀 오탐이 매우 잘 나므로, 충분히 강한 sim가 아니면 커스텀을 막습니다.
-CUSTOM_SPEECH_BLOCK_SCORE = float(os.getenv("CUSTOM_SOUND_SPEECH_BLOCK_SCORE", "0.28"))
+CUSTOM_SPEECH_BLOCK_SCORE = float(os.getenv("CUSTOM_SOUND_SPEECH_BLOCK_SCORE", "0.38"))
 CUSTOM_SPEECH_ALLOW_STRONG_SIM = float(os.getenv("CUSTOM_SOUND_SPEECH_ALLOW_STRONG_SIM", "0.62"))
 
 # 커스텀 매칭은 소리가 들어올 때만 의미가 있습니다.
 # (마이크가 아주 미세한 소음까지 계속 보내면 임베딩 유사도가 우연히 임계값을 넘을 수 있어 오탐 폭주 가능)
 # rms가 너무 낮으면 커스텀 알림 브로드캐스트/DB저장을 스킵합니다.
-CUSTOM_MIN_RMS = float(os.getenv("CUSTOM_SOUND_MIN_RMS", "0.006"))
+CUSTOM_MIN_RMS = float(os.getenv("CUSTOM_SOUND_MIN_RMS", "0.022"))
 
 # 등록이 2개 이상일 때 1위·2위 유사도 차가 이 미만이면 “배경에서 임의로 한 라벨이 이긴” 것으로 보고 커스텀 알림을 내지 않습니다.
 # (단, 1위가 아래 STRONG 이상이면 차이가 작아도 허용)
-CUSTOM_TOP2_MIN_GAP = float(os.getenv("CUSTOM_SOUND_TOP2_MIN_GAP", "0.02"))
-CUSTOM_STRONG_SIM = float(os.getenv("CUSTOM_SOUND_STRONG_SIM", "0.46"))
+CUSTOM_TOP2_MIN_GAP = float(os.getenv("CUSTOM_SOUND_TOP2_MIN_GAP", "0.08"))
+CUSTOM_STRONG_SIM = float(os.getenv("CUSTOM_SOUND_STRONG_SIM", "0.70"))
 
 # 동일 커스텀 소리는 한 번 울린 뒤 최소 이 간격(초) 동안은 다시 알림하지 않습니다.
 # (일반 cooldown_sec가 5초인데 4초 윈도우가 ~6초마다 들어오면 매번 쿨다운이 풀려 연속 알림이 납니다.)
-CUSTOM_COOLDOWN_SEC = int(os.getenv("CUSTOM_SOUND_COOLDOWN_SEC", "12"))
+CUSTOM_COOLDOWN_SEC = int(os.getenv("CUSTOM_SOUND_COOLDOWN_SEC", "15"))
 
 # 등록 커스텀이 2개 이상일 때 1·2위 유사도가 이 정도로 붙으면 "애매"로 보고 아래 펫 보조/스킵 로직을 탑니다.
 CUSTOM_AMBIGUITY_MARGIN = float(os.getenv("CUSTOM_SOUND_AMBIGUITY_MARGIN", "0.12"))
