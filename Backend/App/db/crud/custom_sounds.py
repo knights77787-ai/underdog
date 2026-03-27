@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import numpy as np
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from App.Core.config import CUSTOM_SOUND_AUDIO_RETENTION_HOURS, DATABASE_PATH
@@ -115,33 +116,50 @@ def create_custom_sound(
     return row
 
 
-def list_custom_sounds(db: Session, client_session_uuid: str) -> list[CustomSound]:
-    """세션별 커스텀 사운드 목록 (최근 등록 순)."""
-    return (
-        db.query(CustomSound)
-        .filter(CustomSound.client_session_uuid == client_session_uuid)
-        .order_by(CustomSound.custom_sound_id.desc())
-        .all()
-    )
+def list_custom_sounds(
+    db: Session,
+    client_session_uuid: str,
+    user_id: int | None = None,
+) -> list[CustomSound]:
+    """커스텀 사운드 목록 조회.
+
+    - guest: client_session_uuid 기준
+    - login user: user_id 기준(과거 동일 세션 등록도 함께 보여주기 위해 OR로 보강)
+    """
+    q = db.query(CustomSound)
+    if user_id is not None:
+        q = q.filter(
+            or_(
+                CustomSound.user_id == user_id,
+                CustomSound.client_session_uuid == client_session_uuid,
+            )
+        )
+    else:
+        q = q.filter(CustomSound.client_session_uuid == client_session_uuid)
+    return q.order_by(CustomSound.custom_sound_id.desc()).all()
 
 
 def delete_custom_sound(
     db: Session,
     client_session_uuid: str,
     custom_sound_id: int,
+    user_id: int | None = None,
 ) -> bool:
     """
     커스텀 사운드 1건 삭제 (DB + 파일). 세션 소유권을 함께 확인.
     Returns: True if deleted, False if not found (wrong session or already deleted).
     """
-    row: CustomSound | None = (
-        db.query(CustomSound)
-        .filter(
-            CustomSound.custom_sound_id == custom_sound_id,
-            CustomSound.client_session_uuid == client_session_uuid,
+    q = db.query(CustomSound).filter(CustomSound.custom_sound_id == custom_sound_id)
+    if user_id is not None:
+        q = q.filter(
+            or_(
+                CustomSound.user_id == user_id,
+                CustomSound.client_session_uuid == client_session_uuid,
+            )
         )
-        .first()
-    )
+    else:
+        q = q.filter(CustomSound.client_session_uuid == client_session_uuid)
+    row: CustomSound | None = q.first()
     if row is None:
         return False
 

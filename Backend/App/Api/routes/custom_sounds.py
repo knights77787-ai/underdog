@@ -20,6 +20,7 @@ from App.db.crud.custom_sounds import (
 )
 from App.db.crud.sessions import get_or_create_by_client_uuid
 from App.db.database import get_db
+from App.db.models import Session as SessionModel
 from App.Services.yamnet_service import YamnetService
 
 from scipy.signal import resample
@@ -34,6 +35,15 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 _yamnet_instance: YamnetService | None = None
 _yamnet_error: str | None = None
+
+
+def _resolve_user_id_from_session(db: Session, session_id: str) -> int | None:
+    row = (
+        db.query(SessionModel)
+        .filter(SessionModel.client_session_uuid == session_id)
+        .first()
+    )
+    return int(row.user_id) if row and row.user_id is not None else None
 
 
 def _get_yamnet() -> YamnetService:
@@ -301,7 +311,8 @@ def get_custom_sound_audio(
     db: Session = Depends(get_db),
 ):
     """커스텀 소리 오디오 파일 스트리밍 (재생용). 보관 기간 만료 시 410."""
-    rows = list_custom_sounds(db, session_id)
+    user_id = _resolve_user_id_from_session(db, session_id)
+    rows = list_custom_sounds(db, session_id, user_id=user_id)
     row = next((r for r in rows if r.custom_sound_id == custom_sound_id), None)
     if not row:
         raise HTTPException(404, "해당 소리를 찾을 수 없거나 권한이 없습니다.")
@@ -333,8 +344,15 @@ def get_custom_sounds(
     session_id: str = Query(...),
     db: Session = Depends(get_db),
 ):
-    expire_stale_custom_sounds_audio_for_session(db, session_id)
-    rows = list_custom_sounds(db, session_id)
+    user_id = _resolve_user_id_from_session(db, session_id)
+    # 로그인 사용자는 해당 계정의 전체 등록음을 보여주므로 만료 정리는 user_id 범위로 수행
+    if user_id is not None:
+        rows_for_expire = list_custom_sounds(db, session_id, user_id=user_id)
+        for r in rows_for_expire:
+            maybe_expire_custom_sound_audio(db, r)
+    else:
+        expire_stale_custom_sounds_audio_for_session(db, session_id)
+    rows = list_custom_sounds(db, session_id, user_id=user_id)
     now = datetime.utcnow()
     out = []
     for r in rows:
@@ -371,7 +389,13 @@ def remove_custom_sound(
     - 세션 ID를 함께 받아 해당 세션이 소유한 항목만 삭제.
     - DB 레코드와 연결된 오디오 파일을 함께 제거.
     """
-    deleted = delete_custom_sound(db, client_session_uuid=session_id, custom_sound_id=custom_sound_id)
+    user_id = _resolve_user_id_from_session(db, session_id)
+    deleted = delete_custom_sound(
+        db,
+        client_session_uuid=session_id,
+        custom_sound_id=custom_sound_id,
+        user_id=user_id,
+    )
     if not deleted:
         raise HTTPException(404, "해당 소리를 찾을 수 없거나 권한이 없습니다.")
     return {"ok": True}
