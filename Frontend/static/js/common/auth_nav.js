@@ -124,9 +124,8 @@
     if (keywordRegEl) {
       keywordRegEl.addEventListener("click", (e) => {
         e.preventDefault();
-        if (typeof window.UnderdogKeywordRegisterModal?.open === "function") {
-          window.UnderdogKeywordRegisterModal.open();
-        }
+        const url = buildUrlWithSession("/keywords-page", { includeProvider: true });
+        window.location.href = url;
       });
     }
     if (settingsEl) {

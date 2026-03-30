@@ -278,6 +278,12 @@ def frontend_new_sound():
     return _send_html("new_sound.html")
 
 
+@app.get("/keywords-page", response_class=FileResponse)
+def frontend_keywords():
+    """사용자 키워드 등록·목록·편집 페이지."""
+    return _send_html("keywords.html")
+
+
 @app.get("/legal/sound-data", response_class=FileResponse)
 def frontend_sound_data_notice():
     """등록 음원 수집·보관 기간 안내(약관성 고지)."""
