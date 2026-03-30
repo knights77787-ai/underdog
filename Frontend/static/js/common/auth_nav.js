@@ -108,6 +108,7 @@
     const apiBase = o.apiBase || "";
     const sessionId = o.sessionId || null;
     const soundRegEl = o.soundRegEl || null;
+    const keywordRegEl = o.keywordRegEl || null;
     const settingsEl = o.settingsEl || null;
     const logoutEl = o.logoutEl || null;
     const onBeforeLogout = typeof o.onBeforeLogout === "function" ? o.onBeforeLogout : null;
@@ -118,6 +119,14 @@
         e.preventDefault();
         const url = buildUrlWithSession("/new-sound", { includeProvider: false });
         window.location.href = url;
+      });
+    }
+    if (keywordRegEl) {
+      keywordRegEl.addEventListener("click", (e) => {
+        e.preventDefault();
+        if (typeof window.UnderdogKeywordRegisterModal?.open === "function") {
+          window.UnderdogKeywordRegisterModal.open();
+        }
       });
     }
     if (settingsEl) {

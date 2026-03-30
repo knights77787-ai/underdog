@@ -174,8 +174,32 @@ def get_keyword_to_type() -> dict[str, Literal["danger", "caution", "alert"]]:
         return {p: e for p, e, _ in _rules_flat}
 
 
+def _merge_rules_with_extra(
+    base: list[tuple[str, Literal["danger", "caution", "alert"], str]],
+    extra: list[tuple[str, Literal["danger", "caution", "alert"], str]],
+) -> list[tuple[str, Literal["danger", "caution", "alert"], str]]:
+    """같은 event_type 안에서는 JSON 기본 규칙을 먼저, 사용자 등록 구문을 뒤에 둔다."""
+    by_et: dict[str, list[tuple[str, Literal["danger", "caution", "alert"], str]]] = {
+        "danger": [],
+        "caution": [],
+        "alert": [],
+    }
+    for p, e, c in base:
+        if e in by_et:
+            by_et[e].append((p, e, c))
+    for p, e, c in extra:
+        if e in by_et:
+            by_et[e].append((p, e, c))
+    out: list[tuple[str, Literal["danger", "caution", "alert"], str]] = []
+    for et in _EVENT_TYPE_ORDER:
+        out.extend(by_et[et])
+    return out
+
+
 def judge(
     text: str,
+    *,
+    extra_rules: list[tuple[str, Literal["danger", "caution", "alert"], str]] | None = None,
 ) -> tuple[str, str, str | None, float]:
     """
     판정 우선순위: Warning(danger) → Caution → Daily(alert) → info.
@@ -187,7 +211,12 @@ def judge(
     text_compact = "".join(text.split())
     text_norm = _normalize_text(text)
     with _RULE_LOCK:
-        rules = list(_rules_flat)
+        base_rules = list(_rules_flat)
+    rules = (
+        _merge_rules_with_extra(base_rules, extra_rules)
+        if extra_rules
+        else base_rules
+    )
     scores = {"danger": 1.0, "caution": 0.85, "alert": 0.7}
     for phrase, etype, canonical in rules:
         if _is_phrase_matched(phrase, text, text_compact, text_norm):

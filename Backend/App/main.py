@@ -49,6 +49,7 @@ from App.Api.routes.feedback import router as feedback_router
 from App.Api.routes.health import router as health_router
 from App.Api.routes.custom_phrase_audio import router as custom_phrase_audio_router
 from App.Api.routes.custom_sounds import router as custom_sounds_router
+from App.Api.routes.user_keywords import router as user_keywords_router
 from App.Api.routes.settings import router as settings_router
 from App.Api.routes.push import router as push_router
 from App.Core.config import ADMIN_TOKEN, DATABASE_PATH, DEV
@@ -232,6 +233,7 @@ app.include_router(ws_router)
 # 커스텀 사운드 / 커스텀 구문 업로드·조회
 app.include_router(custom_sounds_router)
 app.include_router(custom_phrase_audio_router)
+app.include_router(user_keywords_router)
 
 # ---------- 프론트엔드 서빙 (API 라우트보다 나중에 등록) ----------
 # 프로젝트 루트 = Backend의 상위(underdog). Frontend = 루트/Frontend (배포 시 _repo_root_dir 기준)

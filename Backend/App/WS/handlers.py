@@ -72,6 +72,7 @@ def clear_cooldown_for_session(session_id: str) -> None:
         del _last_alert_ts_by_key[k]
     _last_caption_dedupe.pop(session_id, None)
     _settings_cache.pop(session_id, None)
+    _user_kw_cache.pop(session_id, None)
 
 
 def record_alert_ts(session_id: str, keyword: str, event_type: str, ts_ms: int) -> None:
@@ -103,6 +104,33 @@ async def _enqueue_audiocls(
 # 세션별 설정 캐시 (TTL 1초). caption/alert 판정 시 DB 조회 완화
 _settings_cache_ttl_sec = 1  # 테스트 버튼 등 설정 변경 반영을 빠르게 하기 위함
 _settings_cache: dict[str, tuple[dict, float]] = {}  # client_session_uuid -> (settings, cached_at)
+
+# 사용자 등록 STT 키워드: 짧은 TTL + 등록 API에서 무효화
+_user_kw_cache: dict[str, tuple[list[tuple[str, str, str]], float]] = {}
+_USER_KW_TTL_SEC = 5.0
+
+
+def invalidate_user_keyword_cache(client_session_uuid: str) -> None:
+    _user_kw_cache.pop(client_session_uuid, None)
+
+
+def _get_user_keyword_rules(client_session_uuid: str) -> list[tuple[str, str, str]]:
+    now = time.monotonic()
+    entry = _user_kw_cache.get(client_session_uuid)
+    if entry is not None:
+        rules, cached_at = entry
+        if now - cached_at < _USER_KW_TTL_SEC:
+            return rules
+    from App.db.crud import user_custom_keywords as crud_uw
+    from App.db.database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        rules = crud_uw.list_rules_for_session(db, client_session_uuid)
+        _user_kw_cache[client_session_uuid] = (rules, now)
+        return rules
+    finally:
+        db.close()
 
 
 def _get_settings(client_session_uuid: str) -> dict:
@@ -211,8 +239,12 @@ async def _handle_caption_generated(
     # 1) 설정 조회
     settings = await asyncio.to_thread(_get_settings, sid)
 
-    # 2) 키워드 판정
-    category, event_type, keyword, score = keyword_detector.judge(text)
+    # 2) 키워드 판정 (기본 JSON 규칙 + 사용자 등록 키워드)
+    extra_kw = await asyncio.to_thread(_get_user_keyword_rules, sid)
+    category, event_type, keyword, score = keyword_detector.judge(
+        text,
+        extra_rules=extra_kw if extra_kw else None,
+    )
     keyword_matched = bool(keyword) and event_type in ("danger", "caution", "alert")
     caption_all_enabled = bool(settings.get("caption_all", False))
     logger.info(

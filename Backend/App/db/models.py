@@ -67,6 +67,19 @@ class CustomSound(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class UserCustomKeyword(Base):
+    """사용자가 등록한 STT 키워드(문구). 실시간 자막·알림 판정 시 기본 키워드와 병합."""
+
+    __tablename__ = "user_custom_keywords"
+
+    user_custom_keyword_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.user_id"), nullable=True, index=True)
+    client_session_uuid: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    phrase: Mapped[str] = mapped_column(String(255), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(16), nullable=False)  # danger | caution | alert
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class CustomPhraseAudio(Base):
     __tablename__ = "custom_phrase_audio"
 

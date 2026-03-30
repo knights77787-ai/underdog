@@ -140,12 +140,14 @@ async function loadUserInfo() {
 // 사용자 드롭다운: 소리등록, 설정, 로그아웃
 function setupUserDropdown() {
   const userDropdownSoundReg = document.getElementById("userDropdownSoundReg");
+  const userDropdownKeywordReg = document.getElementById("userDropdownKeywordReg");
   const userDropdownSettings = document.getElementById("userDropdownSettings");
   const userDropdownLogout = document.getElementById("userDropdownLogout");
   window.UnderdogAuthNav?.bindUserDropdown?.({
     apiBase: API_BASE,
     sessionId: SESSION_ID,
     soundRegEl: userDropdownSoundReg,
+    keywordRegEl: userDropdownKeywordReg,
     settingsEl: userDropdownSettings,
     logoutEl: userDropdownLogout,
   });

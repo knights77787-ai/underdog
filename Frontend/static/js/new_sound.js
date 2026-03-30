@@ -79,6 +79,7 @@ const btnUserIcon = document.getElementById("btnUserIcon");
 const userDropdownName = document.getElementById("userDropdownName");
 const userDropdownEmail = document.getElementById("userDropdownEmail");
 const userDropdownSoundReg = document.getElementById("userDropdownSoundReg");
+const userDropdownKeywordReg = document.getElementById("userDropdownKeywordReg");
 const userDropdownSettings = document.getElementById("userDropdownSettings");
 const userDropdownLogout = document.getElementById("userDropdownLogout");
 
@@ -909,6 +910,7 @@ function setupUserDropdown() {
     apiBase: API_BASE,
     sessionId: SESSION_ID,
     soundRegEl: userDropdownSoundReg,
+    keywordRegEl: userDropdownKeywordReg,
     settingsEl: userDropdownSettings,
     logoutEl: userDropdownLogout,
   });
